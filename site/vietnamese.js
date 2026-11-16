@@ -1,4 +1,5 @@
 import svgpath from 'svgpath';
+import { glyphBounds } from './glyph-review.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
@@ -27,17 +28,17 @@ export function composeVietnamese(glyphs) {
     const [base, ...marks] = char.normalize('NFD');
     const original = glyphs.get(base);
     if (!original || (base === 'i' && !marks.includes('\u0323'))) continue;
-    const lower = base === base.toLowerCase();
-    const bodyTop = lower ? (base === 'i' ? 660 : 480) : 700;
+    const bounds = glyphBounds(original);
+    const bodyTop = bounds.y + bounds.height;
     let top = bodyTop + 28;
     let advance = original.advance;
     const paths = [original.d];
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
-      let x = original.advance / 2;
+      let x = bounds.x + bounds.width / 2;
       let y = top;
-      if (mark === '\u0323') y = -84;
+      if (mark === '\u0323') y = bounds.y - 69;
       else if (mark === '\u031b') {
-        x = original.advance - 47;
+        x = bounds.x + bounds.width;
         y = bodyTop - 72;
         advance += 60;
       } else top += 123;

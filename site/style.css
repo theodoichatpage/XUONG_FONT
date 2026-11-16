@@ -26,10 +26,10 @@ button:disabled,.download[aria-disabled=true]{opacity:.48;cursor:default}
 .primary:hover:not(:disabled):not([aria-disabled=true]){color:white;background:var(--red-dark)}
 .quiet{border-color:transparent;color:var(--red)}
 label{display:block;font-weight:600;font-size:13px}
-input:not([type=range]):not([type=checkbox]):not([type=file]),select{display:block;width:100%;margin-top:5px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#fffcf6;color:var(--ink)}
+input:not([type=range]):not([type=checkbox]):not([type=file]),textarea,select{display:block;width:100%;margin-top:5px;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#fffcf6;color:var(--ink)}
 input[type=range]{display:block;width:100%;accent-color:var(--red)}
 input[type=checkbox]{accent-color:var(--red)}
-input:focus-visible,button:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible,.upload:focus-visible,.upload:has(+ input:focus-visible){outline:2px solid var(--red);outline-offset:3px}
+input:focus-visible,textarea:focus-visible,button:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible,.upload:focus-visible,.upload:has(+ input:focus-visible){outline:2px solid var(--red);outline-offset:3px}
 .upload{min-height:112px;display:grid;justify-items:center;align-content:center;gap:4px;text-align:center;border:1px dashed #ae9384;border-radius:9px;background:#f9f0e8;color:var(--red);cursor:pointer;padding:10px}
 .upload.over,.upload:hover{background:var(--accent)}
 .upload-icon{font-size:22px;line-height:1}

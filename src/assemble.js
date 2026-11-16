@@ -15,13 +15,13 @@ const escAttr = (s) => s.replace(/[&<>"']/g, (c) => `&#x${c.codePointAt(0).toStr
  * @param {{wordSpace?:number}} opts
  * @returns {Buffer} TTF
  */
-function buildTTF(name, glyphs, { wordSpace = 300 } = {}) {
+function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT } = {}) {
   const id = name.replace(/[^A-Za-z0-9_-]+/g, '') || 'DrawYourFont';
   const parts = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg"><defs>`,
     `<font id="${id}" horiz-adv-x="${wordSpace}">`,
-    `<font-face font-family="${escAttr(name)}" units-per-em="${UPM}" ascent="${ASCENT}" descent="${DESCENT}" x-height="${XH}" cap-height="${CAP}"/>`,
+    `<font-face font-family="${escAttr(name)}" units-per-em="${UPM}" ascent="${ascent}" descent="${descent}" x-height="${XH}" cap-height="${CAP}"/>`,
     `<missing-glyph horiz-adv-x="${Math.round(UPM / 2)}"/>`,
     `<glyph glyph-name="space" unicode="${esc(' ')}" horiz-adv-x="${wordSpace}" d=""/>`,
   ];

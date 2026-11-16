@@ -1,4 +1,7 @@
+import svgpath from 'svgpath';
 import { MAX_SIDE, makeGlyph } from './engine.js';
+
+const { band } = require('../src/metrics');
 
 export async function referenceCanvas(file, crop) {
   const image = await createImageBitmap(file);
@@ -220,4 +223,49 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
   return { ...glyph, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
+}
+
+function median(values) {
+  const sorted = values.sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// Every letter from the same image uses the same conversion from pixels to font units.
+export function alignReferenceGlyphs(words) {
+  const glyphs = words.flat();
+  const capitals = glyphs.filter(({ char }) => /^[A-ZĐ0-9]$/u.test(char));
+  const anchors = capitals.length ? capitals : glyphs.filter(({ char }) => /^[acenosuvwxz]$/u.test(char));
+  const scale = median((anchors.length ? anchors : glyphs).map(glyph => {
+    const [bottom, top] = band(glyph.char);
+    return (top - bottom) / glyph.pixelCrop.h;
+  }));
+  const gaps = [];
+  for (const word of words) {
+    for (let i = 1; i < word.length; i++) {
+      const left = word[i - 1].pixelCrop, right = word[i].pixelCrop;
+      const gap = (right.x - left.x - left.w) * scale;
+      if (gap > 0) gaps.push(gap);
+    }
+  }
+  const side = Math.round(Math.max(18, Math.min(55, (median(gaps) || 80) / 2)));
+  return words.map(word => {
+    const upright = word.filter(({ char }) => /^[A-ZĐ0-9bdfhkltđ]$/u.test(char));
+    const stable = upright.length ? upright : word.filter(({ char }) => {
+      const [base, ...marks] = char.normalize('NFD');
+      return /^\p{L}$/u.test(base) && !/[gjpqy]/u.test(base) && !marks.includes('\u0323');
+    });
+    const baseline = median(stable.map(({ pixelCrop }) => pixelCrop.y + pixelCrop.h));
+    return word.map(glyph => {
+      const crop = glyph.pixelCrop;
+      const [bottom, top] = band(glyph.char);
+      const ratio = scale * crop.h / (top - bottom);
+      const alignedTop = Number.isFinite(baseline) ? (baseline - crop.y) * scale : bottom + scale * crop.h;
+      return {
+        ...glyph,
+        d: svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(side, alignedTop).round(1).toString(),
+        advance: Math.round(crop.w * scale + 2 * side)
+      };
+    });
+  }).flat();
 }

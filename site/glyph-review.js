@@ -1,5 +1,6 @@
 const size = 320;
 const inset = 18;
+const boundsCache = new WeakMap();
 const ns = 'http://www.w3.org/2000/svg';
 
 function canvas() {
@@ -8,7 +9,7 @@ function canvas() {
   return result;
 }
 
-function outlineBounds(path) {
+export function outlineBounds(path) {
   const svg = document.createElementNS(ns, 'svg');
   svg.style.position = 'fixed';
   svg.style.visibility = 'hidden';
@@ -20,9 +21,14 @@ function outlineBounds(path) {
   finally { svg.remove(); }
 }
 
+export function glyphBounds(glyph) {
+  if (!boundsCache.has(glyph)) boundsCache.set(glyph, outlineBounds(glyph.d));
+  return boundsCache.get(glyph);
+}
+
 export function prepareGlyphReview(image, box, glyph) {
   const reference = canvas(), rendered = canvas(), overlay = canvas();
-  const rect = outlineBounds(glyph.d);
+  const rect = glyphBounds(glyph);
   if (!rect.width || !rect.height || !box.w || !box.h) throw new Error('Vùng khoanh hoặc nét ký tự trống.');
 
   const refRatio = box.w / box.h;

@@ -126,9 +126,11 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
   function sample(x, y) {
     const center = pixel(x, y);
     if (!coverage || x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) return center;
-    // Reduce one-pixel edge steps without shifting the outside bounds.
-    return (center * 8 + pixel(x - 1, y) + pixel(x + 1, y)
-      + pixel(x, y - 1) + pixel(x, y + 1)) / 12;
+    // Filter the antialiasing ramp before fitting curves, keeping thin features.
+    const cross = pixel(x - 1, y) + pixel(x + 1, y) + pixel(x, y - 1) + pixel(x, y + 1);
+    const corners = pixel(x - 1, y - 1) + pixel(x + 1, y - 1)
+      + pixel(x - 1, y + 1) + pixel(x + 1, y + 1);
+    return (center * 8 + cross * 2 + corners) / 20;
   }
   for (let y = 0; y < h * scale; y++) {
     const sy = (y + .5) / scale - .5, top = Math.floor(sy), dy = sy - top;
@@ -147,14 +149,14 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
 
 // ---------- trace + build ----------
 
-async function traceCrop(img, scale) {
+async function traceCrop(img, scale, photograph) {
   traceReady ??= initPotrace();
   await traceReady;
   const svg = await potrace(img, {
     turdsize: 0,
-    alphamax: 0.86,
+    alphamax: photograph ? 1.02 : 0.86,
     opticurve: 1,
-    opttolerance: 0.38 * scale,
+    opttolerance: (photograph ? 0.65 : 0.38) * scale,
     extractcolors: false,
   });
   const outline = [...svg.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].map(match => match[1]).join(' ');
@@ -168,13 +170,13 @@ export async function makeGlyph(ink, width, box, char, coverage) {
   const size = Math.max(box.x1 - box.x0 + 1, box.y1 - box.y0 + 1);
   const scale = Math.max(1, Math.min(3, Math.floor(900 / size)));
   const crop = cropToImageData(ink, width, box, coverage, scale);
-  const d = await traceCrop(crop, scale);
+  const d = await traceCrop(crop, scale, Boolean(coverage));
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
   return { char, ...placeGlyph(d, crop, PAD * scale, char), source: 'Ảnh mẫu' };
 }
 
-export function exportFont(name, glyphs, spacing) {
-  return buildTTF(name, glyphs.map(g => ({ ...g, advance: Math.max(1, g.advance + spacing) })));
+export function exportFont(name, glyphs, spacing, metrics) {
+  return buildTTF(name, glyphs.map(g => ({ ...g, advance: Math.max(1, g.advance + spacing) })), metrics);
 }
 
 export { MAX_SIDE };

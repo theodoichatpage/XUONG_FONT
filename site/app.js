@@ -1,10 +1,12 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO } from './reference-image.js';
+import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { inventoryInstruction, designInstruction } from '../src/gemini-font-prompts.mjs';
-import { prepareGlyphReview } from './glyph-review.js';
+import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
+
+const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
 const $ = id => document.getElementById(id);
 $('inventory-instruction').textContent = inventoryInstruction;
@@ -769,11 +771,18 @@ function scheduleFont() {
       if (fontFace) document.fonts.delete(fontFace);
       fontFace = undefined;
       $('preview').style.removeProperty('font-family');
+      $('preview').style.removeProperty('line-height');
       return;
     }
     try {
       const name = $('name').value.trim() || 'Xuong Font';
-      const ttf = exportFont(name, active, Number($('spacing').value));
+      let ascent = ASCENT, descent = DESCENT;
+      for (const glyph of active) {
+        const { y, height } = glyphBounds(glyph);
+        ascent = Math.max(ascent, Math.ceil(y + height + 24));
+        descent = Math.min(descent, Math.floor(y - 24));
+      }
+      const ttf = exportFont(name, active, Number($('spacing').value), { ascent, descent });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;
@@ -781,6 +790,7 @@ function scheduleFont() {
       fontFace = face;
       document.fonts.add(face);
       $('preview').style.fontFamily = face.family + ', Georgia, serif';
+      $('preview').style.lineHeight = String((ascent - descent) / UPM);
       downloadURL = URL.createObjectURL(new Blob([ttf], { type: 'font/ttf' }));
       download.href = downloadURL;
       download.download = (name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
@@ -894,6 +904,7 @@ async function runFontJob(infer) {
         model = result.model ?? model;
         const words = result.words.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
         const neighbors = words.map(word => word.area);
+        const imageGlyphs = [];
         for (const { text, area: original } of words) {
           const chars = [...text.normalize('NFC').replace(/\s/g, '')];
           for (const char of chars) if (charset.includes(char)) observed.add(char);
@@ -916,20 +927,27 @@ async function runFontJob(infer) {
             if (inkCrossesBox(mask, area)) continue;
             parts = split();
           }
+          const wordGlyphs = [];
           for (const [offset, part] of parts.entries()) {
             controller.signal.throwIfAborted();
             const char = chars[offset];
-            const pixels = (part.x1 - part.x0) * (part.y1 - part.y0);
-            if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
             try {
               const glyph = await traceSymbol(mask, part, char, area);
               glyph.reference = { index, crop: glyph.pixelCrop };
-              traced.set(char, { glyph, pixels });
+              wordGlyphs.push(glyph);
             } catch { /* Keep the letter listed as observed even if tracing fails. */ }
           }
+          if (wordGlyphs.length) imageGlyphs.push(wordGlyphs);
         }
         controller.signal.throwIfAborted();
-        for (const [char, { glyph }] of traced) glyphs.set(char, glyph);
+        for (const glyph of alignReferenceGlyphs(imageGlyphs)) {
+          const { char, pixelCrop } = glyph;
+          const pixels = pixelCrop.w * pixelCrop.h;
+          if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
+          traced.set(char, { glyph, pixels });
+          glyphs.set(char, glyph);
+        }
+        updateComposed();
         accepted = traced.size;
         refresh();
       }
