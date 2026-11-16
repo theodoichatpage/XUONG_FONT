@@ -208,6 +208,44 @@ function addFiles(files) {
   showReference(firstNew);
 }
 
+const viewer = $('image-viewer');
+const viewerImage = $('viewer-image');
+let zoom = 1;
+let zoomWidth = 0;
+
+function setZoom(value) {
+  zoom = Math.max(0.25, Math.min(12, value));
+  viewerImage.style.width = Math.round(zoomWidth * zoom) + 'px';
+  $('zoom-value').textContent = Math.round(zoom * 100) + '%';
+  $('zoom-in').disabled = zoom >= 12;
+  $('zoom-out').disabled = zoom <= 0.25;
+}
+
+function openViewer(url, width, height, title) {
+  if (viewer.open) return;
+  zoomWidth = width;
+  viewerImage.src = url;
+  $('viewer-title').textContent = title;
+  viewer.showModal();
+  const viewport = $('viewer-scroll');
+  setZoom(Math.max(1, Math.min(4, (viewport.clientWidth - 24) / width, (window.innerHeight * 0.66) / height)));
+  viewport.scrollTop = 0;
+  viewport.scrollLeft = 0;
+}
+
+function zoomSource() {
+  if (!source) return;
+  const original = document.createElement('canvas');
+  original.width = source.width;
+  original.height = source.height;
+  original.getContext('2d').putImageData(source, 0, 0);
+  openViewer(original.toDataURL(), source.width, source.height, 'Ảnh mẫu');
+}
+
+$('zoom-source').addEventListener('click', zoomSource);
+$('zoom-in').addEventListener('click', () => setZoom(zoom * 1.3));
+$('zoom-out').addEventListener('click', () => setZoom(zoom / 1.3));
+
 function point(event) {
   const bounds = canvas.getBoundingClientRect();
   return {
@@ -219,17 +257,29 @@ function point(event) {
 canvas.addEventListener('pointerdown', event => {
   if (busy || loading || event.button !== 0) return;
   canvas.setPointerCapture(event.pointerId);
-  dragStart = point(event);
+  dragStart = { ...point(event), clientX: event.clientX, clientY: event.clientY, moved: false };
 });
 canvas.addEventListener('pointermove', event => {
   if (!dragStart || busy) return;
   const p = point(event);
+  if (Math.hypot(event.clientX - dragStart.clientX, event.clientY - dragStart.clientY) >= 4) dragStart.moved = true;
+  if (!dragStart.moved) return;
   const w = Math.abs(p.x - dragStart.x), h = Math.abs(p.y - dragStart.y);
   if (w < 4 || h < 4) return;
   crop = { x: Math.min(p.x, dragStart.x), y: Math.min(p.y, dragStart.y), w, h };
   renderSource();
 });
-for (const event of ['pointerup', 'pointercancel']) canvas.addEventListener(event, () => { if (dragStart) persistReferences(); dragStart = undefined; });
+canvas.addEventListener('pointerup', () => {
+  if (!dragStart) return;
+  const { moved } = dragStart;
+  dragStart = undefined;
+  if (moved) persistReferences();
+  else zoomSource();
+});
+canvas.addEventListener('pointercancel', () => {
+  if (dragStart?.moved) persistReferences();
+  dragStart = undefined;
+});
 
 function inkBounds(ink, width) {
   const height = ink.length / width;
@@ -444,7 +494,15 @@ function addReviewGroup(index, settings, rows) {
     preview.src = thumbnail;
     input.addEventListener('input', () => persistReferences());
     include.addEventListener('change', () => persistReferences());
-    row.append(include, preview, input, score);
+    const enlarge = document.createElement('button');
+    enlarge.type = 'button';
+    enlarge.className = 'ocr-thumbnail';
+    enlarge.setAttribute('aria-label', 'Phóng to ảnh của từ ' + word.text);
+    enlarge.addEventListener('click', () => {
+      if (preview.naturalWidth) openViewer(preview.src, preview.naturalWidth, preview.naturalHeight, 'Ảnh chữ · ' + input.value);
+    });
+    enlarge.append(preview);
+    row.append(include, enlarge, input, score);
     group.append(row);
     const item = { index, word, thumbnail, input, include, settings };
     reviewed.rows.push(item);

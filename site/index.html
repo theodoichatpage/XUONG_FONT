@@ -35,7 +35,7 @@
       </div>
       <div id="stage" hidden>
         <canvas id="image" aria-label="Ảnh mẫu. Kéo trên ảnh để khoanh vùng chữ."></canvas>
-        <div class="inline"><small>Kéo trên ảnh để khoanh dòng hoặc một chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
+        <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><div><button id="zoom-source" class="quiet" type="button">Phóng to</button><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div></div>
       </div>
       <div class="field-row">
         <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
@@ -79,5 +79,17 @@
     <p id="missing" class="help" aria-live="polite"></p>
   </section>
 </main>
+<dialog id="image-viewer" aria-labelledby="viewer-title">
+  <div class="viewer-toolbar">
+    <h2 id="viewer-title">Ảnh mẫu</h2>
+    <div class="viewer-actions">
+      <button id="zoom-out" type="button" aria-label="Thu nhỏ">−</button>
+      <output id="zoom-value" aria-live="polite"></output>
+      <button id="zoom-in" type="button" aria-label="Phóng to thêm">+</button>
+      <form method="dialog"><button type="submit" autofocus>Đóng</button></form>
+    </div>
+  </div>
+  <div id="viewer-scroll"><img id="viewer-image" alt="Ảnh mẫu phóng to"></div>
+</dialog>
 </body>
 </html>
