@@ -277,7 +277,8 @@ function lowercaseBodyTop(ink, width, bounds, char) {
   const [base] = char.normalize('NFD');
   const withShoulder = LOWERCASE.ascenders.includes(base) && !/[flđ]/u.test(base);
   const tracked = LOWERCASE.body + LOWERCASE.descenders + LOWERCASE.dotted;
-  if (!withShoulder && !tracked.includes(base)) return undefined;
+  const withCrossbar = LOWERCASE.crossbar.includes(base);
+  if (!withShoulder && !withCrossbar && !tracked.includes(base)) return undefined;
   const rows = [];
   for (let y = bounds.y0; y <= bounds.y1; y++) {
     let left = width, right = -1;
@@ -295,6 +296,12 @@ function lowercaseBodyTop(ink, width, bounds, char) {
     start = i + 1;
   }
   if (bestLength < rows.length * .5) return undefined;
+  if (withCrossbar) {
+    const stem = median(rows.slice(Math.floor(rows.length * .36), Math.ceil(rows.length * .66)));
+    const bar = rows.findIndex((span, i) => i >= rows.length * .08 && i < rows.length * .36
+      && span >= stem * 1.32 && rows[i + 1] >= stem * 1.19);
+    return bar < 0 ? undefined : bounds.y0 + bar;
+  }
   if (withShoulder) {
     // The upper stem is narrow until the shoulder starts on the right.
     const stem = median(rows.slice(bestStart + Math.floor(bestLength * .08), bestStart + Math.ceil(bestLength * .15)));
@@ -304,6 +311,21 @@ function lowercaseBodyTop(ink, width, bounds, char) {
     return shoulder < 0 ? undefined : bounds.y0 + shoulder;
   }
   return bounds.y0 + bestStart;
+}
+
+// Insets at the middle of the glyph ignore overhanging accents and tails.
+function opticalInsets(ink, width, bounds) {
+  const height = bounds.y1 - bounds.y0 + 1;
+  const left = [], right = [];
+  for (let y = bounds.y0 + Math.floor(height * .32); y <= bounds.y0 + Math.floor(height * .67); y++) {
+    let x0 = bounds.x0, x1 = bounds.x1;
+    while (x0 <= x1 && !ink[y * width + x0]) x0++;
+    if (x0 > x1) continue;
+    while (!ink[y * width + x1]) x1--;
+    left.push(x0 - bounds.x0);
+    right.push(bounds.x1 - x1);
+  }
+  return [median(left) || 0, median(right) || 0];
 }
 
 export async function traceSymbol(mask, bbox, char, wordBox) {
@@ -342,7 +364,8 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
   const bodyTop = mask.preserveOutline ? lowercaseBodyTop(symbolInk, w, bounds, char) : undefined;
   return { ...glyph, preserveOutline: mask.preserveOutline,
-    referenceBodyTop: Number.isFinite(bodyTop) ? y + bodyTop : undefined, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
+    referenceBodyTop: Number.isFinite(bodyTop) ? y + bodyTop : undefined,
+    referenceInsets: mask.preserveOutline ? opticalInsets(symbolInk, w, bounds) : undefined, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
 }
 
@@ -375,18 +398,23 @@ export function alignReferenceGlyphs(words) {
   const gaps = [], wordGaps = [];
   const bearings = new Map();
   const measuredGap = (left, right) => (right.x - left.x - left.w) * scale;
+  const opticalGaps = [];
   function addBearing(char, edge, gap) {
     if (!bearings.has(char)) bearings.set(char, { left: [], right: [] });
-    bearings.get(char)[edge].push(Math.max(-36, Math.min(52, gap / 2)));
+    bearings.get(char)[edge].push(gap);
   }
   for (const [index, word] of words.entries()) {
     for (let i = 1; i < word.length; i++) {
       const left = word[i - 1], right = word[i];
       const gap = measuredGap(left.pixelCrop, right.pixelCrop);
       if (gap > 0) gaps.push(gap);
-      if (clean) {
-        addBearing(left.char, 'right', gap);
-        addBearing(right.char, 'left', gap);
+      if (clean && left.referenceInsets && right.referenceInsets) {
+        const optical = gap + (left.referenceInsets[1] + right.referenceInsets[0]) * scale;
+        if (optical >= 0 && optical <= 145) {
+          opticalGaps.push(optical);
+          addBearing(left.char, 'right', optical);
+          addBearing(right.char, 'left', optical);
+        }
       }
     }
     const last = word.at(-1)?.pixelCrop, next = words[index + 1]?.[0]?.pixelCrop;
@@ -396,7 +424,8 @@ export function alignReferenceGlyphs(words) {
     }
   }
   const side = Math.round(Math.max(clean ? 5 : 18, Math.min(55, (median(gaps) || 70) / 2)));
-  const referenceWordSpace = clean ? Math.round(Math.max(55, median(wordGaps) - 2 * side || 115)) : undefined;
+  const opticalGap = Math.max(30, Math.min(56, median(opticalGaps) || 42));
+  const referenceWordSpace = clean ? Math.round(Math.max(85, Math.min(145, median(wordGaps) - 2 * side || 115))) : undefined;
   return unifyReferenceA(words.map(word => {
     const upright = word.filter(({ char }) => /^[A-ZĐ0-9bdfhkltđ]$/u.test(char));
     const stable = upright.length ? upright : word.filter(({ char }) => {
@@ -410,18 +439,28 @@ export function alignReferenceGlyphs(words) {
       const ratio = scale * crop.h / (top - bottom);
       const alignedTop = Number.isFinite(baseline) ? (baseline - crop.y) * scale : bottom + scale * crop.h;
       const measured = bearings.get(glyph.char);
-      const left = measured?.left.length ? median(measured.left) : side;
-      const right = measured?.right.length ? median(measured.right) : side;
+      function bearing(edge, inset) {
+        if (!clean || !glyph.referenceInsets) return side;
+        const local = measured?.[edge]?.length ? median(measured[edge]) : opticalGap;
+        const gap = opticalGap + Math.max(-12, Math.min(12, (local - opticalGap) * .30));
+        return Math.max(-24, gap / 2 - inset * scale);
+      }
+      const left = bearing('left', glyph.referenceInsets?.[0]);
+      const right = bearing('right', glyph.referenceInsets?.[1]);
       const outline = svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(left, alignedTop).abs().unshort();
       const bodyHeight = alignedTop - (glyph.referenceBodyTop - crop.y) * scale;
       const targetHeight = XH;
-      if (clean && bodyHeight >= .80 * targetHeight && bodyHeight <= 1.20 * targetHeight) {
+      const crossbar = LOWERCASE.crossbar.includes(glyph.char);
+      if (clean && bodyHeight >= .75 * targetHeight && bodyHeight <= 1.20 * targetHeight) {
         outline.iterate(segment => {
           if (!'MLCQ'.includes(segment[0])) return;
           for (let i = 2; i < segment.length; i += 2) {
             const point = segment[i];
-            if (point > 0) segment[i] = point < bodyHeight
-              ? point * targetHeight / bodyHeight : point + targetHeight - bodyHeight;
+            if (point <= 0) continue;
+            if (point < bodyHeight) segment[i] = point * targetHeight / bodyHeight;
+            else if (crossbar && alignedTop > bodyHeight) {
+              segment[i] = targetHeight + (point - bodyHeight) * (top - targetHeight) / (alignedTop - bodyHeight);
+            } else segment[i] = point + targetHeight - bodyHeight;
           }
         });
       }
