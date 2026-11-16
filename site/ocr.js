@@ -71,6 +71,38 @@ export async function detectWords(worker, canvas) {
     .filter(word => word.text.trim() && word.symbols.length);
 }
 
+export async function transcribeWordImages(rows, key) {
+  const width = 640, rowHeight = 80;
+  const sheet = document.createElement('canvas');
+  sheet.width = width;
+  sheet.height = rowHeight * rows.length;
+  const ctx = sheet.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, sheet.width, sheet.height);
+  ctx.font = 'bold 21px sans-serif';
+  ctx.textBaseline = 'middle';
+  for (const [index, row] of rows.entries()) {
+    const y = index * rowHeight;
+    ctx.fillStyle = '#202020';
+    ctx.fillText(String(index + 1), 12, y + rowHeight / 2);
+    ctx.strokeStyle = '#ddd';
+    ctx.strokeRect(0, y, width, rowHeight);
+    const image = row.thumbnail;
+    const scale = Math.min((rowHeight - 10) / image.height, (width - 66) / image.width);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(image, 55, y + (rowHeight - image.height * scale) / 2, image.width * scale, image.height * scale);
+  }
+  const response = await fetch('/api/glyph-review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
+    body: JSON.stringify({ mode: 'transcribe', count: rows.length, sheet: sheet.toDataURL('image/png').split(',')[1] }),
+    signal: AbortSignal.timeout(40000)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error ?? 'Gemini chưa đọc được ảnh.');
+  return new Map(data.rows.map(row => [row.id, row]));
+}
+
 function luminance(data, p) {
   return (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
 }

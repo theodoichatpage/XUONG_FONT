@@ -71,7 +71,7 @@ details .glyph-grid{margin-top:10px}
 .reference-controls{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;margin-top:5px}
 .reference-controls select{min-width:0;margin-top:0}
 #reference-count{margin-left:6px;color:var(--muted);font-weight:400}
-.scan-button{margin-top:8px;color:var(--red)}
+.scan-actions{margin-top:8px;margin-bottom:4px}
 .ocr-review{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
 .ocr-review h3{margin:0 0 4px;font:500 22px var(--display)}
 #ocr-results{max-height:440px;overflow:auto;margin:10px 0;padding:0 4px}

@@ -1,6 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol } from './ocr.js';
+import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol, transcribeWordImages } from './ocr.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { prepareGlyphReview } from './glyph-review.js';
 
@@ -38,7 +38,8 @@ function persistReferences(withImages = false) {
     review: reviewGroups.map(group => ({
       index: group.index, settings: group.settings,
       rows: group.rows.map(row => ({
-        word: row.word, thumbnail: row.thumbnail, text: row.input.value, checked: row.include.checked
+        word: row.word, thumbnail: row.thumbnail, text: row.input.value, checked: row.include.checked,
+        ai: row.ai, done: row.done
       }))
     }))
   };
@@ -148,7 +149,7 @@ function renderReferences() {
   $('reference-count').textContent = activeReference >= 0
     ? `${activeReference + 1}/${references.length}` : `${references.length} ảnh`;
   select.disabled = busy || loading;
-  $('scan').disabled = busy || loading || !references.length;
+  $('scan').disabled = $('ai-scan').disabled = busy || loading || !references.length;
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
 }
@@ -649,9 +650,10 @@ function setScanBusy(value) {
 function addReviewGroup(index, settings, rows) {
   const entry = references[index];
   if (!entry) return;
-  const reviewed = { index, settings, rows: [] };
+  const reviewed = { index, settings, rows: [], element: null };
   reviewGroups.push(reviewed);
   const group = document.createElement('fieldset');
+  reviewed.element = group;
   const title = document.createElement('legend');
   title.textContent = `Ảnh ${index + 1} · ${entry.file.name}`;
   group.append(title);
@@ -661,7 +663,7 @@ function addReviewGroup(index, settings, rows) {
     empty.textContent = 'Chưa đọc được chữ. Bạn có thể khoanh sát chữ hơn hoặc lấy nét thủ công.';
     group.append(empty);
   }
-  for (const { word, thumbnail, text, checked } of rows) {
+  for (const { word, thumbnail, text, checked, ai, done } of rows) {
     const row = document.createElement('div');
     row.className = 'ocr-word';
     const include = document.createElement('input');
@@ -673,11 +675,16 @@ function addReviewGroup(index, settings, rows) {
     input.setAttribute('aria-label', 'Sửa từ ' + word.text);
     input.spellcheck = false;
     const score = document.createElement('small');
-    score.textContent = 'Độ tin cậy ' + Math.round(word.confidence) + '%';
+    score.textContent = ai ? (ai.clear ? 'Gemini đọc rõ' : 'Cần bạn điền hoặc xác nhận chữ') : 'OCR ' + Math.round(word.confidence) + '%';
     const preview = document.createElement('img');
     preview.alt = '';
     preview.src = thumbnail;
-    input.addEventListener('input', () => persistReferences());
+    input.addEventListener('input', () => {
+      item.done = false;
+      if (ai) include.checked = !!input.value.trim();
+      refreshReviewVisibility();
+      persistReferences();
+    });
     include.addEventListener('change', () => persistReferences());
     const enlarge = document.createElement('button');
     enlarge.type = 'button';
@@ -689,25 +696,45 @@ function addReviewGroup(index, settings, rows) {
     enlarge.append(preview);
     row.append(include, enlarge, input, score);
     group.append(row);
-    const item = { index, word, thumbnail, input, include, settings };
+    const item = { index, word, thumbnail, input, include, settings, ai, done: done ?? false, element: row };
     reviewed.rows.push(item);
     reviewedWords.push(item);
   }
   $('ocr-results').append(group);
 }
 
-async function scanReferences() {
+function refreshReviewVisibility() {
+  const showAll = $('show-processed').checked;
+  $('show-processed-row').hidden = !reviewedWords.some(entry => entry.done);
+  for (const group of reviewGroups) {
+    for (const entry of group.rows) entry.element.hidden = entry.done && !showAll;
+    group.element.hidden = !!group.rows.length && group.rows.every(entry => entry.element.hidden);
+  }
+  $('apply-scan').disabled = busy || !reviewedWords.some(entry => !entry.done);
+}
+
+$('show-processed').addEventListener('change', refreshReviewVisibility);
+
+async function scanReferences(useAI = false) {
   if (busy || loading || !references.length) return;
+  const key = useAI ? geminiKey.value.trim() : '';
+  if (useAI && !key) {
+    connectionStatus.textContent = 'Dán khóa Gemini API để AI đọc ảnh.';
+    geminiKey.focus();
+    return;
+  }
   rememberReference();
   reviewedWords = [];
   reviewGroups = [];
   $('ocr-results').replaceChildren();
   $('ocr-status').textContent = '';
   $('ocr-review').hidden = true;
+  $('show-processed').checked = false;
   setScanBusy(true);
   status('Đang tải bộ nhận diện tiếng Việt…');
   let worker;
   let failures = 0;
+  let aiError;
   try {
     worker = await createOcrWorker();
     for (const [index, entry] of references.entries()) {
@@ -715,10 +742,29 @@ async function scanReferences() {
       try {
         const image = await referenceCanvas(entry.file, entry.settings?.crop);
         const words = await detectWords(worker, image);
-        const rows = words.map(({ text, confidence, bbox, symbols }) => ({
+        const candidates = words.map(({ text, confidence, bbox, symbols }) => ({
           word: { text, confidence, bbox, symbols: symbols.map(symbol => ({ bbox: symbol.bbox, confidence: symbol.confidence })) },
-          thumbnail: wordThumbnail(image, bbox).toDataURL()
+          thumbnail: wordThumbnail(image, bbox)
         }));
+        const rows = [];
+        for (let start = 0; start < candidates.length; start += 12) {
+          const batch = candidates.slice(start, start + 12);
+          let labels;
+          if (useAI && !aiError) {
+            try { labels = await transcribeWordImages(batch, key); }
+            catch (error) { aiError = error.message; }
+          }
+          for (const [offset, entry] of batch.entries()) {
+            const label = labels?.get(offset + 1);
+            const recognized = label?.text.normalize('NFC').trim();
+            const clear = !!recognized && label.clear;
+            const text = recognized || entry.word.text;
+            rows.push({
+              word: entry.word, thumbnail: entry.thumbnail.toDataURL(), text,
+              ...(useAI ? { ai: { clear }, checked: clear } : {})
+            });
+          }
+        }
         addReviewGroup(index, entry.settings, rows);
       } catch {
         failures++;
@@ -730,17 +776,22 @@ async function scanReferences() {
     }
     $('ocr-review').hidden = false;
     persistReferences();
-    status(`Tìm được ${reviewedWords.length} từ trong ${references.length - failures}/${references.length} ảnh đã quét. Hãy duyệt kết quả bên dưới.`);
+    const summary = `Tìm được ${reviewedWords.length} vùng chữ trong ${references.length - failures}/${references.length} ảnh đã quét.`;
+    status(aiError ? summary + ' Gemini chưa đọc hết ảnh: ' + aiError : summary);
+    if (useAI && reviewedWords.some(entry => entry.ai?.clear)) {
+      setScanBusy(false);
+      await applyReviewedWords(true);
+    } else refreshReviewVisibility();
   } catch (error) {
     status('Quét ảnh chưa hoàn tất. ' + error.message);
   } finally {
-    try { await worker?.terminate(); } finally { setScanBusy(false); }
+    try { await worker?.terminate(); } finally { setScanBusy(false); refreshReviewVisibility(); }
   }
 }
 
-async function applyReviewedWords() {
+async function applyReviewedWords(automatic = false) {
   if (busy || loading) return;
-  const chosen = reviewedWords.filter(entry => entry.include.checked);
+  const chosen = reviewedWords.filter(entry => entry.include.checked && !entry.done && (!automatic || entry.ai?.clear));
   const message = $('ocr-status');
   if (!chosen.length) {
     message.textContent = 'Chọn ít nhất một từ để lấy nét.';
@@ -763,6 +814,7 @@ async function applyReviewedWords() {
   const scores = new Map();
   const failed = new Set();
   const imported = new Set();
+  const mapped = [];
   try {
     for (const [index, group] of groups) {
       let image;
@@ -775,13 +827,15 @@ async function applyReviewedWords() {
       for (const { entry, chars } of group) {
         const mask = wordInk(image, entry.word.bbox, entry.settings);
         const matching = chars.length === entry.word.symbols.length;
+        const agreesWithOcr = entry.word.confidence >= 70 && chars.join('') === entry.word.text.normalize('NFC');
         const separated = splitWordByGaps(mask, entry.word.bbox, chars.length);
         const boxes = separated.length ? separated
-          : matching ? entry.word.symbols.map(symbol => symbol.bbox) : [];
+          : matching && (!automatic || agreesWithOcr) ? entry.word.symbols.map(symbol => symbol.bbox) : [];
         if (!boxes.length) {
           skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (${entry.word.symbols.length} vùng OCR cho ${chars.length} chữ)`);
           continue;
         }
+        mapped.push({ entry, chars });
         for (const [i, char] of chars.entries()) {
           if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
           const score = matching ? entry.word.symbols[i].confidence ?? entry.word.confidence : 0;
@@ -804,6 +858,12 @@ async function applyReviewedWords() {
       }
     }
     for (const [char, glyph] of added) glyphs.set(char, glyph);
+    for (const { entry, chars } of mapped) {
+      if (chars.join('') === entry.input.value.normalize('NFC').replace(/\s/g, '') && chars.every(char => glyphs.has(char))) {
+        entry.done = true;
+        entry.include.checked = false;
+      }
+    }
     for (const index of imported) {
       const entry = references[index];
       entry.settings = { ...entry.settings, used: true };
@@ -814,14 +874,22 @@ async function applyReviewedWords() {
     const missing = [...failed].filter(char => !added.has(char));
     message.textContent = added.size ? `Đã thêm ${added.size} ký tự từ ảnh gốc. Xem bộ ký tự và tải .TTF bên dưới.` : 'Chưa có ký tự mới để thêm.';
     if (missing.length) message.textContent += ' Cần khoanh lại: ' + missing.join(' ');
-    if (skipped.length) message.textContent += '\nChưa lấy nét từ ' + skipped.length + ' vùng:\n' + skipped.join('\n');
+    if (automatic) {
+      const pending = reviewedWords.filter(entry => !entry.done);
+      // Leave only unambiguous matches imported. Remaining rows need an explicit choice.
+      pending.forEach(entry => { entry.include.checked = false; });
+      message.textContent += ` Còn ${pending.length} vùng cần duyệt.`;
+      persistReferences();
+    } else if (skipped.length) message.textContent += '\nChưa lấy nét từ ' + skipped.length + ' vùng:\n' + skipped.join('\n');
   } finally {
     setScanBusy(false);
+    refreshReviewVisibility();
   }
 }
 
-$('scan').addEventListener('click', scanReferences);
-$('apply-scan').addEventListener('click', applyReviewedWords);
+$('ai-scan').addEventListener('click', () => scanReferences(true));
+$('scan').addEventListener('click', () => scanReferences());
+$('apply-scan').addEventListener('click', () => applyReviewedWords());
 
 document.addEventListener('paste', event => {
   const clipboard = event.clipboardData;
@@ -932,7 +1000,7 @@ async function restoreReferenceProject() {
     references.push(...images.map((file, index) => ({ file, settings: state.settings?.[index] })));
     for (const group of state.review ?? []) addReviewGroup(group.index, group.settings, group.rows);
     $('ocr-review').hidden = !reviewGroups.length;
-    $('apply-scan').disabled = !reviewedWords.length;
+    refreshReviewVisibility();
     const index = state.activeReference >= 0 && state.activeReference < references.length ? state.activeReference : 0;
     await showReference(index);
     $('reference-storage').textContent = `Đã khôi phục ${images.length} ảnh và phần duyệt đã lưu.`;

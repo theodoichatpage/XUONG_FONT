@@ -43,7 +43,11 @@
           <select id="reference"></select>
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
-        <button id="scan" class="scan-button" type="button">Quét tất cả ảnh</button>
+        <div class="tool-row scan-actions">
+          <button id="ai-scan" class="primary" type="button">AI đọc ảnh và dựng chữ</button>
+          <button id="scan" type="button">Quét OCR thủ công</button>
+        </div>
+        <p class="help">Quy trình AI gửi các vùng chữ đến Gemini. Bạn chỉ cần duyệt những vùng chưa chắc chắn.</p>
       </div>
       <div id="stage" hidden>
         <canvas id="image" tabindex="0" role="button" aria-haspopup="dialog" aria-label="Ảnh mẫu. Bấm để xem lớn, kéo để khoanh vùng chữ."></canvas>
@@ -61,8 +65,9 @@
       </form>
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <section id="ocr-review" class="ocr-review" hidden aria-labelledby="ocr-title">
-        <h3 id="ocr-title">Duyệt chữ nhận diện</h3>
-        <p class="help">Đối chiếu mỗi từ với ảnh, sửa chữ và tích các dòng bạn muốn dùng. Nếu số chữ thay đổi, Xưởng Font sẽ thử tách lại các nét dựa trên khoảng trống trong ảnh.</p>
+        <h3 id="ocr-title">Duyệt vùng chữ</h3>
+        <label id="show-processed-row" class="check" hidden><input id="show-processed" type="checkbox"> Hiện cả các vùng đã xử lý</label>
+        <p class="help">Sửa chữ ở những vùng còn thiếu hoặc chưa rõ, rồi bấm lấy nét. Nếu số chữ thay đổi, Xưởng Font sẽ thử tách lại theo khoảng trống trong ảnh.</p>
         <div id="ocr-results"></div>
         <button id="apply-scan" class="primary" type="button">Lấy nét từ các từ đã chọn</button>
         <p id="ocr-status" class="status" role="status" aria-live="polite"></p>

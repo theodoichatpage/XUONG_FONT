@@ -14,9 +14,13 @@ Start-Process .\dist\xuong-font.html
 
 `dist/xuong-font.html` là bản mở trực tiếp. Để đưa lên hosting tĩnh, dùng thư mục `dist` với trang chính `index.html`.
 
+## AI đọc ảnh và dựng chữ
+
+Nhập khóa Gemini API, thêm ảnh mẫu và bấm **AI đọc ảnh và dựng chữ**. Xưởng Font tìm các vùng chữ bằng OCR trong trình duyệt, gửi các vùng cắt đến Gemini để đọc nội dung, rồi tự lấy đường nét từ pixel gốc khi phân tách đủ rõ. Các nét đã có được giữ lại. Chỉ những vùng chưa đọc chắc hoặc chưa tách được mới hiện mặc định trong phần duyệt. Sửa hoặc điền chữ ngay cạnh ảnh, rồi bấm **Lấy nét từ các từ đã chọn**. Ký tự chưa có mẫu vẫn hiện **Còn thiếu**.
+
 ## Quét nhiều ảnh trên web
 
-1. Mở [Xưởng Font](https://xuong-font.vercel.app/) và đưa các ảnh vào danh sách, rồi bấm **Quét tất cả ảnh**. Nếu một ảnh có nhiều chi tiết, hãy khoanh vùng chữ trước khi quét.
+1. Mở [Xưởng Font](https://xuong-font.vercel.app/) và đưa các ảnh vào danh sách, rồi bấm **Quét OCR thủ công**. Nếu một ảnh có nhiều chi tiết, hãy khoanh vùng chữ trước khi quét.
 2. So sánh từ OCR với hình cắt bên cạnh. Sửa ký tự đọc sai, giữ nguyên số ký tự của từ, hoặc bỏ chọn vùng bị tách sai.
 3. Bấm **Lấy nét từ các từ đã chọn**. Web dùng nét từ pixel ảnh gốc và giữ các nét đã thêm trước đó. Với nhiều nguồn cho cùng một chữ, công cụ ưu tiên vùng OCR có độ tin cậy cao nhất trong các từ được chọn.
 4. Kiểm tra ô **Còn thiếu**, lấy thêm nét hoặc dùng **Tạo dấu tiếng Việt**, rồi tải `.ttf`.
