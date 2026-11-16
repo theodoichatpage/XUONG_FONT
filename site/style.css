@@ -90,3 +90,12 @@ dialog::backdrop{background:#221a17bd}
 #viewer-image{display:block;margin:auto;max-width:none;height:auto;image-rendering:pixelated}
 .ocr-thumbnail{padding:1px 3px;display:flex;width:fit-content;max-width:100%;cursor:zoom-in}
 .ocr-thumbnail img{display:block}
+#ai-review{padding:12px 16px 18px;max-height:74vh;overflow:auto}
+#ai-review h3{margin:0 0 5px}
+#ai-proof{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+#ai-proof figure{margin:0;text-align:center}
+#ai-proof img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:7px}
+#ai-proof figcaption{color:var(--muted);font-size:12px;margin-top:3px}
+#gemini-key{max-width:440px}
+#ai-review-run{margin-top:9px}
+#ai-review-findings:empty{display:none}

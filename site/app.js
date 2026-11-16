@@ -2,6 +2,7 @@ import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
 import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol } from './ocr.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
+import { prepareGlyphReview } from './glyph-review.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('image');
@@ -212,6 +213,112 @@ const viewer = $('image-viewer');
 const viewerImage = $('viewer-image');
 let zoom = 1;
 let zoomWidth = 0;
+let reviewGlyph;
+let reviewProof;
+let reviewRequest;
+let reviewVersion = 0;
+
+function resetGlyphReview(glyph) {
+  reviewVersion++;
+  reviewRequest?.abort();
+  reviewRequest = undefined;
+  reviewGlyph = glyph;
+  reviewProof = undefined;
+  $('viewer-scroll').hidden = false;
+  $('ai-review').hidden = true;
+  $('ai-proof').hidden = true;
+  $('ai-review-open').hidden = !glyph;
+  $('ai-review-run').disabled = true;
+  $('ai-review-status').textContent = '';
+  $('ai-review-findings').replaceChildren();
+  $('ai-review-action').textContent = '';
+}
+
+async function openGlyphReview() {
+  if (!reviewGlyph) return;
+  $('viewer-scroll').hidden = true;
+  $('ai-review').hidden = false;
+  $('ai-reference-note').textContent = 'Đang chuẩn bị ảnh đối chiếu…';
+  const glyph = reviewGlyph;
+  const turn = reviewVersion;
+  try {
+    let image;
+    let box;
+    let label;
+    if (source && crop) {
+      image = document.createElement('canvas');
+      image.width = source.width;
+      image.height = source.height;
+      image.getContext('2d').putImageData(source, 0, 0);
+      box = crop;
+      label = 'Đang dùng vùng khoanh trên ảnh đang mở.';
+    } else if (glyph.reference && references[glyph.reference.index]) {
+      const entry = references[glyph.reference.index];
+      image = await referenceCanvas(entry.file, glyph.reference.crop);
+      box = { x: 0, y: 0, w: image.width, h: image.height };
+      label = 'Đang dùng vùng ảnh đã lưu khi lấy nét.';
+    }
+    if (turn !== reviewVersion) return;
+    if (!image) {
+      $('ai-reference-note').textContent = 'Hãy đóng cửa sổ này, khoanh sát một chữ trên ảnh mẫu rồi mở lại ký tự để đối chiếu.';
+      return;
+    }
+    reviewProof = prepareGlyphReview(image, box, glyph);
+    $('ai-reference').src = reviewProof.reference;
+    $('ai-rendered').src = reviewProof.rendered;
+    $('ai-overlay').src = reviewProof.overlay;
+    $('ai-proof').hidden = false;
+    $('ai-reference-note').textContent = label + ' Hai hình được căn theo khung nét. Hãy xác nhận ảnh gốc chỉ chứa chữ ' + glyph.char + '.';
+    $('ai-review-run').disabled = false;
+  } catch (error) {
+    if (turn === reviewVersion) $('ai-reference-note').textContent = error.message;
+  }
+}
+
+async function runGlyphReview() {
+  if (!reviewProof || !reviewGlyph || reviewRequest) return;
+  const key = $('gemini-key').value.trim();
+  if (!key) {
+    $('ai-review-status').textContent = 'Hãy nhập khóa Gemini API.';
+    $('gemini-key').focus();
+    return;
+  }
+  const request = new AbortController();
+  reviewRequest = request;
+  $('ai-review-run').disabled = true;
+  $('ai-review-status').textContent = 'Đang đối chiếu với Gemini…';
+  $('ai-review-findings').replaceChildren();
+  $('ai-review-action').textContent = '';
+  try {
+    const response = await fetch('/api/glyph-review', {
+      method: 'POST', signal: request.signal,
+      headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
+      body: JSON.stringify({ char: reviewGlyph.char, reference: reviewProof.reference.split(',')[1], rendered: reviewProof.rendered.split(',')[1] })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    if (reviewRequest !== request) return;
+    const labels = { close: 'Hình dáng gần mẫu', needs_retrace: 'Cần lấy nét lại', unclear: 'Chưa đủ rõ để kết luận' };
+    $('ai-review-status').textContent = labels[data.verdict];
+    for (const detail of data.findings) {
+      const item = document.createElement('li');
+      item.textContent = detail;
+      $('ai-review-findings').append(item);
+    }
+    $('ai-review-action').textContent = data.action;
+  } catch (error) {
+    if (reviewRequest === request) $('ai-review-status').textContent = error.message || 'Chưa kết nối được với Gemini.';
+  } finally {
+    if (reviewRequest === request) {
+      reviewRequest = undefined;
+      $('ai-review-run').disabled = false;
+    }
+  }
+}
+
+$('ai-review-open').addEventListener('click', openGlyphReview);
+$('ai-review-run').addEventListener('click', runGlyphReview);
+viewer.addEventListener('close', () => resetGlyphReview());
 
 function setZoom(value) {
   zoom = Math.max(0.25, Math.min(12, value));
@@ -221,8 +328,9 @@ function setZoom(value) {
   $('zoom-out').disabled = zoom <= 0.25;
 }
 
-function openViewer(url, width, height, title) {
+function openViewer(url, width, height, title, glyph) {
   if (viewer.open) return;
+  resetGlyphReview(glyph);
   zoomWidth = width;
   viewerImage.src = url;
   $('viewer-title').textContent = title;
@@ -243,7 +351,7 @@ function zoomGlyph(char) {
     <rect x="-30" y="-1025" width="${viewWidth + 60}" height="${viewHeight + 50}" fill="#fffaf1"/>
     <path transform="scale(1 -1)" d="${glyph.d}" fill="#592f29"/>
   </svg>`;
-  openViewer('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(outline), width, height, `Ký tự ${char} · ${glyph.source}`);
+  openViewer('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(outline), width, height, `Ký tự ${char} · ${glyph.source}`, glyph);
 }
 
 function zoomSource() {
@@ -341,7 +449,15 @@ async function trace(single) {
     for (const [i, char] of chars.entries()) {
       if (traced.has(char)) continue;
       status(`Đang dựng nét chữ ${i + 1}/${chars.length}…`);
-      traced.set(char, await makeGlyph(ink, width, boxes[i], char));
+      const box = boxes[i];
+      const glyph = await makeGlyph(ink, width, box, char);
+      if (activeReference >= 0) {
+        const area = selection();
+        glyph.reference = { index: activeReference, crop: {
+          x: area.x + box.x0, y: area.y + box.y0, w: box.x1 - box.x0 + 1, h: box.y1 - box.y0 + 1
+        } };
+      }
+      traced.set(char, glyph);
     }
     const replacements = [...traced.keys()].filter(char => glyphs.get(char)?.source === 'Ảnh mẫu');
     if (replacements.length && !window.confirm(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`)) {
@@ -621,7 +737,13 @@ async function applyReviewedWords() {
           if (scores.has(char) && scores.get(char) >= score) continue;
           try {
             message.textContent = `Đang lấy nét chữ ${char}…`;
-            added.set(char, await traceSymbol(mask, boxes[i], char, entry.word.bbox));
+            const box = boxes[i];
+            const area = entry.settings?.crop;
+            const glyph = await traceSymbol(mask, box, char, entry.word.bbox);
+            glyph.reference = { index, crop: {
+              x: (area?.x ?? 0) + box.x0, y: (area?.y ?? 0) + box.y0, w: box.x1 - box.x0, h: box.y1 - box.y0
+            } };
+            added.set(char, glyph);
             scores.set(char, score);
             imported.add(index);
           } catch {

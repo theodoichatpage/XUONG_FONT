@@ -86,10 +86,27 @@
       <button id="zoom-out" type="button" aria-label="Thu nhỏ">−</button>
       <output id="zoom-value" aria-live="polite"></output>
       <button id="zoom-in" type="button" aria-label="Phóng to thêm">+</button>
+      <button id="ai-review-open" type="button" hidden>AI kiểm tra nét</button>
       <form method="dialog"><button type="submit" autofocus>Đóng</button></form>
     </div>
   </div>
   <div id="viewer-scroll"><img id="viewer-image" alt="Ảnh mẫu phóng to"></div>
+  <section id="ai-review" hidden aria-labelledby="ai-review-title">
+    <h3 id="ai-review-title">Đối chiếu nét với ảnh mẫu</h3>
+    <p id="ai-reference-note" class="help"></p>
+    <div id="ai-proof" hidden>
+      <figure><img id="ai-reference" alt="Vùng ký tự từ ảnh mẫu"><figcaption>Ảnh gốc</figcaption></figure>
+      <figure><img id="ai-rendered" alt="Nét ký tự đã vẽ"><figcaption>Nét đã vẽ</figcaption></figure>
+      <figure><img id="ai-overlay" alt="Nét đỏ chồng lên ảnh gốc"><figcaption>Chồng nét đỏ</figcaption></figure>
+    </div>
+    <label for="gemini-key">Khóa Gemini API</label>
+    <input id="gemini-key" type="password" autocomplete="off" spellcheck="false">
+    <p class="help">Khi bấm kiểm tra, hai ảnh đầu được gửi đến Google Gemini. Khóa chỉ dùng trong phiên này. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Lấy khóa Gemini API</a></p>
+    <button id="ai-review-run" class="primary" type="button" disabled>Gửi Gemini kiểm tra</button>
+    <p id="ai-review-status" class="status" role="status" aria-live="polite"></p>
+    <ul id="ai-review-findings"></ul>
+    <p id="ai-review-action" class="help"></p>
+  </section>
 </dialog>
 </body>
 </html>
