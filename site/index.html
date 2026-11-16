@@ -111,6 +111,16 @@
       <label>Cỡ chữ <output id="size-value">68</output> px<input type="range" id="size" min="24" max="110" value="68"></label>
       <label>Khoảng cách chữ <output id="spacing-value">0</output><input type="range" id="spacing" min="-30" max="140" value="0"></label>
     </div>
+    <details>
+      <summary>Đo và cân nét dọc</summary>
+      <label for="stroke-letters">Chữ cần chỉnh, rồi chữ làm chuẩn</label>
+      <input id="stroke-letters" value="E F" maxlength="20" autocomplete="off" spellcheck="false">
+      <div class="tool-row">
+        <button id="measure-strokes" type="button">Đo nét</button>
+        <button id="match-strokes" type="button">Cân nét chữ đầu</button>
+      </div>
+      <p id="stroke-result" class="help" aria-live="polite"></p>
+    </details>
     <p id="missing" class="help" aria-live="polite"></p>
   </section>
 

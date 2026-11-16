@@ -4,7 +4,7 @@ import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol,
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
-import { balanceGlyphSpacing, fitLowercaseT } from './font-layout.js';
+import { balanceGlyphSpacing, fitLowercaseT, measureLeftStem, matchLeftStem } from './font-layout.js';
 
 const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
@@ -1164,6 +1164,40 @@ $('reset').addEventListener('click', () => {
   refresh();
   status('Đã xóa bộ ký tự.');
 });
+function compareStrokes(apply) {
+  if (busy || loading) return;
+  const result = $('stroke-result');
+  const [first, second] = [...$('stroke-letters').value.normalize('NFC').replace(/\s+/gu, '')];
+  const target = usableGlyph(first), reference = usableGlyph(second);
+  if (!target || !reference || first === second) {
+    result.textContent = 'Nhập hai chữ khác nhau đã có trong bộ font, ví dụ E F.';
+    return;
+  }
+  const a = measureLeftStem(fitLowercaseT(target)), b = measureLeftStem(fitLowercaseT(reference));
+  if (!a || !b) {
+    result.textContent = 'Không đo được hai nét dọc để so. Thử các chữ có thân đứng như E, F hoặc H.';
+    return;
+  }
+  if (!apply) {
+    const difference = Math.round((a.width / b.width - 1) * 100);
+    result.textContent = `${first}: ${a.width} · ${second}: ${b.width} đơn vị font. ${difference
+      ? `${first} ${difference > 0 ? 'dày' : 'mảnh'} hơn ${second} khoảng ${Math.abs(difference)}%.`
+      : 'Hai nét có độ dày bằng nhau theo phép đo.'}`;
+    return;
+  }
+  const updated = matchLeftStem(target, reference);
+  if (!updated) {
+    result.textContent = 'Hai nét đã gần bằng nhau hoặc chữ đầu không phù hợp để cân tự động.';
+    return;
+  }
+  glyphs.set(first, { ...updated, source: 'Ảnh mẫu' });
+  updateComposed();
+  refresh();
+  result.textContent = `Đã cân nét dọc của ${first} theo ${second}. Bấm Đo nét để kiểm tra lại.`;
+}
+
+$('measure-strokes').addEventListener('click', () => compareStrokes(false));
+$('match-strokes').addEventListener('click', () => compareStrokes(true));
 $('sample').addEventListener('input', () => { save(); renderPreview(); });
 $('size').addEventListener('input', renderPreview);
 $('name').addEventListener('input', () => { save(); scheduleFont(); });

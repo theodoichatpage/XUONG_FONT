@@ -25,9 +25,12 @@ function profile(glyph) {
   const pixels = context.getImageData(0, 0, width, height).data;
   const rows = [];
   for (let y = 0; y < height; y++) {
-    let left = width, right = -1;
+    let left = width, right = -1, firstEnd = -1;
     for (let x = 0; x < width; x++) {
-      if (pixels[(y * width + x) * 4 + 3] < 128) continue;
+      if (pixels[(y * width + x) * 4 + 3] < 128) {
+        if (right >= 0 && firstEnd < 0) firstEnd = right + 1;
+        continue;
+      }
       left = Math.min(left, x);
       right = x;
     }
@@ -35,7 +38,8 @@ function profile(glyph) {
       y: top - (y - .5) / resolution,
       left: (left - .5) / resolution + box.x,
       right: (right - .5) / resolution + box.x,
-      width: (right - left + 1) / resolution
+      width: (right - left + 1) / resolution,
+      stem: ((firstEnd < 0 ? right + 1 : firstEnd) - left) / resolution
     });
   }
   const result = { box, rows };
@@ -87,4 +91,38 @@ export function balanceGlyphSpacing(glyphs, adjustment) {
     return { ...glyph, d: svgpath(glyph.d).translate(leftBearing - box.x, 0).round(1).toString(),
       advance: Math.max(1, Math.round(box.width + leftBearing + rightBearing)) };
   });
+}
+
+export function measureLeftStem(glyph) {
+  const { box, rows } = profile(glyph);
+  const middle = rows.filter(row => row.y >= XH * .28 && row.y <= XH * .76);
+  if (middle.length < 6) return null;
+  const width = median(middle.map(row => row.stem));
+  const edge = median(middle.map(row => row.left));
+  if (!Number.isFinite(width) || width < 8) return null;
+  return { width, edge, box };
+}
+
+export function matchLeftStem(glyph, reference) {
+  const current = measureLeftStem(glyph), desired = measureLeftStem(reference);
+  if (!current || !desired) return null;
+  const delta = desired.width - current.width;
+  if (Math.abs(delta) < 4) return null;
+  const start = current.edge, seam = start + current.width;
+  const right = current.box.x + current.box.width;
+  // Keep the exterior edges fixed and taper the adjustment into the interior.
+  if (right - seam < 12 || Math.abs(delta) > current.width * .45 || seam + delta >= right - 6) return null;
+  const outline = svgpath(glyph.d).abs().unshort().unarc().iterate(segment => {
+    if (segment[0] === 'H') {
+      segment[1] = adjust(segment[1]);
+    } else if ('MLCQ'.includes(segment[0])) {
+      for (let i = 1; i < segment.length; i += 2) segment[i] = adjust(segment[i]);
+    }
+  });
+  function adjust(x) {
+    if (x <= start || x >= right) return x;
+    if (x <= seam) return x + delta * (x - start) / current.width;
+    return x + delta * (right - x) / (right - seam);
+  }
+  return { ...glyph, d: outline.round(1).toString() };
 }
