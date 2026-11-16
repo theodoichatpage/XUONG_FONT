@@ -1,7 +1,7 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
-import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
+import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
 
@@ -62,10 +62,15 @@ let referenceImagesNeedSave = false;
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey));
   if (saved) {
-    glyphs = new Map(saved.glyphs.map(glyph => [glyph.char, glyph]));
+    glyphs = new Map(saved.glyphs.filter(glyph => !['AI suy đoán', 'AI theo ảnh'].includes(glyph.source))
+      .map(glyph => [glyph.char, glyph]));
+    for (const [char, glyph] of glyphs) {
+      if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base ?? char.normalize('NFD')[0])) glyphs.delete(char);
+    }
     $('name').value = saved.name;
     $('sample').value = saved.sample;
     $('spacing').value = saved.spacing;
+    if (glyphs.size < saved.glyphs.length) save();
   }
 } catch {
   // A project can still be used when local storage is unavailable.
@@ -155,9 +160,8 @@ function renderReferences() {
   $('gemini-badge').dataset.state = state;
   $('gemini-badge-label').textContent = 'Gemini: ' + (state === 'ready' ? 'Đã kết nối' : state === 'loading' ? 'Đang kiểm tra' : 'Chưa kết nối');
   $('ai-scan').disabled = busy || loading || !references.length || !connectedGeminiModel || !!connectionRequest;
-  $('infer-missing').disabled = $('ai-scan').disabled || !inventory || !inventory.traced.length;
   $('ai-scan-help').textContent = connectedGeminiModel
-    ? 'Thêm đủ ảnh và dựng chữ có mẫu trước. Chỉ bấm suy đoán khi bạn không còn mẫu để bổ sung.'
+    ? 'Thêm ảnh có các ký tự bạn muốn đưa vào bộ font.'
     : 'Kiểm tra kết nối Gemini thành công để bật bước dựng chữ.';
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
@@ -710,7 +714,7 @@ for (const char of charset) {
 function renderGlyphs() {
   for (const [char, tile] of tiles) {
     const glyph = usableGlyph(char);
-    tile.className = 'glyph' + (glyph ? (glyph.source === 'Ảnh mẫu' || glyph.source === draftSources.reference) ? ' ready' : ' generated' : '');
+    tile.className = 'glyph' + (glyph ? (glyph.source === 'Ảnh mẫu') ? ' ready' : ' generated' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
     tile.setAttribute('aria-label', char + ' · ' + (glyph?.source ?? 'Còn thiếu'));
     tile.title = tile.getAttribute('aria-label');
@@ -815,9 +819,6 @@ function reportDesign(message) {
 function usableGlyph(char) {
   const glyph = glyphs.get(char);
   if (!glyph || (glyph.source === 'Ảnh mẫu' && !completeTildeO(glyph))) return undefined;
-  if (glyph.source === draftSources.reference) return undefined;
-  if (glyph.source === draftSources.inferred && glyph.inventoryId !== inventory?.id) return undefined;
-  if (glyph.source === draftSources.inferred && !glyph.inventoryId) return undefined;
   return glyph;
 }
 
@@ -827,22 +828,13 @@ function inventoryReport(prefix = '') {
   const unresolved = present - inventory.traced.length;
   reportDesign(prefix + `Có mẫu: ${present} ký tự. Đã dựng từ ảnh: ${inventory.traced.length}.`
     + (unresolved ? ` Chưa tách được: ${inventory.observed.filter(char => !inventory.traced.includes(char)).join(' ')}.` : '')
-    + ` Chưa thấy mẫu: ${missing}. Chỉ bấm suy đoán khi không còn ảnh bổ sung.`);
+    + ` Chưa thấy mẫu: ${missing}.`);
 }
 
-function designAnchors() {
-  const chosen = (inventory?.traced ?? []).map(usableGlyph).filter(glyph => glyph?.source === 'Ảnh mẫu' && glyph.reference).slice(0, 8)
-    .map(({ char, advance, d }) => ({ char, advance, path: d }));
-  while (chosen.length && JSON.stringify(chosen).length > 10500) chosen.pop();
-  return chosen.length ? JSON.stringify(chosen) : '';
-}
-
-async function runFontJob(infer) {
+async function runFontJob() {
   if (busy || loading || !references.length || !connectedGeminiModel || connectionRequest) return;
   const key = geminiKey.value.trim();
   if (!key) return;
-  const anchors = infer ? designAnchors() : '';
-  if (infer && (!inventory || !anchors)) return;
   const controller = new AbortController();
   designRun = controller;
   busy = true;
@@ -854,122 +846,102 @@ async function runFontJob(infer) {
   let model = connectedGeminiModel;
   let accepted = 0;
   try {
-    if (infer) {
-      const pending = charset.filter(char => !inventory.observed.includes(char) && !usableGlyph(char));
-      const samples = pending.length ? await designReferences(references, referenceCanvas, controller.signal) : [];
-      for (let start = 0; start < pending.length && !controller.signal.aborted; start += 8) {
-        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-        const chars = pending.slice(start, start + 8);
-        reportDesign(`Đang suy đoán ${chars.join(' ')} · ${accepted}/${pending.length} ký tự đã lưu.`);
-        const result = await requestGlyphDesign({ chars, samples, key, model, anchors, signal: controller.signal });
-        model = result.model ?? model;
-        for (const glyph of result.glyphs) {
-          if (glyph.source !== draftSources.inferred) continue;
-          glyphs.set(glyph.char, { ...glyph, inventoryId: inventory.id });
-          accepted++;
-        }
-        refresh();
-      }
-      const remaining = pending.length - accepted;
-      inventoryReport(`Đã suy đoán thêm ${accepted} ký tự.` + (remaining ? ` Còn ${remaining} ký tự có thể suy đoán. ` : ' '));
-    } else {
-      const observed = new Set();
-      const traced = new Map();
-      const skipped = [];
-      for (const [index, entry] of references.entries()) {
-        controller.signal.throwIfAborted();
-        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-        const progress = `Ảnh ${index + 1}/${references.length}`;
-        const saved = () => `Đã cập nhật ${accepted} ký tự.`;
-        const started = performance.now();
-        const waiting = () => reportDesign(`${progress} · Chờ Gemini ${Math.floor((performance.now() - started) / 1000)} giây. ${saved()}`);
-        let image, detectedWords = entry.settings?.detectedWords;
-        try {
-          image = await referenceCanvas(entry.file);
-          controller.signal.throwIfAborted();
-          if (!detectedWords?.length) {
-            waiting();
-            const timer = setInterval(waiting, 1000);
-            try {
-              const result = await inventoryImage(image, key, model, controller.signal);
-              model = result.model ?? model;
-              detectedWords = result.words;
-              if (detectedWords.length) {
-                entry.settings = { ...entry.settings, detectedWords };
-                persistReferences();
-              }
-            } finally {
-              clearInterval(timer);
-            }
-          }
-        } catch (error) {
-          if (controller.signal.aborted) throw error;
-          if (error.status && error.status < 500) throw new Error(`${progress} · ${error.message}`);
-          skipped.push(`${progress} · ${error.message}`);
-          continue;
-        }
-        reportDesign(`${progress} · Đang dựng nét từ ảnh. ${saved()}`);
-        const words = detectedWords.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
-        const neighbors = words.map(word => word.area);
-        const imageGlyphs = [];
-        for (const { text, area: original } of words) {
-          const chars = [...text.normalize('NFC').replace(/\s/g, '')];
-          for (const char of chars) if (charset.includes(char)) observed.add(char);
-          if (chars.some(char => !charset.includes(char))) continue;
-          const expanded = expandWordBox(original, neighbors, image);
-          let area = expanded;
-          let mask = wordInk(image, area);
-          const split = () => {
-            if (chars.length === 1) return [area];
-            const separated = splitCleanWord(mask, area, chars);
-            if (separated.length) return separated;
-            if (chars.some(char => /^[õÕ]$/u.test(char))) {
-              const byBody = splitWordByGaps(mask, area, chars.length, true);
-              if (byBody.length) return byBody;
-            }
-            return splitWordByGaps(mask, area, chars.length);
-          };
-          let parts = split();
-          if (!parts.length || inkCrossesBox(mask, area)) {
-            area = original;
-            mask = wordInk(image, area);
-            if (inkCrossesBox(mask, area)) continue;
-            parts = split();
-          }
-          const wordGlyphs = [];
-          for (const [offset, part] of parts.entries()) {
-            controller.signal.throwIfAborted();
-            const char = chars[offset];
-            try {
-              const glyph = await traceSymbol(mask, part, char, area);
-              glyph.reference = { index, crop: glyph.pixelCrop };
-              wordGlyphs.push(glyph);
-            } catch { /* Keep the letter listed as observed even if tracing fails. */ }
-          }
-          if (wordGlyphs.length) imageGlyphs.push(wordGlyphs);
-        }
-        controller.signal.throwIfAborted();
-        for (const glyph of alignReferenceGlyphs(imageGlyphs)) {
-          const { char, pixelCrop } = glyph;
-          const pixels = pixelCrop.w * pixelCrop.h;
-          if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
-          traced.set(char, { glyph, pixels });
-          glyphs.set(char, glyph);
-        }
-        updateComposed();
-        accepted = traced.size;
-        refresh();
-      }
-      if (skipped.length) {
-        reportDesign(`Đã cập nhật ${accepted} ký tự. ${skipped.join(' ')} Bấm Dựng chữ có mẫu để thử lại.`);
-        return;
-      }
+    const observed = new Set();
+    const traced = new Map();
+    const skipped = [];
+    for (const [index, entry] of references.entries()) {
+      controller.signal.throwIfAborted();
       if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-      inventory = { id: crypto.randomUUID(), observed: [...observed], traced: [...traced.keys()] };
-      persistReferences();
+      const progress = `Ảnh ${index + 1}/${references.length}`;
+      const saved = () => `Đã cập nhật ${accepted} ký tự.`;
+      const started = performance.now();
+      const waiting = () => reportDesign(`${progress} · Chờ Gemini ${Math.floor((performance.now() - started) / 1000)} giây. ${saved()}`);
+      let image, detectedWords = entry.settings?.detectedWords;
+      try {
+        image = await referenceCanvas(entry.file);
+        controller.signal.throwIfAborted();
+        if (!detectedWords?.length) {
+          waiting();
+          const timer = setInterval(waiting, 1000);
+          try {
+            const result = await inventoryImage(image, key, model, controller.signal);
+            model = result.model ?? model;
+            detectedWords = result.words;
+            if (detectedWords.length) {
+              entry.settings = { ...entry.settings, detectedWords };
+              persistReferences();
+            }
+          } finally {
+            clearInterval(timer);
+          }
+        }
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        if (error.status && error.status < 500) throw new Error(`${progress} · ${error.message}`);
+        skipped.push(`${progress} · ${error.message}`);
+        continue;
+      }
+      reportDesign(`${progress} · Đang dựng nét từ ảnh. ${saved()}`);
+      const words = detectedWords.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
+      const neighbors = words.map(word => word.area);
+      const imageGlyphs = [];
+      for (const { text, area: original } of words) {
+        const chars = [...text.normalize('NFC').replace(/\s/g, '')];
+        for (const char of chars) if (charset.includes(char)) observed.add(char);
+        if (chars.some(char => !charset.includes(char))) continue;
+        const expanded = expandWordBox(original, neighbors, image);
+        let area = expanded;
+        let mask = wordInk(image, area);
+        const split = () => {
+          if (chars.length === 1) return [area];
+          const separated = splitCleanWord(mask, area, chars);
+          if (separated.length) return separated;
+          if (chars.some(char => /^[õÕ]$/u.test(char))) {
+            const byBody = splitWordByGaps(mask, area, chars.length, true);
+            if (byBody.length) return byBody;
+          }
+          return splitWordByGaps(mask, area, chars.length);
+        };
+        let parts = split();
+        if (!parts.length || inkCrossesBox(mask, area)) {
+          area = original;
+          mask = wordInk(image, area);
+          if (inkCrossesBox(mask, area)) continue;
+          parts = split();
+        }
+        const wordGlyphs = [];
+        for (const [offset, part] of parts.entries()) {
+          controller.signal.throwIfAborted();
+          const char = chars[offset];
+          try {
+            const glyph = await traceSymbol(mask, part, char, area);
+            glyph.reference = { index, crop: glyph.pixelCrop };
+            wordGlyphs.push(glyph);
+          } catch { /* Keep the letter listed as observed even if tracing fails. */ }
+        }
+        if (wordGlyphs.length) imageGlyphs.push(wordGlyphs);
+      }
+      controller.signal.throwIfAborted();
+      for (const glyph of alignReferenceGlyphs(imageGlyphs)) {
+        const { char, pixelCrop } = glyph;
+        const pixels = pixelCrop.w * pixelCrop.h;
+        if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
+        traced.set(char, { glyph, pixels });
+        glyphs.set(char, glyph);
+      }
+      updateComposed();
+      accepted = traced.size;
       refresh();
-      inventoryReport();
     }
+    if (skipped.length) {
+      reportDesign(`Đã cập nhật ${accepted} ký tự. ${skipped.join(' ')} Bấm Dựng chữ có mẫu để thử lại.`);
+      return;
+    }
+    if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+    inventory = { id: crypto.randomUUID(), observed: [...observed], traced: [...traced.keys()] };
+    persistReferences();
+    refresh();
+    inventoryReport();
     if (geminiKey.value.trim() === key) {
       connectedGeminiModel = model;
       saveGeminiPreference();
@@ -987,8 +959,7 @@ async function runFontJob(infer) {
   }
 }
 
-$('ai-scan').addEventListener('click', () => runFontJob(false));
-$('infer-missing').addEventListener('click', () => runFontJob(true));
+$('ai-scan').addEventListener('click', runFontJob);
 $('stop-design').addEventListener('click', () => {
   if (!designRun) return;
   designRun.abort();

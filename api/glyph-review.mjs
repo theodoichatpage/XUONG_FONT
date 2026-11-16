@@ -1,4 +1,4 @@
-import { inventoryInstruction, designInstruction } from '../src/gemini-font-prompts.mjs';
+import { inventoryInstruction } from '../src/gemini-font-prompts.mjs';
 
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const models = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
@@ -37,24 +37,6 @@ function validWord(word) {
     && word.box.every(value => Number.isInteger(value) && value >= 0 && value <= 1000)
     && word.box[0] < word.box[2] && word.box[1] < word.box[3];
 }
-
-const designSchema = {
-  type: 'OBJECT',
-  properties: {
-    glyphs: { type: 'ARRAY', maxItems: 8, items: {
-      type: 'OBJECT',
-      properties: {
-        char: { type: 'STRING' },
-        path: { type: 'STRING' },
-        advance: { type: 'INTEGER' },
-        evidence: { type: 'STRING', enum: ['reference', 'inferred'] }
-      },
-      required: ['char', 'path', 'advance', 'evidence']
-    } }
-  },
-  required: ['glyphs']
-};
-
 
 const instruction = [
   'Bạn là người kiểm tra độ trung thành của một ký tự font được vector hóa.',
@@ -116,20 +98,12 @@ export async function POST(request) {
   let input;
   try { input = await request.json(); }
   catch { return json({ error: 'Không đọc được yêu cầu kiểm tra.' }, 400); }
-  const { char, reference, rendered, check, chars, samples, anchors, image, mode, preferredModel } = input ?? {};
+  const { char, reference, rendered, check, image, mode, preferredModel } = input ?? {};
   const testing = check === true;
-  const designing = mode === 'design';
+  if (mode === 'design') return json({ error: 'Tính năng suy đoán ký tự đã được gỡ.' }, 410);
   const inventory = mode === 'inventory';
   if (inventory && !jpeg(image)) return json({ error: 'Ảnh mẫu vượt giới hạn.' }, 400);
-  if (designing && (!Array.isArray(chars) || chars.length < 1 || chars.length > 8
-    || !chars.every(char => typeof char === 'string' && [...char].length === 1)
-    || new Set(chars).size !== chars.length || !Array.isArray(samples) || samples.length < 1 || samples.length > 3
-    || !samples.every(jpeg)
-    || samples.reduce((size, value) => size + value.length, 0) > 3_450_000
-    || (typeof anchors !== 'string' || !anchors || anchors.length > 10500))) {
-    return json({ error: 'Yêu cầu dựng chữ hoặc ảnh mẫu vượt giới hạn.' }, 400);
-  }
-  if (!testing && !designing && !inventory && (typeof char !== 'string' || [...char].length !== 1 || !isPng(reference) || !isPng(rendered))) {
+  if (!testing && !inventory && (typeof char !== 'string' || [...char].length !== 1 || !isPng(reference) || !isPng(rendered))) {
     return json({ error: 'Cần một ký tự và hai ảnh PNG hợp lệ.' }, 400);
   }
   try {
@@ -140,14 +114,6 @@ export async function POST(request) {
         systemInstruction: { parts: [{ text: inventoryInstruction }] },
         contents: [{ parts: [{ inlineData: { mimeType: 'image/jpeg', data: image } }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: inventorySchema, maxOutputTokens: 4200 }
-      } : designing ? {
-        systemInstruction: { parts: [{ text: designInstruction }] },
-        contents: [{ parts: [
-          { text: 'Ký tự cần thiết kế: ' + JSON.stringify(chars) + (anchors ? '\nNét neo đã dựng: ' + anchors : '') },
-          ...samples.map(data => ({ inlineData: { mimeType: 'image/jpeg', data } }))
-        ] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema: designSchema,
-          maxOutputTokens: 10000, thinkingConfig: { thinkingLevel: 'low' } }
       } : {
         systemInstruction: { parts: [{ text: instruction }] },
         contents: [{ parts: [
@@ -170,12 +136,6 @@ export async function POST(request) {
     if (inventory) {
       if (!Array.isArray(review.words)) return json({ error: 'Gemini không trả danh sách vùng chữ.' }, 502);
       return json({ words: review.words.filter(validWord).slice(0, 70), model }, 200);
-    }
-    if (designing) {
-      if (!Array.isArray(review.glyphs)) return json({ error: 'Gemini chưa trả bộ nét ký tự.' }, 502);
-      const glyphs = review.glyphs.filter(glyph => chars.includes(glyph?.char) && typeof glyph.path === 'string'
-        && glyph.path.length <= 4900 && Number.isFinite(glyph.advance) && glyph.evidence === 'inferred');
-      return json({ glyphs, model }, 200);
     }
     if (!schema.properties.verdict.enum.includes(review.verdict) || !Array.isArray(review.findings)
       || !review.findings.every(item => typeof item === 'string') || typeof review.action !== 'string') {

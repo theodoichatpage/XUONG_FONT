@@ -14,13 +14,9 @@ Start-Process .\dist\xuong-font.html
 
 `dist/xuong-font.html` là bản mở trực tiếp. Để đưa lên hosting tĩnh, dùng thư mục `dist` với trang chính `index.html`.
 
-## Dựng chữ theo ảnh trước, suy đoán sau
+## Dựng chữ theo ảnh
 
-1. Thêm ảnh mẫu, kiểm tra kết nối Gemini rồi bấm **1. Dựng chữ có mẫu**. Gemini đọc ảnh và định vị chữ thực sự nhìn thấy. Xưởng Font dùng vùng ảnh gốc để lấy đường viền. Ký tự đọc được nhưng chưa tách rõ vẫn nằm trong danh sách có mẫu.
-2. Khi không còn ảnh bổ sung, bấm **2. Suy đoán chữ thiếu**. Gemini dùng đường viền các ký tự đã lấy nét làm mẫu neo và thiết kế các ký tự chưa thấy. Các nét AI cũ thiếu vùng đối chiếu không làm mẫu neo.
-3. Nếu dừng giữa phần suy đoán, bấm lại nút đó để tiếp tục. Kiểm tra dáng chữ trong **Thử tiêu đề** trước khi tải `.TTF`.
-
-**Xem chỉ dẫn gửi Gemini** hiển thị đúng câu lệnh của hai bước. Những ảnh mẫu dùng để xử lý được gửi tới Gemini khi bấm nút tương ứng.
+Thêm ảnh mẫu và bấm **Dựng chữ có mẫu** để Gemini đọc và định vị các ký tự gửi từ ảnh. Xưởng Font dựng đường viền từ vùng ảnh gốc. Nếu còn ký tự thiếu, bổ sung ảnh mẫu. Kiểm tra dáng chữ trong **Thử tiêu đề** trước khi tải `.TTF`.
 
 ## AI kiểm tra nét
 
