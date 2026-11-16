@@ -357,6 +357,21 @@ function refresh() {
   scheduleFont();
 }
 
+document.addEventListener('paste', event => {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const isImage = file => ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+  const files = [...clipboard.files].filter(isImage);
+  const images = files.length ? files : [...clipboard.items]
+    .filter(item => item.kind === 'file')
+    .map(item => item.getAsFile())
+    .filter(file => file && isImage(file));
+  if (!images.length) return;
+  event.preventDefault();
+  if (busy) return status('Đang dựng nét. Hãy dán lại ảnh khi hoàn tất.');
+  addFiles(images);
+});
+
 $('file').addEventListener('change', event => {
   addFiles(event.target.files);
   event.target.value = '';
