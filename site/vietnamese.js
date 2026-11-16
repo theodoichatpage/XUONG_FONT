@@ -6,7 +6,7 @@ export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
 export const punctuation = [...'.,:;!?-–—()“”‘’/+'];
 export const toneSamples = new Map([
   ['\u0301', 'Sắc'], ['\u0300', 'Huyền'], ['\u0323', 'Nặng'],
-  ['\u0303', 'Ngã'], ['\u0309', 'Hỏi']
+  ['\u0303', 'Ngã'], ['\u0309', 'Hỏi'], ['\u0306', 'Trăng'], ['\u0302', 'Mũ']
 ]);
 
 const vowels = [...'AĂÂEÊIOÔƠUƯYaăâeêioôơuưy'];
@@ -42,10 +42,10 @@ function undotI(glyph) {
   return { ...glyph, d: stem.shape.d };
 }
 
-export function composeVietnamese(glyphs) {
+export function composeVietnamese(glyphs, replace = () => false) {
   const result = [];
   for (const char of accented) {
-    if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
+    if (glyphs.get(char)?.source === 'Ảnh mẫu' && !replace(char)) continue;
     const [base, ...marks] = char.normalize('NFD');
     let original = glyphs.get(base);
     if (original && base === 'i' && !marks.includes('\u0323')) original = undotI(original);
@@ -83,4 +83,18 @@ export function composeVietnamese(glyphs) {
     result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', base });
   }
   return result;
+}
+
+// Explicit application only replaces existing variants that can use an imported mark.
+export function applyReferenceMarks(glyphs, selection) {
+  const selectedMark = toneSamples.has(selection) ? selection : undefined;
+  const base = selectedMark ? undefined : selection?.normalize('NFD')[0];
+  if (selectedMark ? !glyphs.has(selectedMark) : !base || !glyphs.has(base)) return [];
+  const targets = new Set(accented.filter(char => {
+    if (!glyphs.has(char)) return false;
+    const [root, ...marks] = char.normalize('NFD');
+    return selectedMark ? marks.includes(selectedMark) : root === base
+      && marks.some(mark => toneSamples.has(mark) && glyphs.has(mark));
+  }));
+  return composeVietnamese(glyphs, char => targets.has(char)).filter(glyph => targets.has(glyph.char));
 }

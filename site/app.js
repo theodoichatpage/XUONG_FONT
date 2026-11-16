@@ -1,5 +1,5 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { core, lowercase, charset, toneSamples, composeVietnamese } from './vietnamese.js';
+import { core, lowercase, charset, toneSamples, composeVietnamese, applyReferenceMarks } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -1073,6 +1073,17 @@ $('clear-crop').addEventListener('click', () => { crop = undefined; renderSource
 $('chars').addEventListener('input', () => persistReferences());
 $('trace-form').addEventListener('submit', event => { event.preventDefault(); trace(false); });
 $('single').addEventListener('click', () => trace(true));
+
+$('apply-tone-samples').addEventListener('click', () => {
+  if (busy || loading) return;
+  const generated = applyReferenceMarks(glyphs, selected);
+  if (!generated.length) return status('Chọn một chữ gốc có biến thể, hoặc chọn một dấu mẫu đã thêm.');
+  for (const glyph of generated) glyphs.set(glyph.char, glyph);
+  const message = `Đã áp dụng dấu mẫu cho: ${generated.map(glyph => glyph.char).join(' ')}.`;
+  refresh();
+  status(message);
+  reportDesign(message);
+});
 
 $('accents').addEventListener('click', () => {
   if (busy) return;
