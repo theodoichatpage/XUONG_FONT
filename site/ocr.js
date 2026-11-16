@@ -71,7 +71,7 @@ export async function detectWords(worker, canvas) {
     .filter(word => word.text.trim() && word.symbols.length);
 }
 
-export async function transcribeWordImages(rows, key) {
+export async function transcribeWordImages(rows, key, preferredModel) {
   const width = 640, rowHeight = 80;
   const sheet = document.createElement('canvas');
   sheet.width = width;
@@ -95,12 +95,12 @@ export async function transcribeWordImages(rows, key) {
   const response = await fetch('/api/glyph-review', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
-    body: JSON.stringify({ mode: 'transcribe', count: rows.length, sheet: sheet.toDataURL('image/png').split(',')[1] }),
+    body: JSON.stringify({ mode: 'transcribe', preferredModel, count: rows.length, sheet: sheet.toDataURL('image/png').split(',')[1] }),
     signal: AbortSignal.timeout(40000)
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? 'Gemini chưa đọc được ảnh.');
-  return new Map(data.rows.map(row => [row.id, row]));
+  return { labels: new Map(data.rows.map(row => [row.id, row])), model: data.model };
 }
 
 function luminance(data, p) {

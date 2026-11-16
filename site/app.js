@@ -296,7 +296,7 @@ async function runGlyphReview() {
     const response = await fetch('/api/glyph-review', {
       method: 'POST', signal: request.signal,
       headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
-      body: JSON.stringify({ char: reviewGlyph.char, reference: reviewProof.reference.split(',')[1], rendered: reviewProof.rendered.split(',')[1] })
+      body: JSON.stringify({ preferredModel: connectedGeminiModel, char: reviewGlyph.char, reference: reviewProof.reference.split(',')[1], rendered: reviewProof.rendered.split(',')[1] })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
@@ -323,10 +323,12 @@ const geminiKey = $('gemini-key');
 const connectionButton = $('gemini-check');
 const connectionStatus = $('gemini-connection');
 let connectionRequest;
+let connectedGeminiModel;
 
 function resetConnection() {
   connectionRequest?.abort();
   connectionRequest = undefined;
+  connectedGeminiModel = undefined;
   connectionButton.disabled = !geminiKey.value.trim();
   connectionStatus.textContent = '';
 }
@@ -347,7 +349,10 @@ async function checkGeminiConnection() {
     });
     const data = await response.json();
     if (!response.ok || data.connected !== true) throw new Error(data.error ?? 'Gemini chưa xác nhận kết nối.');
-    if (connectionRequest === request) connectionStatus.textContent = 'Đã kết nối Gemini. Chọn ký tự để kiểm tra nét.';
+    if (connectionRequest === request) {
+      connectedGeminiModel = data.model;
+      connectionStatus.textContent = 'Đã kết nối Gemini (' + data.model + '). Bạn có thể dùng AI đọc ảnh và dựng chữ.';
+    }
   } catch (error) {
     if (connectionRequest === request) connectionStatus.textContent = error.message || 'Chưa kết nối được với Gemini.';
   } finally {
@@ -751,7 +756,11 @@ async function scanReferences(useAI = false) {
           const batch = candidates.slice(start, start + 12);
           let labels;
           if (useAI && !aiError) {
-            try { labels = await transcribeWordImages(batch, key); }
+            try {
+              const result = await transcribeWordImages(batch, key, connectedGeminiModel);
+              labels = result.labels;
+              if (geminiKey.value.trim() === key) connectedGeminiModel = result.model;
+            }
             catch (error) { aiError = error.message; }
           }
           for (const [offset, entry] of batch.entries()) {
