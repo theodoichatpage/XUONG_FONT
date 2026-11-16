@@ -102,3 +102,6 @@ dialog::backdrop{background:#221a17bd}
 
 #gemini-key-home:not(:empty){margin-top:12px}
 #gemini-key-help{margin-top:4px}
+
+#gemini-check{margin-top:6px}
+#gemini-connection:not(:empty){margin-top:5px}

@@ -318,6 +318,55 @@ async function runGlyphReview() {
   }
 }
 
+const geminiKey = $('gemini-key');
+const connectionButton = $('gemini-check');
+const connectionStatus = $('gemini-connection');
+let connectionRequest;
+
+function resetConnection() {
+  connectionRequest?.abort();
+  connectionRequest = undefined;
+  connectionButton.disabled = !geminiKey.value.trim();
+  connectionStatus.textContent = '';
+}
+
+async function checkGeminiConnection() {
+  const key = geminiKey.value.trim();
+  if (!key || connectionRequest) return;
+  const request = new AbortController();
+  connectionRequest = request;
+  connectionButton.disabled = true;
+  connectionStatus.textContent = 'Đang kiểm tra Gemini…';
+  try {
+    const response = await fetch('/api/glyph-review', {
+      method: 'POST',
+      signal: request.signal,
+      headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
+      body: JSON.stringify({ check: true })
+    });
+    const data = await response.json();
+    if (!response.ok || data.connected !== true) throw new Error(data.error ?? 'Gemini chưa xác nhận kết nối.');
+    if (connectionRequest === request) connectionStatus.textContent = 'Đã kết nối Gemini. Chọn ký tự để kiểm tra nét.';
+  } catch (error) {
+    if (connectionRequest === request) connectionStatus.textContent = error.message || 'Chưa kết nối được với Gemini.';
+  } finally {
+    if (connectionRequest === request) {
+      connectionRequest = undefined;
+      connectionButton.disabled = false;
+    }
+  }
+}
+
+geminiKey.addEventListener('input', resetConnection);
+geminiKey.addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    checkGeminiConnection();
+  }
+});
+connectionButton.addEventListener('click', checkGeminiConnection);
+resetConnection();
+
 $('ai-review-open').addEventListener('click', openGlyphReview);
 $('ai-review-run').addEventListener('click', runGlyphReview);
 viewer.addEventListener('close', () => resetGlyphReview());

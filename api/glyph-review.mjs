@@ -34,15 +34,19 @@ export async function POST(request) {
   let input;
   try { input = await request.json(); }
   catch { return json({ error: 'Không đọc được yêu cầu kiểm tra.' }, 400); }
-  const { char, reference, rendered } = input ?? {};
-  if (typeof char !== 'string' || [...char].length !== 1 || !isPng(reference) || !isPng(rendered)) {
+  const { char, reference, rendered, check } = input ?? {};
+  const testing = check === true;
+  if (!testing && (typeof char !== 'string' || [...char].length !== 1 || !isPng(reference) || !isPng(rendered))) {
     return json({ error: 'Cần một ký tự và hai ảnh PNG hợp lệ.' }, 400);
   }
   try {
     const result = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
+      body: JSON.stringify(testing ? {
+        contents: [{ parts: [{ text: 'Chỉ trả lời OK.' }] }],
+        generationConfig: { maxOutputTokens: 128, thinkingConfig: { thinkingLevel: 'low' } }
+      } : {
         systemInstruction: { parts: [{ text: instruction }] },
         contents: [{ parts: [
           { text: 'Ký tự cần kiểm tra: ' + JSON.stringify(char) },
@@ -60,6 +64,10 @@ export async function POST(request) {
     if (result.status === 429) return json({ error: 'Gemini đã chạm giới hạn sử dụng. Hãy kiểm tra hạn mức API.' }, 429);
     if (!result.ok) return json({ error: 'Gemini hiện chưa trả kết quả. Hãy thử lại.' }, 502);
     const payload = await result.json();
+    if (testing) {
+      if (!payload.candidates?.length) return json({ error: 'Gemini chưa trả phản hồi kiểm tra. Hãy thử lại.' }, 502);
+      return json({ connected: true }, 200);
+    }
     const text = payload.candidates?.[0]?.content?.parts?.filter(part => !part.thought).map(part => part.text ?? '').join('');
     const review = JSON.parse(text);
     if (!schema.properties.verdict.enum.includes(review.verdict) || !Array.isArray(review.findings)
