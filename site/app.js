@@ -646,9 +646,22 @@ function updateComposed() {
   }
 }
 
+function splitReferenceWord(mask, area, chars) {
+  if (chars.length === 1) return [area];
+  const separated = splitCleanWord(mask, area, chars);
+  if (separated.length) return separated;
+  if (chars.some(char => /^[õÕ]$/u.test(char))) {
+    const byBody = splitWordByGaps(mask, area, chars.length, true);
+    if (byBody.length) return byBody;
+  }
+  return splitWordByGaps(mask, area, chars.length);
+}
+
 async function trace(single) {
   if (busy || loading) return;
-  const chars = [...$('chars').value.normalize('NFC').replace(/\s/g, '')];
+  const text = $('chars').value.normalize('NFC').trim();
+  const words = text.split(/\s+/u).map(word => [...word]);
+  const chars = words.flat();
   if (!source || !chars.length) return status('Hãy chọn ảnh và nhập chữ trong vùng đã khoanh.');
   if (chars.some(char => !charset.includes(char))) return status('Bản này hỗ trợ chữ hoa, chữ thường tiếng Việt, số và dấu câu trong bảng.');
   if (single && chars.length !== 1) return status('Hãy khoanh một chữ và nhập đúng một ký tự.');
@@ -656,24 +669,52 @@ async function trace(single) {
   $('trace').disabled = $('single').disabled = true;
   renderReferences();
   try {
-    const { ink, blobs, width } = segmentation();
-    const boxes = single ? inkBounds(ink, width) : blobs;
-    if (boxes.length !== chars.length) {
-      throw new Error(`Tìm được ${boxes.length} cụm nét, bạn nhập ${chars.length} ký tự. Hãy chỉnh ngưỡng hoặc khoanh từng chữ và bấm “Thêm một chữ”.`);
-    }
+    const area = selection();
+    const image = document.createElement('canvas');
+    image.width = area.w;
+    image.height = area.h;
+    image.getContext('2d').putImageData(source, -area.x, -area.y);
+    const rect = { x0: 0, y0: 0, x1: image.width, y1: image.height };
+    const mask = wordInk(image, rect);
+    const parts = mask.preserveOutline ? splitReferenceWord(mask, rect, chars) : [];
     const traced = new Map();
-    for (const [i, char] of chars.entries()) {
-      if (traced.has(char)) continue;
-      status(`Đang dựng nét chữ ${i + 1}/${chars.length}…`);
-      const box = boxes[i];
-      const glyph = await makeGlyph(ink, width, box, char);
-      if (activeReference >= 0) {
-        const area = selection();
-        glyph.reference = { index: activeReference, crop: {
-          x: area.x + box.x0, y: area.y + box.y0, w: box.x1 - box.x0 + 1, h: box.y1 - box.y0 + 1
-        } };
+
+    if (parts.length === chars.length) {
+      const word = [];
+      for (const [i, char] of chars.entries()) {
+        status(`Đang dựng nét chữ ${i + 1}/${chars.length}…`);
+        const glyph = await traceSymbol(mask, parts[i], char, rect);
+        if (activeReference >= 0) {
+          const { x, y, w, h } = glyph.pixelCrop;
+          glyph.reference = { index: activeReference, crop: { x: area.x + x, y: area.y + y, w, h } };
+        }
+        word.push(glyph);
       }
-      traced.set(char, glyph);
+      let start = 0;
+      const groups = words.map(chars => {
+        const group = word.slice(start, start + chars.length);
+        start += chars.length;
+        return group;
+      });
+      for (const glyph of alignReferenceGlyphs(groups)) traced.set(glyph.char, glyph);
+    } else {
+      const { ink, blobs, width } = segmentation();
+      const boxes = single ? inkBounds(ink, width) : blobs;
+      if (boxes.length !== chars.length) {
+        throw new Error(`Tìm được ${boxes.length} cụm nét, bạn nhập ${chars.length} ký tự. Hãy khoanh từng từ hoặc chọn một chữ.`);
+      }
+      for (const [i, char] of chars.entries()) {
+        if (traced.has(char)) continue;
+        status(`Đang dựng nét chữ ${i + 1}/${chars.length}…`);
+        const box = boxes[i];
+        const glyph = await makeGlyph(ink, width, box, char);
+        if (activeReference >= 0) {
+          glyph.reference = { index: activeReference, crop: {
+            x: area.x + box.x0, y: area.y + box.y0, w: box.x1 - box.x0 + 1, h: box.y1 - box.y0 + 1
+          } };
+        }
+        traced.set(char, glyph);
+      }
     }
     const replacements = [...traced.keys()].filter(char => glyphs.get(char)?.source === 'Ảnh mẫu');
     if (replacements.length && !window.confirm(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`)) {
@@ -892,22 +933,12 @@ async function runFontJob() {
         const expanded = expandWordBox(original, neighbors, image);
         let area = expanded;
         let mask = wordInk(image, area);
-        const split = () => {
-          if (chars.length === 1) return [area];
-          const separated = splitCleanWord(mask, area, chars);
-          if (separated.length) return separated;
-          if (chars.some(char => /^[õÕ]$/u.test(char))) {
-            const byBody = splitWordByGaps(mask, area, chars.length, true);
-            if (byBody.length) return byBody;
-          }
-          return splitWordByGaps(mask, area, chars.length);
-        };
-        let parts = split();
+        let parts = splitReferenceWord(mask, area, chars);
         if (!parts.length || inkCrossesBox(mask, area)) {
           area = original;
           mask = wordInk(image, area);
           if (inkCrossesBox(mask, area)) continue;
-          parts = split();
+          parts = splitReferenceWord(mask, area, chars);
         }
         const wordGlyphs = [];
         for (const [offset, part] of parts.entries()) {
@@ -934,7 +965,7 @@ async function runFontJob() {
       refresh();
     }
     if (skipped.length) {
-      reportDesign(`Đã cập nhật ${accepted} ký tự. ${skipped.join(' ')} Bấm Dựng chữ có mẫu để thử lại.`);
+      reportDesign(`Đã cập nhật ${accepted} ký tự. ${skipped.join(' ')} Thử lại, hoặc khoanh vùng chữ và nhập nội dung để dựng trực tiếp.`);
       return;
     }
     if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
