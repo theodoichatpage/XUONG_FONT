@@ -1,6 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, traceSymbol } from './ocr.js';
+import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol } from './ocr.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('image');
@@ -444,57 +444,53 @@ async function applyReviewedWords() {
     message.textContent = 'Chọn ít nhất một từ để lấy nét.';
     return;
   }
-  const corrected = new Map();
+  const groups = new Map();
+  const skipped = [];
   for (const entry of chosen) {
     const chars = [...entry.input.value.normalize('NFC').replace(/\s/g, '')];
-    if (chars.length !== entry.word.symbols.length || chars.some(char => !charset.includes(char))) {
-      message.textContent = `Ảnh ${entry.index + 1}: “${entry.input.value}” cần đúng ${entry.word.symbols.length} ký tự trong bảng. Bạn có thể bỏ chọn và khoanh thủ công.`;
-      entry.input.focus();
-      return;
+    if (!chars.length || chars.some(char => !charset.includes(char))) {
+      skipped.push(`Ảnh ${entry.index + 1}: “${entry.input.value}” (ký tự ngoài bảng hoặc ô trống)`);
+      continue;
     }
-    corrected.set(entry, chars);
+    const group = groups.get(entry.index) ?? [];
+    group.push({ entry, chars });
+    groups.set(entry.index, group);
   }
   setScanBusy(true);
   const added = new Map();
+  const scores = new Map();
   const failed = new Set();
   const imported = new Set();
-  // Rank references by OCR confidence per character without replacing approved artwork.
-  const candidates = new Map();
-  for (const [entry, chars] of corrected) {
-    chars.forEach((char, i) => {
-      if (glyphs.get(char)?.source === 'Ảnh mẫu') return;
-      const symbol = entry.word.symbols[i];
-      const options = candidates.get(char) ?? [];
-      options.push({ entry, symbol });
-      candidates.set(char, options);
-    });
-  }
   try {
-    const byReference = new Map();
-    for (const [char, options] of candidates) {
-      const best = options.reduce((a, b) =>
-        (a.symbol.confidence ?? a.entry.word.confidence) >= (b.symbol.confidence ?? b.entry.word.confidence) ? a : b);
-      const group = byReference.get(best.entry.index) ?? [];
-      group.push({ char, ...best });
-      byReference.set(best.entry.index, group);
-    }
-    for (const [index, group] of byReference) {
+    for (const [index, group] of groups) {
       let image;
       try {
         image = await referenceCanvas(references[index].file, group[0].entry.settings?.crop);
       } catch {
-        group.forEach(({ char }) => failed.add(char));
+        skipped.push(`Ảnh ${index + 1}: không mở được ảnh`);
         continue;
       }
-      const masks = new Map();
-      for (const { char, entry, symbol } of group) {
-        try {
-          message.textContent = `Đang lấy nét chữ ${char}…`;
-          if (!masks.has(entry)) masks.set(entry, wordInk(image, entry.word.bbox, entry.settings));
-          added.set(char, await traceSymbol(masks.get(entry), symbol.bbox, char));
-          imported.add(index);
-        } catch {
-          failed.add(char);
+      for (const { entry, chars } of group) {
+        const mask = wordInk(image, entry.word.bbox, entry.settings);
+        const matching = chars.length === entry.word.symbols.length;
+        const boxes = matching ? entry.word.symbols.map(symbol => symbol.bbox)
+          : splitWordByGaps(mask, entry.word.bbox, chars.length);
+        if (!boxes.length) {
+          skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (${entry.word.symbols.length} vùng OCR cho ${chars.length} chữ)`);
+          continue;
+        }
+        for (const [i, char] of chars.entries()) {
+          if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
+          const score = matching ? entry.word.symbols[i].confidence ?? entry.word.confidence : 0;
+          if (scores.has(char) && scores.get(char) >= score) continue;
+          try {
+            message.textContent = `Đang lấy nét chữ ${char}…`;
+            added.set(char, await traceSymbol(mask, boxes[i], char));
+            scores.set(char, score);
+            imported.add(index);
+          } catch {
+            failed.add(char);
+          }
         }
       }
     }
@@ -508,6 +504,7 @@ async function applyReviewedWords() {
     const missing = [...failed].filter(char => !added.has(char));
     message.textContent = added.size ? `Đã thêm ${added.size} ký tự từ ảnh gốc. Xem bộ ký tự và tải .TTF bên dưới.` : 'Chưa có ký tự mới để thêm.';
     if (missing.length) message.textContent += ' Cần khoanh lại: ' + missing.join(' ');
+    if (skipped.length) message.textContent += '\nChưa lấy nét từ ' + skipped.length + ' vùng:\n' + skipped.join('\n');
   } finally {
     setScanBusy(false);
   }
