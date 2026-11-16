@@ -105,3 +105,7 @@ dialog::backdrop{background:#221a17bd}
 
 #gemini-check{margin-top:6px}
 #gemini-connection:not(:empty){margin-top:5px}
+
+.source-image-wrap{position:relative;display:table;margin:0 auto;max-width:100%}
+.remove-reference{position:absolute;top:4px;right:4px;width:24px;height:24px;padding:0;line-height:1;border-radius:50%;background:#2c221dd9;color:#fff;border:1px solid #ffffff85;font-size:17px}
+.remove-reference:hover:not(:disabled){background:var(--red);color:#fff;border-color:#fff}

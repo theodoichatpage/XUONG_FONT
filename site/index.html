@@ -50,7 +50,10 @@
         <p class="help">Quy trình AI gửi các vùng chữ đến Gemini. Bạn chỉ cần duyệt những vùng chưa chắc chắn.</p>
       </div>
       <div id="stage" hidden>
-        <canvas id="image" tabindex="0" role="button" aria-haspopup="dialog" aria-label="Ảnh mẫu. Bấm để xem lớn, kéo để khoanh vùng chữ."></canvas>
+        <div class="source-image-wrap">
+          <canvas id="image" tabindex="0" role="button" aria-haspopup="dialog" aria-label="Ảnh mẫu. Bấm để xem lớn, kéo để khoanh vùng chữ."></canvas>
+          <button id="remove-reference" class="remove-reference" type="button" aria-label="Bỏ ảnh đang mở khỏi danh sách" title="Bỏ ảnh này" hidden>×</button>
+        </div>
         <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
       </div>
       <div class="field-row">

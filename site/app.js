@@ -26,7 +26,7 @@ let restoring = true;
 let storageRevision = 0;
 
 function persistReferences(withImages = false) {
-  if (restoring || !references.length) return;
+  if (restoring || (!references.length && !withImages)) return;
   rememberReference();
   withImages ||= referenceImagesNeedSave;
   const turn = ++storageRevision;
@@ -149,6 +149,8 @@ function renderReferences() {
   $('reference-count').textContent = activeReference >= 0
     ? `${activeReference + 1}/${references.length}` : `${references.length} ảnh`;
   select.disabled = busy || loading;
+  $('remove-reference').hidden = activeReference < 0;
+  $('remove-reference').disabled = busy || loading;
   $('scan').disabled = $('ai-scan').disabled = busy || loading || !references.length;
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
@@ -197,6 +199,44 @@ async function showReference(index) {
     }
   }
 }
+
+async function removeActiveReference() {
+  if (busy || loading || restoring || activeReference < 0) return;
+  const index = activeReference;
+  const [removed] = references.splice(index, 1);
+  if (!removed) return;
+  activeReference = -1;
+  source = crop = undefined;
+  $('stage').hidden = true;
+  $('filename').textContent = 'PNG, JPG, WebP';
+  $('chars').value = '';
+  reviewGroups = reviewGroups.filter(group => {
+    if (group.index === index) {
+      group.element.remove();
+      return false;
+    }
+    if (group.index > index) group.index--;
+    for (const row of group.rows) row.index = group.index;
+    group.element.querySelector('legend').textContent =
+      `Ảnh ${group.index + 1} · ${references[group.index].file.name}`;
+    return true;
+  });
+  reviewedWords = reviewGroups.flatMap(group => group.rows);
+  $('ocr-review').hidden = !reviewGroups.length;
+  $('ocr-status').textContent = '';
+  for (const glyph of glyphs.values()) {
+    if (glyph.reference?.index === index) delete glyph.reference;
+    else if (glyph.reference?.index > index) glyph.reference.index--;
+  }
+  save();
+  renderReferences();
+  refreshReviewVisibility();
+  persistReferences(true);
+  if (references.length) await showReference(Math.min(index, references.length - 1));
+  status('Đã bỏ ảnh “' + removed.file.name + '” khỏi danh sách.');
+}
+
+$('remove-reference').addEventListener('click', removeActiveReference);
 
 function addFiles(files) {
   if (restoring) return status('Đang khôi phục ảnh. Hãy thử lại sau khi hoàn tất.');
