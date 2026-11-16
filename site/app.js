@@ -1,6 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol, transcribeWordImages } from './ocr.js';
+import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol, locateWordsWithGemini } from './ocr.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { prepareGlyphReview } from './glyph-review.js';
 
@@ -151,7 +151,11 @@ function renderReferences() {
   select.disabled = busy || loading;
   $('remove-reference').hidden = activeReference < 0;
   $('remove-reference').disabled = busy || loading;
-  $('scan').disabled = $('ai-scan').disabled = busy || loading || !references.length;
+  $('scan').disabled = busy || loading || !references.length;
+  $('ai-scan').disabled = busy || loading || !references.length || !connectedGeminiModel || !!connectionRequest;
+  $('ai-scan-help').textContent = connectedGeminiModel
+    ? 'Gemini đọc trực tiếp ảnh mẫu. Bạn chỉ duyệt những vùng chưa chắc chắn.'
+    : 'Kiểm tra kết nối Gemini thành công để bật nút AI.';
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
 }
@@ -321,8 +325,8 @@ async function openGlyphReview() {
 async function runGlyphReview() {
   if (!reviewProof || !reviewGlyph || reviewRequest) return;
   const key = $('gemini-key').value.trim();
-  if (!key) {
-    $('ai-review-status').textContent = 'Hãy nhập khóa Gemini API.';
+  if (!key || !connectedGeminiModel || connectionRequest) {
+    $('ai-review-status').textContent = 'Nhập khóa rồi bấm Kiểm tra kết nối trước.';
     $('gemini-key').focus();
     return;
   }
@@ -371,15 +375,18 @@ function resetConnection() {
   connectedGeminiModel = undefined;
   connectionButton.disabled = !geminiKey.value.trim();
   connectionStatus.textContent = '';
+  renderReferences();
 }
 
 async function checkGeminiConnection() {
   const key = geminiKey.value.trim();
-  if (!key || connectionRequest) return;
+  if (!key || connectionRequest || busy) return;
+  connectedGeminiModel = undefined;
   const request = new AbortController();
   connectionRequest = request;
   connectionButton.disabled = true;
   connectionStatus.textContent = 'Đang kiểm tra Gemini…';
+  renderReferences();
   try {
     const response = await fetch('/api/glyph-review', {
       method: 'POST',
@@ -399,6 +406,7 @@ async function checkGeminiConnection() {
     if (connectionRequest === request) {
       connectionRequest = undefined;
       connectionButton.disabled = false;
+      renderReferences();
     }
   }
 }
@@ -763,78 +771,78 @@ $('show-processed').addEventListener('change', refreshReviewVisibility);
 async function scanReferences(useAI = false) {
   if (busy || loading || !references.length) return;
   const key = useAI ? geminiKey.value.trim() : '';
-  if (useAI && !key) {
-    connectionStatus.textContent = 'Dán khóa Gemini API để AI đọc ảnh.';
-    geminiKey.focus();
+  if (useAI && (!key || !connectedGeminiModel || connectionRequest)) {
+    status('Hãy kiểm tra kết nối Gemini thành công trước khi chạy AI.');
     return;
   }
   rememberReference();
-  reviewedWords = [];
-  reviewGroups = [];
-  $('ocr-results').replaceChildren();
-  $('ocr-status').textContent = '';
-  $('ocr-review').hidden = true;
-  $('show-processed').checked = false;
-  setScanBusy(true);
-  status('Đang tải bộ nhận diện tiếng Việt…');
+  const prepared = [];
+  const failures = [];
   let worker;
-  let failures = 0;
-  let aiError;
+  let model = connectedGeminiModel;
+  setScanBusy(true);
+  connectionButton.disabled = true;
+  status(useAI ? 'Đang chuẩn bị ảnh mẫu cho Gemini…' : 'Đang tải bộ nhận diện tiếng Việt…');
   try {
-    worker = await createOcrWorker();
+    if (!useAI) worker = await createOcrWorker();
     for (const [index, entry] of references.entries()) {
-      status(`Đang quét ảnh ${index + 1}/${references.length}…`);
+      status(`Đang ${useAI ? 'đọc ảnh bằng Gemini' : 'quét OCR'} ${index + 1}/${references.length}…`);
+      let image;
       try {
-        const image = await referenceCanvas(entry.file, entry.settings?.crop);
-        const words = await detectWords(worker, image);
-        const candidates = words.map(({ text, confidence, bbox, symbols }) => ({
-          word: { text, confidence, bbox, symbols: symbols.map(symbol => ({ bbox: symbol.bbox, confidence: symbol.confidence })) },
-          thumbnail: wordThumbnail(image, bbox)
-        }));
-        const rows = [];
-        for (let start = 0; start < candidates.length; start += 12) {
-          const batch = candidates.slice(start, start + 12);
-          let labels;
-          if (useAI && !aiError) {
-            try {
-              const result = await transcribeWordImages(batch, key, connectedGeminiModel);
-              labels = result.labels;
-              if (geminiKey.value.trim() === key) connectedGeminiModel = result.model;
-            }
-            catch (error) { aiError = error.message; }
-          }
-          for (const [offset, entry] of batch.entries()) {
-            const label = labels?.get(offset + 1);
-            const recognized = label?.text.normalize('NFC').trim();
-            const clear = !!recognized && label.clear;
-            const text = recognized || entry.word.text;
-            rows.push({
-              word: entry.word, thumbnail: entry.thumbnail.toDataURL(), text,
-              ...(useAI ? { ai: { clear }, checked: clear } : {})
-            });
-          }
-        }
-        addReviewGroup(index, entry.settings, rows);
+        image = await referenceCanvas(entry.file, entry.settings?.crop);
       } catch {
-        failures++;
-        const note = document.createElement('p');
-        note.className = 'help';
-        note.textContent = `Không quét được ảnh ${index + 1} · ${entry.file.name}`;
-        $('ocr-results').append(note);
+        failures.push(index + 1);
+        continue;
       }
+      let words;
+      if (useAI) {
+        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+        const result = await locateWordsWithGemini(image, key, model);
+        words = result.words;
+        model = result.model ?? model;
+      } else {
+        try { words = await detectWords(worker, image); }
+        catch {
+          failures.push(index + 1);
+          continue;
+        }
+      }
+      const rows = words.map(({ text, confidence, bbox, symbols, clear }) => ({
+        word: { text, confidence, bbox, symbols: symbols.map(symbol => ({ bbox: symbol.bbox, confidence: symbol.confidence })) },
+        thumbnail: wordThumbnail(image, bbox).toDataURL(),
+        ...(useAI ? { text, ai: { clear }, checked: clear && !!text } : {})
+      }));
+      prepared.push({ index, settings: entry.settings, rows });
     }
+    if (useAI && geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+    if (!prepared.length) throw new Error('Không mở hoặc đọc được ảnh nào.');
+    if (useAI) connectedGeminiModel = model;
+    reviewedWords = [];
+    reviewGroups = [];
+    $('ocr-results').replaceChildren();
+    $('ocr-status').textContent = '';
+    $('show-processed').checked = false;
+    for (const group of prepared) addReviewGroup(group.index, group.settings, group.rows);
     $('ocr-review').hidden = false;
     persistReferences();
-    const summary = `Tìm được ${reviewedWords.length} vùng chữ trong ${references.length - failures}/${references.length} ảnh đã quét.`;
-    status(aiError ? summary + ' Gemini chưa đọc hết ảnh: ' + aiError : summary);
-    if (useAI && reviewedWords.some(entry => entry.ai?.clear)) {
+    const suffix = failures.length ? ' Không mở hoặc đọc được ảnh ' + failures.join(', ') + '.' : '';
+    status(`Tìm được ${reviewedWords.length} vùng chữ trong ${prepared.length}/${references.length} ảnh.` + suffix);
+    if (useAI && reviewedWords.some(entry => entry.include.checked)) {
       setScanBusy(false);
       await applyReviewedWords(true);
-    } else refreshReviewVisibility();
+    }
   } catch (error) {
-    status('Quét ảnh chưa hoàn tất. ' + error.message);
+    if (useAI) {
+      connectedGeminiModel = undefined;
+      connectionStatus.textContent = 'Cần kiểm tra lại kết nối trước khi chạy AI.';
+    }
+    status((useAI ? 'Đã dừng Gemini. ' : 'Quét OCR chưa hoàn tất. ') + error.message);
   } finally {
-    try { await worker?.terminate(); } finally { setScanBusy(false); refreshReviewVisibility(); }
+    try { await worker?.terminate(); } finally {
+      setScanBusy(false);
+      connectionButton.disabled = !geminiKey.value.trim();
+      refreshReviewVisibility();
+    }
   }
 }
 

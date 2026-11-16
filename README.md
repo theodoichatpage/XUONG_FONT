@@ -16,7 +16,7 @@ Start-Process .\dist\xuong-font.html
 
 ## AI đọc ảnh và dựng chữ
 
-Nhập khóa Gemini API, thêm ảnh mẫu và bấm **AI đọc ảnh và dựng chữ**. Xưởng Font tìm các vùng chữ bằng OCR trong trình duyệt, gửi các vùng cắt đến Gemini để đọc nội dung, rồi tự lấy đường nét từ pixel gốc khi phân tách đủ rõ. Các nét đã có được giữ lại. Chỉ những vùng chưa đọc chắc hoặc chưa tách được mới hiện mặc định trong phần duyệt. Sửa hoặc điền chữ ngay cạnh ảnh, rồi bấm **Lấy nét từ các từ đã chọn**. Ký tự chưa có mẫu vẫn hiện **Còn thiếu**.
+Nhập khóa Gemini API và bấm **Kiểm tra kết nối**. Khi đã kết nối, thêm ảnh mẫu và bấm **AI đọc ảnh và dựng chữ**. Gemini định vị và đọc trực tiếp ảnh mẫu. Xưởng Font lấy đường nét từ pixel gốc khi phân tách đủ rõ. Nếu kết nối lỗi giữa chừng, lượt AI dừng và giữ kết quả trước đó. Các nét đã có được giữ lại. Chỉ những vùng chưa đọc chắc hoặc chưa tách được mới hiện mặc định trong phần duyệt. Sửa hoặc điền chữ ngay cạnh ảnh, rồi bấm **Lấy nét từ các từ đã chọn**. Ký tự chưa có mẫu vẫn hiện **Còn thiếu**.
 
 ## Quét nhiều ảnh trên web
 

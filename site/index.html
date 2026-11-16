@@ -44,10 +44,10 @@
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
         <div class="tool-row scan-actions">
-          <button id="ai-scan" class="primary" type="button">AI đọc ảnh và dựng chữ</button>
+          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>AI đọc ảnh và dựng chữ</button>
           <button id="scan" type="button">Quét OCR thủ công</button>
         </div>
-        <p class="help">Quy trình AI gửi các vùng chữ đến Gemini. Bạn chỉ cần duyệt những vùng chưa chắc chắn.</p>
+        <p id="ai-scan-help" class="help">Kiểm tra kết nối Gemini thành công để bật nút AI.</p>
       </div>
       <div id="stage" hidden>
         <div class="source-image-wrap">

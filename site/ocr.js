@@ -71,36 +71,31 @@ export async function detectWords(worker, canvas) {
     .filter(word => word.text.trim() && word.symbols.length);
 }
 
-export async function transcribeWordImages(rows, key, preferredModel) {
-  const width = 640, rowHeight = 80;
-  const sheet = document.createElement('canvas');
-  sheet.width = width;
-  sheet.height = rowHeight * rows.length;
-  const ctx = sheet.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, sheet.width, sheet.height);
-  ctx.font = 'bold 21px sans-serif';
-  ctx.textBaseline = 'middle';
-  for (const [index, row] of rows.entries()) {
-    const y = index * rowHeight;
-    ctx.fillStyle = '#202020';
-    ctx.fillText(String(index + 1), 12, y + rowHeight / 2);
-    ctx.strokeStyle = '#ddd';
-    ctx.strokeRect(0, y, width, rowHeight);
-    const image = row.thumbnail;
-    const scale = Math.min((rowHeight - 10) / image.height, (width - 66) / image.width);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(image, 55, y + (rowHeight - image.height * scale) / 2, image.width * scale, image.height * scale);
-  }
+export async function locateWordsWithGemini(image, key, preferredModel) {
+  const sample = document.createElement('canvas');
+  const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+  sample.width = Math.max(1, Math.round(image.width * scale));
+  sample.height = Math.max(1, Math.round(image.height * scale));
+  sample.getContext('2d').drawImage(image, 0, 0, sample.width, sample.height);
   const response = await fetch('/api/glyph-review', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
-    body: JSON.stringify({ mode: 'transcribe', preferredModel, count: rows.length, sheet: sheet.toDataURL('image/png').split(',')[1] }),
+    body: JSON.stringify({ mode: 'locate', preferredModel, image: sample.toDataURL('image/jpeg', .92).split(',')[1] }),
     signal: AbortSignal.timeout(40000)
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? 'Gemini chưa đọc được ảnh.');
-  return { labels: new Map(data.rows.map(row => [row.id, row])), model: data.model };
+  const words = data.rows.map(({ box, text, clear }) => {
+    const [top, left, bottom, right] = box;
+    return {
+      text: text.normalize('NFC').trim(), clear, confidence: 0, symbols: [],
+      bbox: {
+        x0: Math.floor(left * image.width / 1000), x1: Math.ceil(right * image.width / 1000),
+        y0: Math.floor(top * image.height / 1000), y1: Math.ceil(bottom * image.height / 1000)
+      }
+    };
+  });
+  return { words, model: data.model };
 }
 
 function luminance(data, p) {
