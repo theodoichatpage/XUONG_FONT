@@ -1,0 +1,20 @@
+{
+  "name": "xuong-font",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "esbuild site/app.js --bundle --minify --format=iife --outfile=dist/app.js --external:node:fs --external:wawoff2 && node scripts/copy-static.cjs"
+  },
+  "dependencies": {
+    "esm-potrace-wasm": "0.5.0",
+    "svg2ttf": "6.0.3",
+    "svgpath": "2.6.0",
+    "ttf2woff": "3.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

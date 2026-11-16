@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Tạo font tiêu đề tiếng Việt từ ảnh mẫu.">
+<title>Xưởng Font</title>
+<link rel="stylesheet" href="./style.css">
+<script defer src="./app.js"></script>
+</head>
+<body>
+<header class="masthead">
+  <a class="brand" href="./"><span class="monogram" aria-hidden="true">Aa</span> XƯỞNG FONT</a>
+  <span class="privacy">Ảnh xử lý trên thiết bị · <a href="https://github.com/theodoichatpage/XUONG_FONT">Mã nguồn</a></span>
+</header>
+<main>
+  <section class="intro">
+    <div><h1>Xưởng Font</h1><p>Tạo font tiêu đề tiếng Việt từ ảnh mẫu.</p></div>
+    <div class="intro-actions"><label for="name">Tên bộ font</label><input id="name" value="Xuong Font" maxlength="40"></div>
+  </section>
+  <div class="workspace">
+    <section class="panel source" aria-labelledby="source-title">
+      <div class="panel-title"><h2 id="source-title">Ảnh mẫu</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
+      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn hoặc kéo ảnh vào đây</strong><small id="filename">PNG, JPG, WebP</small></label>
+      <input id="file" type="file" accept="image/png,image/jpeg,image/webp" class="visually-hidden">
+      <div id="stage" hidden>
+        <canvas id="image" aria-label="Ảnh mẫu. Kéo trên ảnh để khoanh vùng chữ."></canvas>
+        <div class="inline"><small>Kéo trên ảnh để khoanh dòng hoặc một chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
+      </div>
+      <div class="field-row">
+        <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
+        <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
+      </div>
+      <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
+      <form id="trace-form">
+        <label for="chars">Chữ trong vùng chọn</label>
+        <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
+        <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm chữ</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
+      </form>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="panel glyph-panel" aria-labelledby="glyph-title">
+      <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
+      <div class="tool-row"><button id="accents">Tạo dấu tiếng Việt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
+      <div class="glyph-legend"><span><i class="dot filled"></i> Ảnh mẫu</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
+      <div id="glyphs" class="glyph-grid" aria-label="Ký tự chính"></div>
+      <details><summary id="more-label">Chữ có dấu và dấu câu</summary><div id="more-glyphs" class="glyph-grid"></div></details>
+      <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
+      <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
+    </section>
+  </div>
+  <section class="panel proof" aria-labelledby="proof-title">
+    <div class="panel-title"><h2 id="proof-title">Thử tiêu đề</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
+    <label for="sample">Nội dung xem trước</label>
+    <input id="sample" value="HÀO KHÍ LAM SƠN" maxlength="240">
+    <div id="preview" aria-hidden="true">HÀO KHÍ LAM SƠN</div>
+    <div class="field-row proof-fields">
+      <label>Cỡ chữ <output id="size-value">68</output> px<input type="range" id="size" min="24" max="110" value="68"></label>
+      <label>Khoảng cách chữ <output id="spacing-value">0</output><input type="range" id="spacing" min="-30" max="140" value="0"></label>
+    </div>
+    <p id="missing" class="help" aria-live="polite"></p>
+  </section>
+</main>
+</body>
+</html>
