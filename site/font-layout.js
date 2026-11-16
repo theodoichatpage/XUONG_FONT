@@ -100,13 +100,19 @@ export function measureLeftStem(glyph) {
   const width = median(middle.map(row => row.stem));
   const edge = median(middle.map(row => row.left));
   if (!Number.isFinite(width) || width < 8) return null;
-  return { width, edge, box };
+  const stableRows = middle.filter(row => Math.abs(row.left - edge) <= width * .14
+    && Math.abs(row.stem - width) <= width * .19).length;
+  return { width, edge, box, stable: stableRows >= middle.length * .78 };
 }
 
 export function matchLeftStem(glyph, reference) {
   const current = measureLeftStem(glyph), desired = measureLeftStem(reference);
   if (!current || !desired) return null;
-  const delta = desired.width - current.width;
+  return fitStemWidth(glyph, current, desired.width);
+}
+
+function fitStemWidth(glyph, current, targetWidth) {
+  const delta = targetWidth - current.width;
   if (Math.abs(delta) < 4) return null;
   const start = current.edge, seam = start + current.width;
   const right = current.box.x + current.box.width;
@@ -125,4 +131,33 @@ export function matchLeftStem(glyph, reference) {
     return x + delta * (right - x) / (right - seam);
   }
   return { ...glyph, d: outline.round(1).toString() };
+}
+
+const comparableStems = [
+  'BDEFHIKLMNPRU',
+  'bdhiklmnpru',
+  '0689'
+];
+
+export function balanceFontStrokes(glyphs) {
+  const updates = [];
+  let measured = 0;
+  for (const group of comparableStems) {
+    const candidates = glyphs.filter(glyph => glyph.source !== 'Ghép dấu'
+      && group.includes(glyph.char.normalize('NFD')[0])).map(glyph => ({ glyph, stem: measureLeftStem(glyph) }))
+      .filter(({ stem }) => stem?.stable);
+    measured += candidates.length;
+    // Base letters determine the weight, so a family with many accents has one vote.
+    const bases = candidates.filter(({ glyph }) => group.includes(glyph.char));
+    if (bases.length < 3) continue;
+    const target = median(bases.map(({ stem }) => stem.width));
+    for (const { glyph, stem } of candidates) {
+      const deviation = Math.abs(stem.width - target) / target;
+      if (deviation < .075 || deviation > .35) continue;
+      const adjusted = fitStemWidth(glyph, stem, target);
+      const estimate = adjusted && measureLeftStem(adjusted);
+      if (estimate && Math.abs(estimate.width - target) + 2 < Math.abs(stem.width - target)) updates.push(adjusted);
+    }
+  }
+  return { updates, measured };
 }

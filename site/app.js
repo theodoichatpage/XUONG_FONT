@@ -4,7 +4,7 @@ import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol,
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
-import { balanceGlyphSpacing, fitLowercaseT, measureLeftStem, matchLeftStem } from './font-layout.js';
+import { balanceGlyphSpacing, fitLowercaseT, measureLeftStem, matchLeftStem, balanceFontStrokes } from './font-layout.js';
 
 const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
@@ -1196,6 +1196,20 @@ function compareStrokes(apply) {
   result.textContent = `Đã cân nét dọc của ${first} theo ${second}. Bấm Đo nét để kiểm tra lại.`;
 }
 
+$('balance-font-strokes').addEventListener('click', () => {
+  if (busy || loading) return;
+  const result = $('stroke-result');
+  const active = charset.map(usableGlyph).filter(Boolean);
+  const { updates, measured } = balanceFontStrokes(active);
+  if (!updates.length) {
+    result.textContent = `Đã đo ${measured} chữ có nét đứng ổn định. Chưa có nét phù hợp để cân tự động.`;
+    return;
+  }
+  for (const glyph of updates) glyphs.set(glyph.char, glyph);
+  updateComposed();
+  refresh();
+  result.textContent = `Đã đo ${measured} chữ và cân nét ${updates.length} chữ: ${updates.map(glyph => glyph.char).join(' ')}.`;
+});
 $('measure-strokes').addEventListener('click', () => compareStrokes(false));
 $('match-strokes').addEventListener('click', () => compareStrokes(true));
 $('sample').addEventListener('input', () => { save(); renderPreview(); });
