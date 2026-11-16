@@ -219,6 +219,7 @@ let reviewRequest;
 let reviewVersion = 0;
 
 function resetGlyphReview(glyph) {
+  $('gemini-key-home').append($('gemini-key-field'));
   reviewVersion++;
   reviewRequest?.abort();
   reviewRequest = undefined;
@@ -238,6 +239,7 @@ async function openGlyphReview() {
   if (!reviewGlyph) return;
   $('viewer-scroll').hidden = true;
   $('ai-review').hidden = false;
+  $('gemini-key-review').append($('gemini-key-field'));
   $('ai-reference-note').textContent = 'Đang chuẩn bị ảnh đối chiếu…';
   const glyph = reviewGlyph;
   const turn = reviewVersion;

@@ -99,3 +99,6 @@ dialog::backdrop{background:#221a17bd}
 #gemini-key{max-width:440px}
 #ai-review-run{margin-top:9px}
 #ai-review-findings:empty{display:none}
+
+#gemini-key-home:not(:empty){margin-top:12px}
+#gemini-key-help{margin-top:4px}

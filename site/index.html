@@ -16,7 +16,17 @@
 <main>
   <section class="intro">
     <div><h1>Xưởng Font</h1><p>Tạo font tiêu đề tiếng Việt từ ảnh mẫu.</p></div>
-    <div class="intro-actions"><label for="name">Tên bộ font</label><input id="name" value="Xuong Font" maxlength="40"></div>
+    <div class="intro-actions">
+      <label for="name">Tên bộ font</label>
+      <input id="name" value="Xuong Font" maxlength="40">
+      <div id="gemini-key-home">
+        <div id="gemini-key-field">
+          <label for="gemini-key">Khóa Gemini API</label>
+          <input id="gemini-key" type="password" placeholder="Dán khóa Gemini API tại đây" autocomplete="off" spellcheck="false" aria-describedby="gemini-key-help">
+          <p id="gemini-key-help" class="help">Dùng khi kiểm tra nét bằng AI. Khóa được giữ trong phiên mở trang.</p>
+        </div>
+      </div>
+    </div>
   </section>
   <div class="workspace">
     <section class="panel source" aria-labelledby="source-title">
@@ -99,8 +109,7 @@
       <figure><img id="ai-rendered" alt="Nét ký tự đã vẽ"><figcaption>Nét đã vẽ</figcaption></figure>
       <figure><img id="ai-overlay" alt="Nét đỏ chồng lên ảnh gốc"><figcaption>Chồng nét đỏ</figcaption></figure>
     </div>
-    <label for="gemini-key">Khóa Gemini API</label>
-    <input id="gemini-key" type="password" autocomplete="off" spellcheck="false">
+    <div id="gemini-key-review"></div>
     <p class="help">Khi bấm kiểm tra, hai ảnh đầu được gửi đến Google Gemini. Khóa chỉ dùng trong phiên này. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Lấy khóa Gemini API</a></p>
     <button id="ai-review-run" class="primary" type="button" disabled>Gửi Gemini kiểm tra</button>
     <p id="ai-review-status" class="status" role="status" aria-live="polite"></p>
