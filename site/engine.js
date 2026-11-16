@@ -123,22 +123,37 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
     const p = (blob.y0 + y) * imgWidth + blob.x0 + x;
     return coverage ? coverage[p] : ink[p] * 255;
   }
-  function sample(x, y) {
-    const center = pixel(x, y);
-    if (!coverage || x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) return center;
-    // Filter the antialiasing ramp before fitting curves, keeping thin features.
-    const cross = pixel(x - 1, y) + pixel(x + 1, y) + pixel(x, y - 1) + pixel(x, y + 1);
-    const corners = pixel(x - 1, y - 1) + pixel(x + 1, y - 1)
-      + pixel(x - 1, y + 1) + pixel(x + 1, y + 1);
-    return (center * 8 + cross * 2 + corners) / 20;
+  const source = new Float32Array((w + 2) * (h + 2));
+  for (let y = -1; y <= h; y++) {
+    for (let x = -1; x <= w; x++) {
+      const center = pixel(x, y);
+      const neighbors = pixel(x - 1, y) + pixel(x + 1, y) + pixel(x, y - 1) + pixel(x, y + 1);
+      const diagonals = pixel(x - 1, y - 1) + pixel(x + 1, y - 1)
+        + pixel(x - 1, y + 1) + pixel(x + 1, y + 1);
+      source[(y + 1) * (w + 2) + x + 1] = coverage
+        ? (center * 12 + neighbors * 3 + diagonals) / 28 : center;
+    }
   }
-  for (let y = 0; y < h * scale; y++) {
+  function sample(x, y) {
+    if (x < -1 || x > w || y < -1 || y > h) return 0;
+    return source[(y + 1) * (w + 2) + x + 1];
+  }
+  // Interpolate grayscale across pixel cells with continuous first derivatives.
+  // Bilinear interpolation introduces a new bend at every pixel boundary.
+  function cubic(a, b, c, d, t) {
+    return b + .5 * t * (c - a + t * (2 * a - 5 * b + 4 * c - d
+      + t * (3 * (b - c) + d - a)));
+  }
+  for (let y = -scale; y < (h + 1) * scale; y++) {
     const sy = (y + .5) / scale - .5, top = Math.floor(sy), dy = sy - top;
-    for (let x = 0; x < w * scale; x++) {
+    for (let x = -scale; x < (w + 1) * scale; x++) {
       const sx = (x + .5) / scale - .5, left = Math.floor(sx), dx = sx - left;
-      const a = sample(left, top) * (1 - dx) + sample(left + 1, top) * dx;
-      const b = sample(left, top + 1) * (1 - dx) + sample(left + 1, top + 1) * dx;
-      if (a * (1 - dy) + b * dy >= 128) {
+      const row = k => cubic(sample(left - 1, k), sample(left, k), sample(left + 1, k), sample(left + 2, k), dx);
+      const value = coverage
+        ? cubic(row(top - 1), row(top), row(top + 1), row(top + 2), dy)
+        : (sample(left, top) * (1 - dx) + sample(left + 1, top) * dx) * (1 - dy)
+          + (sample(left, top + 1) * (1 - dx) + sample(left + 1, top + 1) * dx) * dy;
+      if (value >= 128) {
         const p = ((y + pad) * img.width + x + pad) * 4;
         img.data[p] = img.data[p + 1] = img.data[p + 2] = 0;
       }
@@ -154,9 +169,9 @@ async function traceCrop(img, scale, photograph) {
   await traceReady;
   const svg = await potrace(img, {
     turdsize: 0,
-    alphamax: photograph ? 1.02 : 0.86,
+    alphamax: photograph ? 0.88 : 0.86,
     opticurve: 1,
-    opttolerance: (photograph ? 0.65 : 0.38) * scale,
+    opttolerance: (photograph ? 1.2 : 0.38) * scale,
     extractcolors: false,
   });
   const outline = [...svg.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].map(match => match[1]).join(' ');
@@ -168,7 +183,7 @@ async function traceCrop(img, scale, photograph) {
 
 export async function makeGlyph(ink, width, box, char, coverage) {
   const size = Math.max(box.x1 - box.x0 + 1, box.y1 - box.y0 + 1);
-  const scale = Math.max(1, Math.min(3, Math.floor(900 / size)));
+  const scale = Math.max(1, Math.min(coverage ? 2 : 3, Math.floor(900 / size)));
   const crop = cropToImageData(ink, width, box, coverage, scale);
   const d = await traceCrop(crop, scale, Boolean(coverage));
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
