@@ -233,6 +233,21 @@ function openViewer(url, width, height, title) {
   viewport.scrollLeft = 0;
 }
 
+function zoomGlyph(char) {
+  const glyph = glyphs.get(char);
+  if (!glyph) return;
+  const width = 270, height = 320;
+  const viewWidth = Math.max(1, glyph.advance);
+  const viewHeight = 1240;
+  const outline = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="-30 -1025 ${viewWidth + 60} ${viewHeight + 50}">
+    <rect x="-30" y="-1025" width="${viewWidth + 60}" height="${viewHeight + 50}" fill="#fffaf1"/>
+    <path transform="scale(1 -1)" d="${glyph.d}" fill="#592f29"/>
+  </svg>`;
+  openViewer('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(outline), width, height, `Ký tự ${char} · ${glyph.source}`);
+}
+
+$('zoom-glyph').addEventListener('click', () => zoomGlyph(selected));
+
 function zoomSource() {
   if (!source) return;
   const original = document.createElement('canvas');
@@ -355,6 +370,7 @@ for (const char of charset) {
     $('chars').value = char;
     persistReferences();
     renderGlyphs();
+    zoomGlyph(char);
   });
   const grid = lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
   $(grid).append(button);
@@ -385,7 +401,7 @@ function renderGlyphs() {
   }
   $('count').textContent = `${glyphs.size} / ${charset.length} ký tự`;
   $('selected').textContent = selected ? `${selected} · ${glyphs.get(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
-  $('remove').disabled = !glyphs.has(selected);
+  $('remove').disabled = $('zoom-glyph').disabled = !glyphs.has(selected);
   $('reset').disabled = !glyphs.size;
 }
 
