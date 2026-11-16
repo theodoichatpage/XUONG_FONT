@@ -136,10 +136,10 @@ async function traceCrop(img) {
   traceReady ??= initPotrace();
   await traceReady;
   const svg = await potrace(img, {
-    turdsize: 2,
-    alphamax: 1.05,
+    turdsize: 0,
+    alphamax: 0.65,
     opticurve: 1,
-    opttolerance: 0.2,
+    opttolerance: 0.08,
     extractcolors: false,
   });
   const m = /d="([^"]+)"/.exec(svg);

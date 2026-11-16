@@ -124,6 +124,12 @@
       <figure><img id="ai-rendered" alt="Nét ký tự đã vẽ"><figcaption>Nét đã vẽ</figcaption></figure>
       <figure><img id="ai-overlay" alt="Nét đỏ chồng lên ảnh gốc"><figcaption>Chồng nét đỏ</figcaption></figure>
     </div>
+    <div class="tool-row" id="retrace-actions" hidden>
+      <button id="retrace-glyph" type="button">Dựng lại nét từ ảnh gốc</button>
+      <button id="accept-retrace" type="button" class="primary" hidden>Dùng nét mới</button>
+      <button id="cancel-retrace" type="button" hidden>Giữ nét cũ</button>
+    </div>
+    <p id="retrace-status" class="help" role="status" aria-live="polite"></p>
     <div id="gemini-key-review"></div>
     <p class="help">Khi bấm kiểm tra, hai ảnh đầu được gửi đến Google Gemini. Khóa chỉ dùng trong phiên này. <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Lấy khóa Gemini API</a></p>
     <button id="ai-review-run" class="primary" type="button" disabled>Gửi Gemini kiểm tra</button>

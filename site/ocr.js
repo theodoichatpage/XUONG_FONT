@@ -140,7 +140,24 @@ export function wordInk(canvas, box, settings) {
   const borderCount = border.reduce((sum, n) => sum + n, 0);
   const darkBorder = border.subarray(0, threshold + 1).reduce((sum, n) => sum + n, 0);
   const light = settings?.polarity === 'light' || (settings?.polarity !== 'dark' && darkBorder > borderCount / 2);
-  return { frame, ink: pixels.map(value => Number(light ? value > threshold : value <= threshold)) };
+  const ink = pixels.map(value => Number(light ? value > threshold : value <= threshold));
+  if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink };
+  let cumulative = 0;
+  const background = border.findIndex(n => (cumulative += n) >= borderCount / 2);
+  const detailThreshold = Math.round(background + (threshold - background) * .57);
+  let detailInk = ink;
+  if (Math.abs(threshold - background) >= 14) {
+    for (let pass = 0; pass < 2; pass++) {
+      const previous = detailInk;
+      detailInk = previous.map((on, p) => {
+        if (on || !(light ? pixels[p] > detailThreshold : pixels[p] <= detailThreshold)) return on;
+        const x = p % w;
+        return Number((x > 0 && previous[p - 1]) || (x < w - 1 && previous[p + 1])
+          || previous[p - w] || previous[p + w] || false);
+      });
+    }
+  }
+  return { frame, ink, detailInk };
 }
 
 // A clean blank column is a visible boundary between two letters. Only
@@ -167,11 +184,15 @@ export function splitWordByGaps(mask, box, count) {
       start = -1;
     }
   }
-  return boxes.length === count ? boxes : [];
+  if (boxes.length !== count) return [];
+  const cuts = boxes.slice(1).map((next, index) => Math.round((boxes[index].x1 + next.x0) / 2));
+  return boxes.map((box, index) => ({
+    ...box, x0: cuts[index - 1] ?? x + left, x1: cuts[index] ?? x + right
+  }));
 }
 
 export async function traceSymbol(mask, bbox, char, wordBox) {
-  const { frame: { x, y, w, h }, ink } = mask;
+  const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
   const x1 = Math.min(w, bbox.x1 - x), y1 = Math.min(h, bbox.y1 - y);
   const bounds = { x0: w, y0: h, x1: -1, y1: -1 };
@@ -179,7 +200,7 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   for (let py = y0; py < y1; py++) {
     for (let px = x0; px < x1; px++) {
       const p = py * w + px;
-      if (!ink[p]) continue;
+      if (!detailInk[p]) continue;
       symbolInk[p] = 1;
       bounds.x0 = Math.min(bounds.x0, px);
       bounds.x1 = Math.max(bounds.x1, px);

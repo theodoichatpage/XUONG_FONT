@@ -263,6 +263,17 @@ let reviewGlyph;
 let reviewProof;
 let reviewRequest;
 let reviewVersion = 0;
+let retraceSource;
+let retraceCandidate;
+
+function showGlyphProof(proof) {
+  reviewProof = proof;
+  $('ai-reference').src = proof.reference;
+  $('ai-rendered').src = proof.rendered;
+  $('ai-overlay').src = proof.overlay;
+  $('ai-proof').hidden = false;
+  $('ai-review-run').disabled = false;
+}
 
 function resetGlyphReview(glyph) {
   $('gemini-key-home').append($('gemini-key-field'));
@@ -270,7 +281,11 @@ function resetGlyphReview(glyph) {
   reviewRequest?.abort();
   reviewRequest = undefined;
   reviewGlyph = glyph;
-  reviewProof = undefined;
+  reviewProof = retraceSource = retraceCandidate = undefined;
+  $('retrace-actions').hidden = true;
+  $('retrace-glyph').disabled = false;
+  $('accept-retrace').hidden = $('cancel-retrace').hidden = true;
+  $('retrace-status').textContent = '';
   $('viewer-scroll').hidden = false;
   $('ai-review').hidden = true;
   $('ai-proof').hidden = true;
@@ -293,17 +308,20 @@ async function openGlyphReview() {
     let image;
     let box;
     let label;
+    let origin;
     if (source && crop) {
       image = document.createElement('canvas');
       image.width = source.width;
       image.height = source.height;
       image.getContext('2d').putImageData(source, 0, 0);
       box = crop;
+      if (activeReference >= 0) origin = { index: activeReference, crop: { ...crop } };
       label = 'Đang dùng vùng khoanh trên ảnh đang mở.';
     } else if (glyph.reference && references[glyph.reference.index]) {
       const entry = references[glyph.reference.index];
       image = await referenceCanvas(entry.file, glyph.reference.crop);
       box = { x: 0, y: 0, w: image.width, h: image.height };
+      origin = glyph.reference;
       label = 'Đang dùng vùng ảnh đã lưu khi lấy nét.';
     }
     if (turn !== reviewVersion) return;
@@ -311,17 +329,53 @@ async function openGlyphReview() {
       $('ai-reference-note').textContent = 'Hãy đóng cửa sổ này, khoanh sát một chữ trên ảnh mẫu rồi mở lại ký tự để đối chiếu.';
       return;
     }
-    reviewProof = prepareGlyphReview(image, box, glyph);
-    $('ai-reference').src = reviewProof.reference;
-    $('ai-rendered').src = reviewProof.rendered;
-    $('ai-overlay').src = reviewProof.overlay;
-    $('ai-proof').hidden = false;
+    retraceSource = { image, box, origin };
+    showGlyphProof(prepareGlyphReview(image, box, glyph));
+    $('retrace-actions').hidden = false;
     $('ai-reference-note').textContent = label + ' Hai hình được căn theo khung nét. Hãy xác nhận ảnh gốc chỉ chứa chữ ' + glyph.char + '.';
     $('ai-review-run').disabled = false;
   } catch (error) {
     if (turn === reviewVersion) $('ai-reference-note').textContent = error.message;
   }
 }
+
+$('retrace-glyph').addEventListener('click', async () => {
+  if (!reviewGlyph || !retraceSource || reviewRequest) return;
+  const turn = reviewVersion;
+  const { image, box, origin } = retraceSource;
+  const char = reviewGlyph.char;
+  const bounds = { x0: box.x, y0: box.y, x1: box.x + box.w, y1: box.y + box.h };
+  $('retrace-glyph').disabled = true;
+  try {
+    const glyph = await traceSymbol(wordInk(image, bounds), bounds, char);
+    if (turn !== reviewVersion) return;
+    if (origin) glyph.reference = origin;
+    retraceCandidate = glyph;
+    showGlyphProof(prepareGlyphReview(image, box, glyph));
+    $('accept-retrace').hidden = $('cancel-retrace').hidden = false;
+    $('retrace-status').textContent = 'Đang xem nét mới. So sánh với ảnh gốc trước khi thay.';
+  } catch (error) {
+    if (turn === reviewVersion) $('retrace-status').textContent = error.message;
+  } finally {
+    if (turn === reviewVersion) $('retrace-glyph').disabled = false;
+  }
+});
+$('accept-retrace').addEventListener('click', () => {
+  if (!retraceCandidate) return;
+  glyphs.set(retraceCandidate.char, retraceCandidate);
+  reviewGlyph = retraceCandidate;
+  retraceCandidate = undefined;
+  $('accept-retrace').hidden = $('cancel-retrace').hidden = true;
+  $('retrace-status').textContent = 'Đã cập nhật nét cho chữ ' + reviewGlyph.char + '.';
+  updateComposed();
+  refresh();
+});
+$('cancel-retrace').addEventListener('click', () => {
+  retraceCandidate = undefined;
+  $('accept-retrace').hidden = $('cancel-retrace').hidden = true;
+  $('retrace-status').textContent = 'Đang xem nét cũ.';
+  showGlyphProof(prepareGlyphReview(retraceSource.image, retraceSource.box, reviewGlyph));
+});
 
 async function runGlyphReview() {
   if (!reviewProof || !reviewGlyph || reviewRequest) return;
