@@ -766,7 +766,11 @@ function renderGlyphs() {
     if (!glyph) { tile.textContent = name; continue; }
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', `0 -1000 ${glyph.advance} 1240`);
+    if (char === '\u0309') {
+      const { x, y, width, height } = glyphBounds(glyph);
+      const pad = .20 * Math.max(width, height);
+      svg.setAttribute('viewBox', `${x - pad} ${-y - height - pad} ${width + 2 * pad} ${height + 2 * pad}`);
+    } else svg.setAttribute('viewBox', `0 -1000 ${glyph.advance} 1240`);
     svg.setAttribute('aria-hidden', 'true');
     const path = document.createElementNS(ns, 'path');
     path.setAttribute('d', glyph.d);

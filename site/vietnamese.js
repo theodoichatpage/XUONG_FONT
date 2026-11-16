@@ -73,7 +73,7 @@ export function composeVietnamese(glyphs, replace = () => false) {
             advance += Math.max(0, Math.ceil(width - overlap));
             continue;
           }
-          const targetHeight = mark === '\u0323' ? 80 : 95;
+          const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
           const scale = Math.min(targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - 28 - height;
