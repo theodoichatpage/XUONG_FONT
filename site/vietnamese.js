@@ -4,6 +4,11 @@ import { glyphBounds } from './glyph-review.js';
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
 export const punctuation = [...'.,:;!?-–—()“”‘’/+'];
+export const toneSamples = new Map([
+  ['\u0301', 'Sắc'], ['\u0300', 'Huyền'], ['\u0323', 'Nặng'],
+  ['\u0303', 'Ngã'], ['\u0309', 'Hỏi']
+]);
+
 const vowels = [...'AĂÂEÊIOÔƠUƯYaăâeêioôơuưy'];
 const tones = ['', '\u0300', '\u0301', '\u0309', '\u0303', '\u0323'];
 export const accented = [...new Set(vowels.flatMap(vowel => tones.map(tone => (vowel + tone).normalize('NFC'))))]
@@ -21,13 +26,30 @@ const templates = {
   '\u0323': 'M41 0 A41 41 0 1 0 -41 0 A41 41 0 1 0 41 0 Z'
 };
 
+function undotI(glyph) {
+  const contours = [];
+  for (const segment of svgpath(glyph.d).abs().segments) {
+    if (segment[0] === 'M') contours.push([]);
+    contours.at(-1)?.push(segment);
+  }
+  if (contours.length !== 2) return null;
+  const parts = contours.map(contour => {
+    const shape = { d: contour.map(([command, ...coordinates]) => command + coordinates.join(' ')).join('') };
+    return { shape, bounds: glyphBounds(shape) };
+  }).sort((a, b) => b.bounds.height - a.bounds.height);
+  const [stem, dot] = parts;
+  if (dot.bounds.y <= stem.bounds.y + stem.bounds.height || dot.bounds.height > stem.bounds.height * .35) return null;
+  return { ...glyph, d: stem.shape.d };
+}
+
 export function composeVietnamese(glyphs) {
   const result = [];
   for (const char of accented) {
     if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
     const [base, ...marks] = char.normalize('NFD');
-    const original = glyphs.get(base);
-    if (!original || (base === 'i' && !marks.includes('\u0323'))) continue;
+    let original = glyphs.get(base);
+    if (original && base === 'i' && !marks.includes('\u0323')) original = undotI(original);
+    if (!original) continue;
     const bounds = glyphBounds(original);
     const bodyTop = bounds.y + bounds.height;
     let top = bodyTop + 28;
@@ -36,6 +58,20 @@ export function composeVietnamese(glyphs) {
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
       let x = bounds.x + bounds.width / 2;
       let y = top;
+      const sample = toneSamples.has(mark) ? glyphs.get(mark) : undefined;
+      if (sample) {
+        const source = glyphBounds(sample);
+        if (source.width > 0 && source.height > 0) {
+          const targetHeight = mark === '\u0323' ? 80 : 95;
+          const scale = Math.min(targetHeight / source.height, bounds.width * 1.2 / source.width);
+          const height = source.height * scale;
+          if (mark === '\u0323') y = bounds.y - 28 - height;
+          else top += height + 28;
+          paths.push(svgpath(sample.d).translate(-source.x - source.width / 2, -source.y)
+            .scale(scale).translate(x, y).round(1).toString());
+          continue;
+        }
+      }
       if (mark === '\u0323') y = bounds.y - 69;
       else if (mark === '\u031b') {
         x = bounds.x + bounds.width;

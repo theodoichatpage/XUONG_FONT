@@ -1,5 +1,5 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
+import { core, lowercase, charset, toneSamples, composeVietnamese } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -642,7 +642,8 @@ function updateComposed() {
     if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base)) glyphs.delete(char);
   }
   for (const glyph of composed) {
-    if (glyphs.get(glyph.char)?.source === 'Ghép dấu') glyphs.set(glyph.char, glyph);
+    const active = [...glyph.char.normalize('NFD')].slice(1).some(mark => toneSamples.has(mark) && glyphs.has(mark));
+    if (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active) glyphs.set(glyph.char, glyph);
   }
 }
 
@@ -663,7 +664,7 @@ async function trace(single) {
   const words = text.split(/\s+/u).map(word => [...word]);
   const chars = words.flat();
   if (!source || !chars.length) return status('Hãy chọn ảnh và nhập chữ trong vùng đã khoanh.');
-  if (chars.some(char => !charset.includes(char))) return status('Bản này hỗ trợ chữ hoa, chữ thường tiếng Việt, số và dấu câu trong bảng.');
+  if (chars.some(char => !charset.includes(char) && !toneSamples.has(char))) return status('Bản này hỗ trợ chữ hoa, chữ thường tiếng Việt, số và dấu câu trong bảng.');
   if (single && chars.length !== 1) return status('Hãy khoanh một chữ và nhập đúng một ký tự.');
   busy = true;
   $('trace').disabled = $('single').disabled = true;
@@ -676,7 +677,8 @@ async function trace(single) {
     image.getContext('2d').putImageData(source, -area.x, -area.y);
     const rect = { x0: 0, y0: 0, x1: image.width, y1: image.height };
     const mask = wordInk(image, rect);
-    const parts = mask.preserveOutline ? splitReferenceWord(mask, rect, chars) : [];
+    const tone = chars.length === 1 && toneSamples.has(chars[0]);
+    const parts = tone ? [rect] : mask.preserveOutline ? splitReferenceWord(mask, rect, chars) : [];
     const traced = new Map();
 
     if (parts.length === chars.length) {
@@ -696,7 +698,7 @@ async function trace(single) {
         start += chars.length;
         return group;
       });
-      for (const glyph of alignReferenceGlyphs(groups)) traced.set(glyph.char, glyph);
+      for (const glyph of tone ? word : alignReferenceGlyphs(groups)) traced.set(glyph.char, glyph);
     } else {
       const { ink, blobs, width } = segmentation();
       const boxes = single ? inkBounds(ink, width) : blobs;
@@ -736,7 +738,7 @@ async function trace(single) {
 }
 
 const tiles = new Map();
-for (const char of charset) {
+for (const char of [...toneSamples.keys(), ...charset]) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'glyph';
@@ -747,7 +749,7 @@ for (const char of charset) {
     renderGlyphs();
     zoomGlyph(char);
   });
-  const grid = lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
+  const grid = toneSamples.has(char) ? 'tone-samples' : lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
   $(grid).append(button);
   tiles.set(char, button);
 }
@@ -757,10 +759,11 @@ function renderGlyphs() {
     const glyph = usableGlyph(char);
     tile.className = 'glyph' + (glyph ? (glyph.source === 'Ảnh mẫu') ? ' ready' : ' generated' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
-    tile.setAttribute('aria-label', char + ' · ' + (glyph?.source ?? 'Còn thiếu'));
+    const name = toneSamples.get(char) ?? char;
+    tile.setAttribute('aria-label', name + ' · ' + (glyph?.source ?? 'Còn thiếu'));
     tile.title = tile.getAttribute('aria-label');
     tile.replaceChildren();
-    if (!glyph) { tile.textContent = char; continue; }
+    if (!glyph) { tile.textContent = name; continue; }
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('viewBox', `0 -1000 ${glyph.advance} 1240`);
@@ -771,11 +774,11 @@ function renderGlyphs() {
     path.setAttribute('transform', 'scale(1 -1)');
     svg.append(path);
     const label = document.createElement('small');
-    label.textContent = char;
+    label.textContent = name;
     tile.append(svg, label);
   }
   $('count').textContent = `${charset.filter(char => usableGlyph(char)).length} / ${charset.length} ký tự`;
-  $('selected').textContent = selected ? `${selected} · ${usableGlyph(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
+  $('selected').textContent = selected ? `${toneSamples.get(selected) ?? selected} · ${usableGlyph(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
   $('remove').disabled = !glyphs.has(selected);
   $('reset').disabled = !glyphs.size;
 }
