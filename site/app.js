@@ -228,6 +228,7 @@ async function removeActiveReference() {
   reviewedWords = reviewGroups.flatMap(group => group.rows);
   $('ocr-review').hidden = !reviewGroups.length;
   $('ocr-status').textContent = '';
+  $('ai-scan-report').hidden = true;
   for (const glyph of glyphs.values()) {
     if (glyph.reference?.index === index) delete glyph.reference;
     else if (glyph.reference?.index > index) glyph.reference.index--;
@@ -768,6 +769,36 @@ function refreshReviewVisibility() {
 
 $('show-processed').addEventListener('change', refreshReviewVisibility);
 
+function showScanReport(message, pending = false) {
+  $('ai-scan-report').hidden = false;
+  $('ai-scan-result').textContent = message;
+  $('jump-to-review').hidden = !pending;
+}
+
+function summarizeGeminiScan({ added = [], existing = [] } = {}) {
+  const total = reviewedWords.length;
+  if (!total) return showScanReport('Gemini chưa tìm thấy vùng chữ. Thử khoanh sát phần chữ của ảnh rồi chạy lại.');
+  const pending = reviewedWords.filter(entry => !entry.done).length;
+  const start = 'Gemini đã đọc ' + total + ' vùng.';
+  const changes = added.length ? ` Đã thêm ${added.length} ký tự: ${added.join(' ')}.`
+    : existing.length ? ' Các ký tự xử lý được đã có trong bộ font: ' + existing.join(' ') + '.'
+      : ' Chưa thêm ký tự nào.';
+  const next = pending ? ` Còn ${pending} vùng cần duyệt.`
+    : ' Kết quả đã có trong Bộ ký tự. Không cần bấm tách thủ công.';
+  showScanReport(start + changes + next, !!pending);
+  if (added.some(char => document.getElementById('lower-glyphs').contains(tiles.get(char)))) {
+    $('lower-glyphs').closest('details').open = true;
+  }
+  if (added.some(char => document.getElementById('more-glyphs').contains(tiles.get(char)))) {
+    $('more-glyphs').closest('details').open = true;
+  }
+}
+
+$('jump-to-review').addEventListener('click', () => {
+  $('ocr-review').focus({ preventScroll: true });
+  $('ocr-review').scrollIntoView({ block: 'start' });
+});
+
 async function scanReferences(useAI = false) {
   if (busy || loading || !references.length) return;
   const key = useAI ? geminiKey.value.trim() : '';
@@ -783,10 +814,14 @@ async function scanReferences(useAI = false) {
   setScanBusy(true);
   connectionButton.disabled = true;
   status(useAI ? 'Đang chuẩn bị ảnh mẫu cho Gemini…' : 'Đang tải bộ nhận diện tiếng Việt…');
+  if (useAI) showScanReport('Đang chuẩn bị ảnh mẫu cho Gemini…');
+  else $('ai-scan-report').hidden = true;
   try {
     if (!useAI) worker = await createOcrWorker();
     for (const [index, entry] of references.entries()) {
-      status(`Đang ${useAI ? 'đọc ảnh bằng Gemini' : 'quét OCR'} ${index + 1}/${references.length}…`);
+      const progress = `Đang ${useAI ? 'đọc ảnh bằng Gemini' : 'quét OCR'} ${index + 1}/${references.length}…`;
+      status(progress);
+      if (useAI) showScanReport(progress);
       let image;
       try {
         image = await referenceCanvas(entry.file, entry.settings?.crop);
@@ -827,14 +862,18 @@ async function scanReferences(useAI = false) {
     persistReferences();
     const suffix = failures.length ? ' Không mở hoặc đọc được ảnh ' + failures.join(', ') + '.' : '';
     status(`Tìm được ${reviewedWords.length} vùng chữ trong ${prepared.length}/${references.length} ảnh.` + suffix);
-    if (useAI && reviewedWords.some(entry => entry.include.checked)) {
-      setScanBusy(false);
-      await applyReviewedWords(true);
+    if (useAI) {
+      if (reviewedWords.some(entry => entry.include.checked)) {
+        setScanBusy(false);
+        showScanReport('Gemini đã đọc xong. Đang lấy nét từ ảnh gốc…');
+        summarizeGeminiScan(await applyReviewedWords(true));
+      } else summarizeGeminiScan();
     }
   } catch (error) {
     if (useAI) {
       connectedGeminiModel = undefined;
       connectionStatus.textContent = 'Cần kiểm tra lại kết nối trước khi chạy AI.';
+      showScanReport('Đã dừng Gemini. ' + error.message);
     }
     status((useAI ? 'Đã dừng Gemini. ' : 'Quét OCR chưa hoàn tất. ') + error.message);
   } finally {
@@ -872,6 +911,7 @@ async function applyReviewedWords(automatic = false) {
   const failed = new Set();
   const imported = new Set();
   const mapped = [];
+  const existing = new Set();
   try {
     for (const [index, group] of groups) {
       let image;
@@ -894,7 +934,10 @@ async function applyReviewedWords(automatic = false) {
         }
         mapped.push({ entry, chars });
         for (const [i, char] of chars.entries()) {
-          if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
+          if (glyphs.get(char)?.source === 'Ảnh mẫu') {
+            existing.add(char);
+            continue;
+          }
           const score = matching ? entry.word.symbols[i].confidence ?? entry.word.confidence : 0;
           if (scores.has(char) && scores.get(char) >= score) continue;
           try {
@@ -938,6 +981,7 @@ async function applyReviewedWords(automatic = false) {
       message.textContent += ` Còn ${pending.length} vùng cần duyệt.`;
       persistReferences();
     } else if (skipped.length) message.textContent += '\nChưa lấy nét từ ' + skipped.length + ' vùng:\n' + skipped.join('\n');
+    return { added: [...added.keys()], existing: [...existing] };
   } finally {
     setScanBusy(false);
     refreshReviewVisibility();
@@ -946,7 +990,10 @@ async function applyReviewedWords(automatic = false) {
 
 $('ai-scan').addEventListener('click', () => scanReferences(true));
 $('scan').addEventListener('click', () => scanReferences());
-$('apply-scan').addEventListener('click', () => applyReviewedWords());
+$('apply-scan').addEventListener('click', async () => {
+  const result = await applyReviewedWords();
+  if (result && reviewedWords.some(entry => entry.ai)) summarizeGeminiScan(result);
+});
 
 document.addEventListener('paste', event => {
   const clipboard = event.clipboardData;

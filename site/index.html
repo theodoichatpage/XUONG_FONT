@@ -48,6 +48,10 @@
           <button id="scan" type="button">Quét OCR thủ công</button>
         </div>
         <p id="ai-scan-help" class="help">Kiểm tra kết nối Gemini thành công để bật nút AI.</p>
+        <div id="ai-scan-report" class="scan-report" hidden>
+          <p id="ai-scan-result" role="status" aria-live="polite"></p>
+          <button id="jump-to-review" type="button" class="quiet" hidden>Xem vùng cần duyệt ↓</button>
+        </div>
       </div>
       <div id="stage" hidden>
         <div class="source-image-wrap">
@@ -62,12 +66,12 @@
       </div>
       <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
       <form id="trace-form">
-        <label for="chars">Chữ trong vùng chọn</label>
+        <label for="chars">Chữ trong vùng chọn · tách thủ công</label>
         <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
-        <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm chữ</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
+        <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
       </form>
       <p id="status" class="status" role="status" aria-live="polite"></p>
-      <section id="ocr-review" class="ocr-review" hidden aria-labelledby="ocr-title">
+      <section id="ocr-review" class="ocr-review" tabindex="-1" hidden aria-labelledby="ocr-title">
         <h3 id="ocr-title">Duyệt vùng chữ</h3>
         <label id="show-processed-row" class="check" hidden><input id="show-processed" type="checkbox"> Hiện cả các vùng đã xử lý</label>
         <p class="help">Sửa chữ ở những vùng còn thiếu hoặc chưa rõ, rồi bấm lấy nét. Nếu số chữ thay đổi, Xưởng Font sẽ thử tách lại theo khoảng trống trong ảnh.</p>

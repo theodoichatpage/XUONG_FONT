@@ -109,3 +109,6 @@ dialog::backdrop{background:#221a17bd}
 .source-image-wrap{position:relative;display:table;margin:0 auto;max-width:100%}
 .remove-reference{position:absolute;top:4px;right:4px;width:24px;height:24px;padding:0;line-height:1;border-radius:50%;background:#2c221dd9;color:#fff;border:1px solid #ffffff85;font-size:17px}
 .remove-reference:hover:not(:disabled){background:var(--red);color:#fff;border-color:#fff}
+
+.scan-report{margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#f9f1e6;font-size:13px}
+.scan-report .quiet{padding:4px 0;margin-top:2px}
