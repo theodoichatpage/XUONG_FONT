@@ -2,6 +2,7 @@ import svgpath from 'svgpath';
 import { MAX_SIDE, makeGlyph } from './engine.js';
 
 const { unifyReferenceA } = require('../src/refine-outline');
+const { connectedComponents } = require('../src/blob-core');
 const { band } = require('../src/metrics');
 
 export async function referenceCanvas(file, crop) {
@@ -73,6 +74,14 @@ export function wordInk(canvas, box, settings) {
   const light = settings?.polarity === 'light' || (settings?.polarity !== 'dark' && darkBorder > borderCount / 2);
   const ink = pixels.map(value => Number(light ? value > threshold : value <= threshold));
   if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink };
+  const whiteBorder = border.subarray(235).reduce((sum, n) => sum + n, 0);
+  const blackPixels = histogram.subarray(0, 40).reduce((sum, n) => sum + n, 0);
+  const edgePixels = histogram.subarray(40, 216).reduce((sum, n) => sum + n, 0);
+  if (!light && whiteBorder >= borderCount * .95 && blackPixels > 0 && edgePixels <= blackPixels * .20) {
+    // Clean artwork is already the intended outline. Use its coverage directly.
+    const coverage = pixels.map(value => 255 - value);
+    return { frame, ink: coverage.map(value => Number(value >= 128)), coverage, preserveOutline: true };
+  }
   let cumulative = 0;
   const background = border.findIndex(n => (cumulative += n) >= borderCount / 2);
   const detailThreshold = Math.round(background + (threshold - background) * .57);
@@ -127,6 +136,47 @@ export function splitWordByGaps(mask, box, count, bodyOnly = false) {
   const cuts = boxes.slice(1).map((next, index) => Math.round((boxes[index].x1 + next.x0) / 2));
   return boxes.map((box, index) => ({
     ...box, x0: cuts[index - 1] ?? x + left, x1: cuts[index] ?? x + right
+  }));
+}
+
+// A swash can overlap the next letter in x even when neither touches the other.
+export function splitCleanWord(mask, box, chars) {
+  if (!mask.preserveOutline || chars.some(char => !/[\p{L}\p{N}]/u.test(char))) return [];
+  const { frame, ink } = mask;
+  const x0 = Math.max(0, box.x0 - frame.x), y0 = Math.max(0, box.y0 - frame.y);
+  const x1 = Math.min(frame.w, box.x1 - frame.x), y1 = Math.min(frame.h, box.y1 - frame.y);
+  const region = new Uint8Array(ink.length);
+  for (let y = y0; y < y1; y++) {
+    const start = y * frame.w + x0, end = y * frame.w + x1;
+    region.set(ink.subarray(start, end), start);
+  }
+  const labels = new Int32Array(ink.length);
+  const boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
+  const tall = box => box.y1 - box.y0 + 1 >= (y1 - y0) * .47;
+  const bodies = boxes.filter(tall).sort((a, b) => a.x0 + a.x1 - b.x0 - b.x1);
+  if (bodies.length !== chars.length) return [];
+  const groups = bodies.map(body => [body]);
+  for (const mark of boxes.filter(box => !tall(box))) {
+    let best = -1, distance = Infinity;
+    for (const [i, body] of bodies.entries()) {
+      const [base, ...accents] = chars[i].normalize('NFD');
+      if ((!accents.length && !/[ij]/u.test(base)) || (mark.y0 <= body.y1 && mark.y1 >= body.y0)) continue;
+      const dx = Math.abs((body.x0 + body.x1 - mark.x0 - mark.x1) / 2);
+      if (dx <= Math.max(body.x1 - body.x0, (y1 - y0) * .13) && dx < distance) {
+        best = i;
+        distance = dx;
+      }
+    }
+    if (best < 0) return [];
+    groups[best].push(mark);
+  }
+  mask.labels = labels;
+  return groups.map(group => ({
+    x0: frame.x + Math.min(...group.map(box => box.x0)),
+    x1: frame.x + Math.max(...group.map(box => box.x1)) + 1,
+    y0: frame.y + Math.min(...group.map(box => box.y0)),
+    y1: frame.y + Math.max(...group.map(box => box.y1)) + 1,
+    components: new Set(group.map(box => box.label))
   }));
 }
 
@@ -199,9 +249,14 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   const x1 = Math.min(w, bbox.x1 - x), y1 = Math.min(h, bbox.y1 - y);
   const bounds = { x0: w, y0: h, x1: -1, y1: -1 };
   const symbolInk = new Uint8Array(w * h);
+  const coverage = bbox.components ? mask.coverage.slice() : mask.coverage;
   for (let py = y0; py < y1; py++) {
     for (let px = x0; px < x1; px++) {
       const p = py * w + px;
+      if (bbox.components && mask.labels[p] && !bbox.components.has(mask.labels[p])) {
+        coverage[p] = 0;
+        continue;
+      }
       if (!detailInk[p]) continue;
       symbolInk[p] = 1;
       bounds.x0 = Math.min(bounds.x0, px);
@@ -220,9 +275,9 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
       throw new Error('Vùng ảnh chỉ chứa dấu hoặc thiếu thân chữ.');
     }
   }
-  const glyph = await makeGlyph(symbolInk, w, bounds, char, mask.coverage);
+  const glyph = await makeGlyph(symbolInk, w, bounds, char, coverage, mask.preserveOutline);
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
-  return { ...glyph, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
+  return { ...glyph, preserveOutline: mask.preserveOutline, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
 }
 

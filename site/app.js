@@ -1,6 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
+import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -921,6 +921,8 @@ async function runFontJob(infer) {
           let mask = wordInk(image, area);
           const split = () => {
             if (chars.length === 1) return [area];
+            const separated = splitCleanWord(mask, area, chars);
+            if (separated.length) return separated;
             if (chars.some(char => /^[õÕ]$/u.test(char))) {
               const byBody = splitWordByGaps(mask, area, chars.length, true);
               if (byBody.length) return byBody;

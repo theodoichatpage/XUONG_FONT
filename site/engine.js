@@ -116,7 +116,7 @@ export function segmentImage(imgData, sensitivity, polarity) {
   return { ink, blobs: orderBlobs(boxes), width };
 }
 
-function cropToImageData(ink, imgWidth, blob, coverage, scale) {
+function cropToImageData(ink, imgWidth, blob, coverage, scale, preserveOutline) {
   const w = blob.x1 - blob.x0 + 1, h = blob.y1 - blob.y0 + 1;
   const pad = PAD * scale;
   const img = new ImageData(w * scale + 2 * pad, h * scale + 2 * pad);
@@ -133,7 +133,7 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
       const neighbors = pixel(x - 1, y) + pixel(x + 1, y) + pixel(x, y - 1) + pixel(x, y + 1);
       const diagonals = pixel(x - 1, y - 1) + pixel(x + 1, y - 1)
         + pixel(x - 1, y + 1) + pixel(x + 1, y + 1);
-      source[(y + 1) * (w + 2) + x + 1] = coverage
+      source[(y + 1) * (w + 2) + x + 1] = coverage && !preserveOutline
         ? (center * 12 + neighbors * 3 + diagonals) / 28 : center;
     }
   }
@@ -167,14 +167,14 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
 
 // ---------- trace + build ----------
 
-async function traceCrop(img, scale, photograph) {
+async function traceCrop(img, scale, photograph, preserveOutline) {
   traceReady ??= initPotrace();
   await traceReady;
   const svg = await potrace(img, {
     turdsize: 0,
-    alphamax: photograph ? 0.88 : 0.86,
+    alphamax: preserveOutline ? .9 : photograph ? 0.88 : 0.86,
     opticurve: 1,
-    opttolerance: (photograph ? 1.2 : 0.38) * scale,
+    opttolerance: (preserveOutline ? .2 : photograph ? 1.2 : 0.38) * scale,
     extractcolors: false,
   });
   const outline = [...svg.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].map(match => match[1]).join(' ');
@@ -184,17 +184,17 @@ async function traceCrop(img, scale, photograph) {
 }
 
 
-export async function makeGlyph(ink, width, box, char, coverage) {
+export async function makeGlyph(ink, width, box, char, coverage, preserveOutline = false) {
   const size = Math.max(box.x1 - box.x0 + 1, box.y1 - box.y0 + 1);
   const scale = Math.max(1, Math.min(coverage ? 2 : 3, Math.floor(900 / size)));
-  const crop = cropToImageData(ink, width, box, coverage, scale);
-  const fitted = char === 'm' ? fitLetterM(crop, PAD * scale) : null;
-  const traced = fitted ?? await traceCrop(crop, scale, Boolean(coverage));
-  const d = traced && /^u[\u0300\u0301\u0303\u0309]?$/u.test(char.normalize('NFD'))
+  const crop = cropToImageData(ink, width, box, coverage, scale, preserveOutline);
+  const fitted = !preserveOutline && char === 'm' ? fitLetterM(crop, PAD * scale) : null;
+  const traced = fitted ?? await traceCrop(crop, scale, Boolean(coverage), preserveOutline);
+  const d = !preserveOutline && traced && /^u[\u0300\u0301\u0303\u0309]?$/u.test(char.normalize('NFD'))
     ? fitLetterU(crop, PAD * scale, traced) : traced;
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
   const glyph = placeGlyph(d, crop, PAD * scale, char);
-  return { char, ...glyph, d: fitted ? glyph.d : refineOutline(glyph.d, char), source: 'Ảnh mẫu' };
+  return { char, ...glyph, d: fitted || preserveOutline ? glyph.d : refineOutline(glyph.d, char), source: 'Ảnh mẫu' };
 }
 
 export function exportFont(name, glyphs, spacing, metrics) {

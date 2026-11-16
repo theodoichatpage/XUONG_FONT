@@ -135,7 +135,7 @@ function aParts(glyph) {
 }
 
 function unifyReferenceA(glyphs) {
-  const family = glyphs.filter(g => /^a[\u0300-\u036f]*$/u.test(g.char.normalize('NFD')))
+  const family = glyphs.filter(g => !g.preserveOutline && /^a[\u0300-\u036f]*$/u.test(g.char.normalize('NFD')))
     .map(aParts).filter(Boolean);
   if (family.length < 2) return glyphs;
   // Prefer a direct base sample, otherwise the tallest traced body.

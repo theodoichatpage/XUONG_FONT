@@ -3,8 +3,8 @@
 // browser demo bundle: connected components, multi-part glyph merging,
 // reading-order clustering. No sharp, no fs - typed arrays only.
 
-function connectedComponents(ink, width, height, minArea) {
-  const labels = new Int32Array(width * height);
+function connectedComponents(ink, width, height, minArea, labelMap) {
+  const labels = labelMap ?? new Int32Array(width * height);
   const stack = new Int32Array(width * height);
   const boxes = [];
   let next = 1;
@@ -37,7 +37,7 @@ function connectedComponents(ink, width, height, minArea) {
         }
       }
     }
-    if (area >= minArea) boxes.push({ x0, y0, x1, y1, area });
+    if (area >= minArea) boxes.push(labelMap ? { x0, y0, x1, y1, area, label: next } : { x0, y0, x1, y1, area });
     next++;
   }
   return boxes;
