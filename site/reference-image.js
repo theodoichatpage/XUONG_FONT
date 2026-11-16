@@ -151,8 +151,37 @@ export function splitCleanWord(mask, box, chars) {
     region.set(ink.subarray(start, end), start);
   }
   const labels = new Int32Array(ink.length);
-  const boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
   const tall = box => box.y1 - box.y0 + 1 >= (y1 - y0) * .47;
+  let boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
+  if (boxes.filter(tall).length === chars.length - 1) {
+    // Two letters can touch at a tip or a serif even in very clean artwork.
+    const candidate = boxes.filter(tall).sort((a, b) => (b.x1 - b.x0) - (a.x1 - a.x0))[0];
+    if (candidate) {
+      const width = candidate.x1 - candidate.x0 + 1;
+      const middle = (candidate.x0 + candidate.x1) / 2;
+      let cut = -1, score = Infinity;
+      for (let x = Math.ceil(middle - .18 * width); x <= middle + .18 * width; x++) {
+        let pixels = 0;
+        for (let y = candidate.y0; y <= candidate.y1; y++) {
+          pixels += Number(labels[y * frame.w + x] === candidate.label);
+        }
+        const rank = pixels + Math.abs(x - middle) / width;
+        if (rank < score) { cut = x; score = rank; }
+      }
+      if (cut >= 0 && score <= .10 * (candidate.y1 - candidate.y0 + 1)) {
+        for (let y = candidate.y0; y <= candidate.y1; y++) {
+          const p = y * frame.w + cut;
+          if (labels[p] === candidate.label) region[p] = 0;
+        }
+        labels.fill(0);
+        boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
+        for (let y = candidate.y0; y <= candidate.y1; y++) {
+          const p = y * frame.w + cut;
+          if (!labels[p] && !region[p] && ink[p]) labels[p] = -1;
+        }
+      }
+    }
+  }
   const bodies = boxes.filter(tall).sort((a, b) => a.x0 + a.x1 - b.x0 - b.x1);
   if (bodies.length !== chars.length) return [];
   const groups = bodies.map(body => [body]);
@@ -160,7 +189,8 @@ export function splitCleanWord(mask, box, chars) {
     let best = -1, distance = Infinity;
     for (const [i, body] of bodies.entries()) {
       const [base, ...accents] = chars[i].normalize('NFD');
-      if ((!accents.length && !/[ij]/u.test(base)) || (mark.y0 <= body.y1 && mark.y1 >= body.y0)) continue;
+      const overlap = Math.min(mark.y1, body.y1) - Math.max(mark.y0, body.y0) + 1;
+      if ((!accents.length && !/[ij]/u.test(base)) || overlap > .40 * (mark.y1 - mark.y0 + 1)) continue;
       const dx = Math.abs((body.x0 + body.x1 - mark.x0 - mark.x1) / 2);
       if (dx <= Math.max(body.x1 - body.x0, (y1 - y0) * .13) && dx < distance) {
         best = i;
@@ -290,11 +320,22 @@ function median(values) {
 // Every letter from the same image uses the same conversion from pixels to font units.
 export function alignReferenceGlyphs(words) {
   const glyphs = words.flat();
-  const capitals = glyphs.filter(({ char }) => /^[A-ZĐ0-9]$/u.test(char));
+  const clean = glyphs.length > 0 && glyphs.every(glyph => glyph.preserveOutline);
+  const baselineAnchors = clean ? glyphs.filter(({ char }) => {
+    const [base, ...marks] = char.normalize('NFD');
+    return /^[A-ZĐ0-9aceinorsuvwxz]$/u.test(base)
+      && !/[JMNQ]/u.test(base) && !marks.includes('\u0323');
+  }) : [];
+  const bottoms = baselineAnchors.map(({ pixelCrop }) => pixelCrop.y + pixelCrop.h);
+  const capHeight = median(baselineAnchors.map(({ pixelCrop }) => pixelCrop.h));
+  const commonBaseline = Math.max(...bottoms) - Math.min(...bottoms) <= .16 * capHeight
+    ? median(bottoms) : NaN;
+  const capitals = glyphs.filter(({ char }) => /^[A-ZĐ0-9]$/u.test(char) && (!clean || !/[JMNQ]/u.test(char)));
   const anchors = capitals.length ? capitals : glyphs.filter(({ char }) => /^[acenosuvwxz]$/u.test(char));
   const scale = median((anchors.length ? anchors : glyphs).map(glyph => {
     const [bottom, top] = band(glyph.char);
-    return (top - bottom) / glyph.pixelCrop.h;
+    return clean && Number.isFinite(commonBaseline) && /^[A-ZĐ0-9]$/u.test(glyph.char)
+      ? top / (commonBaseline - glyph.pixelCrop.y) : (top - bottom) / glyph.pixelCrop.h;
   }));
   const gaps = [];
   for (const word of words) {
@@ -311,7 +352,7 @@ export function alignReferenceGlyphs(words) {
       const [base, ...marks] = char.normalize('NFD');
       return /^\p{L}$/u.test(base) && !/[gjpqy]/u.test(base) && !marks.includes('\u0323');
     });
-    const baseline = median(stable.map(({ pixelCrop }) => pixelCrop.y + pixelCrop.h));
+    const baseline = Number.isFinite(commonBaseline) ? commonBaseline : median(stable.map(({ pixelCrop }) => pixelCrop.y + pixelCrop.h));
     return word.map(glyph => {
       const crop = glyph.pixelCrop;
       const [bottom, top] = band(glyph.char);
