@@ -6,7 +6,7 @@ export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
 export const punctuation = [...'.,:;!?-–—()“”‘’/+'];
 export const toneSamples = new Map([
   ['\u0301', 'Sắc'], ['\u0300', 'Huyền'], ['\u0323', 'Nặng'],
-  ['\u0303', 'Ngã'], ['\u0309', 'Hỏi'], ['\u0306', 'Trăng'], ['\u0302', 'Mũ']
+  ['\u0303', 'Ngã'], ['\u0309', 'Hỏi'], ['\u0306', 'Trăng'], ['\u0302', 'Mũ'], ['\u031b', 'Râu']
 ]);
 
 const vowels = [...'AĂÂEÊIOÔƠUƯYaăâeêioôơuưy'];
@@ -62,6 +62,17 @@ export function composeVietnamese(glyphs, replace = () => false) {
       if (sample) {
         const source = glyphBounds(sample);
         if (source.width > 0 && source.height > 0) {
+          if (mark === '\u031b') {
+            const scale = Math.min(130 / source.height, bounds.width * .60 / source.width);
+            const width = source.width * scale, height = source.height * scale;
+            const overlap = Math.min(width * .32, bounds.width * .12);
+            const right = bounds.x + bounds.width;
+            // The left base of the horn seats inside the upper-right stem.
+            paths.push(svgpath(sample.d).translate(-source.x, -source.y).scale(scale)
+              .translate(right - overlap, bodyTop - height * .62).round(1).toString());
+            advance += Math.max(0, Math.ceil(width - overlap));
+            continue;
+          }
           const targetHeight = mark === '\u0323' ? 80 : 95;
           const scale = Math.min(targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
