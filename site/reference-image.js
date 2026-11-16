@@ -1,31 +1,5 @@
 import { MAX_SIDE, makeGlyph } from './engine.js';
 
-let library;
-const assets = new URL('./ocr/', document.baseURI);
-
-export async function createOcrWorker() {
-  if (location.protocol === 'file:') {
-    throw new Error('Hãy mở Xưởng Font trên Vercel để chạy OCR trong trình duyệt.');
-  }
-  library ??= new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = new URL('tesseract.min.js', assets).href;
-    script.onload = () => resolve(window.Tesseract);
-    script.onerror = () => reject(new Error('Không tải được bộ nhận diện tiếng Việt.'));
-    document.head.append(script);
-  }).catch(error => {
-    library = undefined;
-    throw error;
-  });
-  const tesseract = await library;
-  return tesseract.createWorker('vie', 1, {
-    workerPath: new URL('worker.min.js', assets).href,
-    corePath: new URL('tesseract-core-lstm.wasm.js', assets).href,
-    langPath: assets.href,
-    workerBlobURL: false
-  });
-}
-
 export async function referenceCanvas(file, crop) {
   const image = await createImageBitmap(file);
   try {
@@ -49,53 +23,6 @@ function region(canvas, box, pad = 0) {
   const w = Math.max(1, Math.min(canvas.width, box.x1 + pad) - x);
   const h = Math.max(1, Math.min(canvas.height, box.y1 + pad) - y);
   return { x, y, w, h };
-}
-
-export function wordThumbnail(canvas, box) {
-  const { x, y, w, h } = region(canvas, box, 4);
-  const scale = Math.min(1, 220 / w, 58 / h);
-  const thumb = document.createElement('canvas');
-  thumb.width = Math.max(1, Math.round(w * scale));
-  thumb.height = Math.max(1, Math.round(h * scale));
-  thumb.getContext('2d').drawImage(canvas, x, y, w, h, 0, 0, thumb.width, thumb.height);
-  thumb.setAttribute('aria-hidden', 'true');
-  return thumb;
-}
-
-export async function detectWords(worker, canvas) {
-  // PSM 11 searches for text throughout a video frame, including separate titles.
-  await worker.setParameters({ tessedit_pageseg_mode: '11' });
-  const { data } = await worker.recognize(canvas, {}, { blocks: true });
-  return (data.blocks ?? []).flatMap(block => block.paragraphs)
-    .flatMap(paragraph => paragraph.lines).flatMap(line => line.words)
-    .filter(word => word.text.trim() && word.symbols.length);
-}
-
-export async function locateWordsWithGemini(image, key, preferredModel) {
-  const sample = document.createElement('canvas');
-  const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
-  sample.width = Math.max(1, Math.round(image.width * scale));
-  sample.height = Math.max(1, Math.round(image.height * scale));
-  sample.getContext('2d').drawImage(image, 0, 0, sample.width, sample.height);
-  const response = await fetch('/api/glyph-review', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
-    body: JSON.stringify({ mode: 'locate', preferredModel, image: sample.toDataURL('image/jpeg', .92).split(',')[1] }),
-    signal: AbortSignal.timeout(40000)
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? 'Gemini chưa đọc được ảnh.');
-  const words = data.rows.map(({ box, text, clear }) => {
-    const [top, left, bottom, right] = box;
-    return {
-      text: text.normalize('NFC').trim(), clear, confidence: 0, symbols: [],
-      bbox: {
-        x0: Math.floor(left * image.width / 1000), x1: Math.ceil(right * image.width / 1000),
-        y0: Math.floor(top * image.height / 1000), y1: Math.ceil(bottom * image.height / 1000)
-      }
-    };
-  });
-  return { words, model: data.model };
 }
 
 function luminance(data, p) {
@@ -158,37 +85,6 @@ export function wordInk(canvas, box, settings) {
     }
   }
   return { frame, ink, detailInk };
-}
-
-// A clean blank column is a visible boundary between two letters. Only
-// recover a word when the resulting boundaries agree with its corrected text.
-export function splitWordByGaps(mask, box, count) {
-  const { frame: { x, y, w, h }, ink } = mask;
-  const left = Math.max(0, box.x0 - x), right = Math.min(w, box.x1 - x);
-  const top = Math.max(0, box.y0 - y), bottom = Math.min(h, box.y1 - y);
-  const boxes = [];
-  let start = -1;
-  for (let column = left; column <= right; column++) {
-    let occupied = false;
-    if (column < right) {
-      for (let row = top; row < bottom; row++) {
-        if (ink[row * w + column]) {
-          occupied = true;
-          break;
-        }
-      }
-    }
-    if (occupied && start < 0) start = column;
-    if (!occupied && start >= 0) {
-      boxes.push({ x0: x + start, x1: x + column, y0: y + top, y1: y + bottom });
-      start = -1;
-    }
-  }
-  if (boxes.length !== count) return [];
-  const cuts = boxes.slice(1).map((next, index) => Math.round((boxes[index].x1 + next.x0) / 2));
-  return boxes.map((box, index) => ({
-    ...box, x0: cuts[index - 1] ?? x + left, x1: cuts[index] ?? x + right
-  }));
 }
 
 export async function traceSymbol(mask, bbox, char, wordBox) {

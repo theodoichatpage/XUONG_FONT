@@ -1,6 +1,7 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol, locateWordsWithGemini } from './ocr.js';
+import { referenceCanvas, wordInk, traceSymbol } from './reference-image.js';
+import { designReferences, draftSources, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { prepareGlyphReview } from './glyph-review.js';
 
@@ -18,8 +19,8 @@ let downloadURL;
 let revision = 0;
 let loadingRevision = 0;
 const references = [];
-let reviewedWords = [];
-let reviewGroups = [];
+let legacyReview = [];
+let designRun;
 let activeReference = -1;
 let loading = false;
 let busy = false;
@@ -37,13 +38,7 @@ function persistReferences(withImages = false) {
   const state = {
     activeReference,
     settings: references.map(entry => entry.settings),
-    review: reviewGroups.map(group => ({
-      index: group.index, settings: group.settings,
-      rows: group.rows.map(row => ({
-        word: row.word, thumbnail: row.thumbnail, text: row.input.value, checked: row.include.checked,
-        ai: row.ai, done: row.done
-      }))
-    }))
+    review: legacyReview
   };
   saveReferences(state, withImages ? references.map(entry => entry.file) : undefined)
     .then(() => {
@@ -153,14 +148,12 @@ function renderReferences() {
   select.disabled = busy || loading;
   $('remove-reference').hidden = activeReference < 0;
   $('remove-reference').disabled = busy || loading;
-  $('scan').disabled = busy || loading || !references.length;
   const state = connectionRequest ? 'loading' : connectedGeminiModel ? 'ready' : 'idle';
   $('gemini-badge').dataset.state = state;
   $('gemini-badge-label').textContent = 'Gemini: ' + (state === 'ready' ? 'Đã kết nối' : state === 'loading' ? 'Đang kiểm tra' : 'Chưa kết nối');
-  $('rebuild-batch').disabled = busy || loading || !reviewedWords.some(entry => entry.done || entry.include.checked);
   $('ai-scan').disabled = busy || loading || !references.length || !connectedGeminiModel || !!connectionRequest;
   $('ai-scan-help').textContent = connectedGeminiModel
-    ? 'Gemini đọc trực tiếp ảnh mẫu. Bạn chỉ duyệt những vùng chưa chắc chắn.'
+    ? 'Gemini vẽ đường viền theo ảnh và thiết kế các chữ còn thiếu. Ảnh mẫu được gửi đến Gemini khi bấm nút.'
     : 'Kiểm tra kết nối Gemini thành công để bật nút AI.';
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
@@ -220,20 +213,8 @@ async function removeActiveReference() {
   $('stage').hidden = true;
   $('filename').textContent = 'PNG, JPG, WebP';
   $('chars').value = '';
-  reviewGroups = reviewGroups.filter(group => {
-    if (group.index === index) {
-      group.element.remove();
-      return false;
-    }
-    if (group.index > index) group.index--;
-    for (const row of group.rows) row.index = group.index;
-    group.element.querySelector('legend').textContent =
-      `Ảnh ${group.index + 1} · ${references[group.index].file.name}`;
-    return true;
-  });
-  reviewedWords = reviewGroups.flatMap(group => group.rows);
-  $('ocr-review').hidden = !reviewGroups.length;
-  $('ocr-status').textContent = '';
+  legacyReview = legacyReview.filter(group => group.index !== index)
+    .map(group => ({ ...group, index: group.index > index ? group.index - 1 : group.index }));
   $('ai-scan-report').hidden = true;
   for (const glyph of glyphs.values()) {
     if (glyph.reference?.index === index) delete glyph.reference;
@@ -711,7 +692,7 @@ for (const char of charset) {
 function renderGlyphs() {
   for (const [char, tile] of tiles) {
     const glyph = glyphs.get(char);
-    tile.className = 'glyph' + (glyph ? glyph.source === 'Ảnh mẫu' ? ' ready' : ' generated' : '');
+    tile.className = 'glyph' + (glyph ? (glyph.source === 'Ảnh mẫu' || glyph.source === draftSources.reference) ? ' ready' : ' generated' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
     tile.setAttribute('aria-label', char + ' · ' + (glyph?.source ?? 'Còn thiếu'));
     tile.title = tile.getAttribute('aria-label');
@@ -799,403 +780,89 @@ function refresh() {
 }
 
 
-function setScanBusy(value) {
-  busy = value;
-  $('trace').disabled = $('single').disabled = value;
-  $('apply-scan').disabled = value || !reviewedWords.length;
-  renderReferences();
-}
-
-const recropDialog = $('recrop-dialog');
-const recropCanvas = $('recrop-canvas');
-const recropContext = recropCanvas.getContext('2d');
-let recropEntry;
-let recropImage;
-let recropBox;
-let recropStart;
-
-function drawRecrop() {
-  recropContext.drawImage(recropImage, 0, 0);
-  recropContext.lineWidth = Math.max(1, recropCanvas.width / 400);
-  recropContext.strokeStyle = '#ff4b3a';
-  recropContext.strokeRect(recropBox.x0, recropBox.y0, recropBox.x1 - recropBox.x0, recropBox.y1 - recropBox.y0);
-}
-
-async function openRecrop(entry) {
-  if (busy || loading || recropDialog.open || !references[entry.index]) return;
-  recropEntry = entry;
-  recropImage = recropBox = undefined;
-  $('apply-recrop').disabled = true;
-  $('recrop-help').textContent = `Kéo khung ôm trọn “${entry.input.value}”, gồm cả dấu và chân chữ. Tránh chạm dòng bên dưới.`;
-  $('recrop-status').textContent = 'Đang mở ảnh mẫu…';
-  recropCanvas.hidden = true;
-  recropDialog.showModal();
-  try {
-    const image = await referenceCanvas(references[entry.index].file, entry.settings?.crop);
-    if (!recropDialog.open || recropEntry !== entry) return;
-    recropImage = image;
-    recropCanvas.width = image.width;
-    recropCanvas.height = image.height;
-    recropCanvas.hidden = false;
-    recropBox = { ...entry.word.bbox };
-    drawRecrop();
-    $('recrop-status').textContent = '';
-  } catch {
-    $('recrop-status').textContent = 'Chưa mở được ảnh cho dòng này.';
-  }
-}
-
-function recropPoint(event) {
-  const area = recropCanvas.getBoundingClientRect();
-  return {
-    x: Math.max(0, Math.min(recropCanvas.width, Math.round((event.clientX - area.left) * recropCanvas.width / area.width))),
-    y: Math.max(0, Math.min(recropCanvas.height, Math.round((event.clientY - area.top) * recropCanvas.height / area.height)))
-  };
-}
-
-recropCanvas.addEventListener('pointerdown', event => {
-  if (!recropImage || event.button !== 0) return;
-  recropCanvas.setPointerCapture(event.pointerId);
-  recropStart = recropPoint(event);
-});
-recropCanvas.addEventListener('pointermove', event => {
-  if (!recropStart) return;
-  const { x, y } = recropPoint(event);
-  if (Math.abs(x - recropStart.x) < 3 || Math.abs(y - recropStart.y) < 3) return;
-  recropBox = { x0: Math.min(x, recropStart.x), x1: Math.max(x, recropStart.x),
-    y0: Math.min(y, recropStart.y), y1: Math.max(y, recropStart.y) };
-  drawRecrop();
-  $('apply-recrop').disabled = false;
-});
-for (const event of ['pointerup', 'pointercancel']) recropCanvas.addEventListener(event, () => { recropStart = undefined; });
-recropDialog.addEventListener('close', () => { recropEntry = recropImage = recropBox = recropStart = undefined; });
-$('apply-recrop').addEventListener('click', async () => {
-  const entry = recropEntry;
-  if (!entry || !recropImage || !recropBox || busy || loading) return;
-  entry.word = { ...entry.word, bbox: recropBox, symbols: [] };
-  entry.thumbnail = wordThumbnail(recropImage, recropBox).toDataURL();
-  entry.preview.src = entry.thumbnail;
-  entry.done = false;
-  entry.include.checked = true;
-  persistReferences();
-  recropDialog.close();
-  const result = await applyReviewedWords(false, entry);
-  if (result && entry.ai) summarizeGeminiScan(result);
-});
-
-function addReviewGroup(index, settings, rows) {
-  const entry = references[index];
-  if (!entry) return;
-  const reviewed = { index, settings, rows: [], element: null };
-  reviewGroups.push(reviewed);
-  const group = document.createElement('fieldset');
-  reviewed.element = group;
-  const title = document.createElement('legend');
-  title.textContent = `Ảnh ${index + 1} · ${entry.file.name}`;
-  group.append(title);
-  if (!rows.length) {
-    const empty = document.createElement('p');
-    empty.className = 'help';
-    empty.textContent = 'Chưa đọc được chữ. Bạn có thể khoanh sát chữ hơn hoặc lấy nét thủ công.';
-    group.append(empty);
-  }
-  for (const { word, thumbnail, text, checked, ai, done } of rows) {
-    const row = document.createElement('div');
-    row.className = 'ocr-word';
-    const include = document.createElement('input');
-    include.type = 'checkbox';
-    include.checked = checked ?? (word.confidence >= 70 && [...word.text.normalize('NFC')].length === word.symbols.length);
-    include.setAttribute('aria-label', 'Dùng từ ' + word.text);
-    const input = document.createElement('input');
-    input.value = text ?? word.text.normalize('NFC');
-    input.setAttribute('aria-label', 'Sửa từ ' + word.text);
-    input.spellcheck = false;
-    const score = document.createElement('small');
-    score.textContent = ai ? (ai.clear ? 'Gemini đọc rõ' : 'Cần bạn điền hoặc xác nhận chữ') : 'OCR ' + Math.round(word.confidence) + '%';
-    const preview = document.createElement('img');
-    preview.alt = '';
-    preview.src = thumbnail;
-    input.addEventListener('input', () => {
-      item.done = false;
-      if (ai) include.checked = !!input.value.trim();
-      refreshReviewVisibility();
-      persistReferences();
-    });
-    include.addEventListener('change', () => { refreshReviewVisibility(); persistReferences(); });
-    const enlarge = document.createElement('button');
-    enlarge.type = 'button';
-    enlarge.className = 'ocr-thumbnail';
-    enlarge.setAttribute('aria-label', 'Phóng to ảnh của từ ' + word.text);
-    enlarge.addEventListener('click', () => {
-      if (preview.naturalWidth) openViewer(preview.src, preview.naturalWidth, preview.naturalHeight, 'Ảnh chữ · ' + input.value);
-    });
-    enlarge.append(preview);
-    const recrop = document.createElement('button');
-    recrop.type = 'button';
-    recrop.className = 'quiet recrop-button';
-    recrop.textContent = 'Khoanh lại vùng';
-    recrop.addEventListener('click', () => openRecrop(item));
-    row.append(include, enlarge, input, score, recrop);
-    group.append(row);
-    const item = { index, word, thumbnail, input, include, settings, ai, done: done ?? false, element: row, preview };
-    reviewed.rows.push(item);
-    reviewedWords.push(item);
-  }
-  $('ocr-results').append(group);
-}
-
-function refreshReviewVisibility() {
-  const showAll = $('show-processed').checked;
-  $('show-processed-row').hidden = !reviewedWords.some(entry => entry.done);
-  for (const group of reviewGroups) {
-    for (const entry of group.rows) entry.element.hidden = entry.done && !showAll;
-    group.element.hidden = !!group.rows.length && group.rows.every(entry => entry.element.hidden);
-  }
-  $('apply-scan').disabled = busy || !reviewedWords.some(entry => !entry.done);
-  $('rebuild-batch').disabled = busy || loading || !reviewedWords.some(entry => entry.done || entry.include.checked);
-}
-
-$('show-processed').addEventListener('change', refreshReviewVisibility);
-
-function showScanReport(message, pending = false) {
+function reportDesign(message) {
   $('ai-scan-report').hidden = false;
   $('ai-scan-result').textContent = message;
-  $('jump-to-review').hidden = !pending;
 }
 
-function summarizeGeminiScan({ added = [], existing = [], replaced = [] } = {}) {
-  const total = reviewedWords.length;
-  if (!total) return showScanReport('Gemini chưa tìm thấy vùng chữ. Thử khoanh sát phần chữ của ảnh rồi chạy lại.');
-  const pending = reviewedWords.filter(entry => !entry.done).length;
-  const recognized = reviewedWords.flatMap(entry => [...entry.input.value.normalize('NFC')].filter(char => charset.includes(char)));
-  const distinct = new Set(recognized);
-  const start = `Gemini đã đọc ${total} vùng · ${recognized.length} lượt chữ · ${distinct.size} ký tự khác nhau.`;
-  const changes = [
-    added.length && `Đã thêm ${added.length} ký tự.`,
-    replaced.length && `Đã dựng lại ${replaced.length} ký tự.`,
-    existing.length && `${existing.length} ký tự đã có trong bộ font.`
-  ].filter(Boolean).join(' ');
-  const next = pending ? `Còn ${pending} vùng cần duyệt.` : 'Xem nét trong Bộ ký tự.';
-  showScanReport([start, changes, next].filter(Boolean).join(' '), !!pending);
+function modelDesigned(glyph) {
+  return glyph?.source === draftSources.reference || glyph?.source === draftSources.inferred;
 }
 
-$('jump-to-review').addEventListener('click', () => {
-  $('ocr-review').focus({ preventScroll: true });
-  $('ocr-review').scrollIntoView({ block: 'start' });
-});
+function designAnchors() {
+  const anchors = [...glyphs.values()].filter(glyph => glyph.source === draftSources.reference);
+  const chosen = anchors.slice(0, 5).map(({ char, advance, d }) => ({ char, advance, path: d }));
+  while (chosen.length && JSON.stringify(chosen).length > 10500) chosen.pop();
+  return chosen.length ? JSON.stringify(chosen) : '';
+}
 
-async function scanReferences(useAI = false) {
-  if (busy || loading || !references.length) return;
-  const key = useAI ? geminiKey.value.trim() : '';
-  if (useAI && (!key || !connectedGeminiModel || connectionRequest)) {
-    status('Hãy kiểm tra kết nối Gemini thành công trước khi chạy AI.');
+async function designFont() {
+  if (busy || loading || !references.length || !connectedGeminiModel || connectionRequest) return;
+  const key = geminiKey.value.trim();
+  if (!key) return;
+  const draftOrder = new Set();
+  for (const group of legacyReview) {
+    for (const row of group.rows ?? []) {
+      for (const char of [...(row.text ?? '').normalize('NFC')]) {
+        if (charset.includes(char)) draftOrder.add(char);
+      }
+    }
+  }
+  for (const char of charset) draftOrder.add(char);
+  const pending = [...draftOrder].filter(char => !modelDesigned(glyphs.get(char)));
+  if (!pending.length) {
+    reportDesign('Tất cả ký tự đã có bản dựng AI. Bấm ký tự để xem nét hoặc tải font .TTF.');
     return;
   }
-  rememberReference();
-  const prepared = [];
-  const failures = [];
-  let worker;
-  let model = connectedGeminiModel;
-  setScanBusy(true);
+  const controller = new AbortController();
+  designRun = { controller, stop: false };
+  busy = true;
+  renderReferences();
+  $('trace').disabled = $('single').disabled = true;
   connectionButton.disabled = true;
-  status(useAI ? 'Đang chuẩn bị ảnh mẫu cho Gemini…' : 'Đang tải bộ nhận diện tiếng Việt…');
-  if (useAI) showScanReport('Đang chuẩn bị ảnh mẫu cho Gemini…');
-  else $('ai-scan-report').hidden = true;
+  $('stop-design').hidden = false;
+  $('stop-design').disabled = false;
+  reportDesign(`Đang chuẩn bị ${references.length} ảnh mẫu…`);
+  let accepted = 0;
+  let model = connectedGeminiModel;
   try {
-    if (!useAI) worker = await createOcrWorker();
-    for (const [index, entry] of references.entries()) {
-      const progress = `Đang ${useAI ? 'đọc ảnh bằng Gemini' : 'quét OCR'} ${index + 1}/${references.length}…`;
-      status(progress);
-      if (useAI) showScanReport(progress);
-      let image;
-      try {
-        image = await referenceCanvas(entry.file, entry.settings?.crop);
-      } catch {
-        failures.push(index + 1);
-        continue;
-      }
-      let words;
-      if (useAI) {
-        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-        const result = await locateWordsWithGemini(image, key, model);
-        words = result.words;
-        model = result.model ?? model;
-      } else {
-        try { words = await detectWords(worker, image); }
-        catch {
-          failures.push(index + 1);
-          continue;
-        }
-      }
-      const rows = words.map(({ text, confidence, bbox, symbols, clear }) => ({
-        word: { text, confidence, bbox, symbols: symbols.map(symbol => ({ bbox: symbol.bbox, confidence: symbol.confidence })) },
-        thumbnail: wordThumbnail(image, bbox).toDataURL(),
-        ...(useAI ? { text, ai: { clear }, checked: clear && !!text } : {})
-      }));
-      prepared.push({ index, settings: entry.settings, rows });
+    rememberReference();
+    const samples = await designReferences(references, referenceCanvas, controller.signal);
+    for (let start = 0; start < pending.length && !designRun.stop; start += 8) {
+      if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi bấm tiếp tục.');
+      const chars = pending.slice(start, start + 8);
+      reportDesign(`Đang vẽ ${chars.join(' ')} · ${accepted}/${pending.length} ký tự của lượt này đã lưu.`);
+      const result = await requestGlyphDesign({ chars, samples, key, model, anchors: designAnchors(), signal: controller.signal });
+      model = result.model ?? model;
+      for (const glyph of result.glyphs) glyphs.set(glyph.char, glyph);
+      accepted += result.glyphs.length;
+      refresh();
     }
-    if (useAI && geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-    if (!prepared.length) throw new Error('Không mở hoặc đọc được ảnh nào.');
-    if (useAI) { connectedGeminiModel = model; saveGeminiPreference(); }
-    reviewedWords = [];
-    reviewGroups = [];
-    $('ocr-results').replaceChildren();
-    $('ocr-status').textContent = '';
-    $('show-processed').checked = false;
-    for (const group of prepared) addReviewGroup(group.index, group.settings, group.rows);
-    $('ocr-review').hidden = false;
-    persistReferences();
-    const suffix = failures.length ? ' Không mở hoặc đọc được ảnh ' + failures.join(', ') + '.' : '';
-    status(`Tìm được ${reviewedWords.length} vùng chữ trong ${prepared.length}/${references.length} ảnh.` + suffix);
-    if (useAI) {
-      if (reviewedWords.some(entry => entry.include.checked)) {
-        setScanBusy(false);
-        showScanReport('Gemini đã đọc xong. Đang lấy nét từ ảnh gốc…');
-        summarizeGeminiScan(await applyReviewedWords(true));
-      } else summarizeGeminiScan();
-    }
-  } catch (error) {
-    if (useAI) {
-      connectedGeminiModel = undefined;
+    if (geminiKey.value.trim() === key) {
+      connectedGeminiModel = model;
       saveGeminiPreference();
-      connectionStatus.textContent = 'Cần kiểm tra lại kết nối trước khi chạy AI.';
-      showScanReport('Đã dừng Gemini. ' + error.message);
     }
-    status((useAI ? 'Đã dừng Gemini. ' : 'Quét OCR chưa hoàn tất. ') + error.message);
+    const remaining = pending.length - accepted;
+    reportDesign(`Đã lưu ${accepted} ký tự trong lượt này.`
+      + (remaining ? ` Còn ${remaining} ký tự cần dựng. Bấm AI vẽ và hoàn thiện font để tiếp tục.` : ' Đã có bản dựng AI cho toàn bộ bảng. Có thể xem thử và tải .TTF.'));
+  } catch (error) {
+    reportDesign(`Đã lưu ${accepted} ký tự trước khi dừng. ${error.message} Bạn có thể bấm nút AI để tiếp tục.`);
   } finally {
-    try { await worker?.terminate(); } finally {
-      setScanBusy(false);
-      connectionButton.disabled = !geminiKey.value.trim();
-      refreshReviewVisibility();
-    }
+    designRun = undefined;
+    busy = false;
+    $('stop-design').hidden = true;
+    $('trace').disabled = $('single').disabled = false;
+    connectionButton.disabled = !geminiKey.value.trim();
+    renderReferences();
   }
 }
 
-async function applyReviewedWords(automatic = false, onlyEntry, rebuild = false) {
-  if (busy || loading) return;
-  const chosen = reviewedWords.filter(entry =>
-    (rebuild ? entry.done || entry.include.checked : entry.include.checked && !entry.done)
-    && (!onlyEntry || entry === onlyEntry) && (!automatic || entry.ai?.clear));
-  const message = $('ocr-status');
-  if (!chosen.length) {
-    message.textContent = 'Chọn ít nhất một từ để lấy nét.';
-    return;
-  }
-  const groups = new Map();
-  const skipped = [];
-  for (const entry of chosen) {
-    const chars = [...entry.input.value.normalize('NFC').replace(/\s/g, '')];
-    if (!chars.length || chars.some(char => !charset.includes(char))) {
-      skipped.push(`Ảnh ${entry.index + 1}: “${entry.input.value}” (ký tự ngoài bảng hoặc ô trống)`);
-      continue;
-    }
-    const group = groups.get(entry.index) ?? [];
-    group.push({ entry, chars });
-    groups.set(entry.index, group);
-  }
-  setScanBusy(true);
-  const added = new Map();
-  const scores = new Map();
-  const failed = new Set();
-  const imported = new Set();
-  const mapped = [];
-  const existing = new Set();
-  try {
-    for (const [index, group] of groups) {
-      let image;
-      try {
-        image = await referenceCanvas(references[index].file, group[0].entry.settings?.crop);
-      } catch {
-        skipped.push(`Ảnh ${index + 1}: không mở được ảnh`);
-        continue;
-      }
-      for (const { entry, chars } of group) {
-        const mask = wordInk(image, entry.word.bbox, entry.settings);
-        const matching = chars.length === entry.word.symbols.length;
-        const agreesWithOcr = entry.word.confidence >= 70 && chars.join('') === entry.word.text.normalize('NFC');
-        const separated = splitWordByGaps(mask, entry.word.bbox, chars.length);
-        const boxes = separated.length ? separated
-          : matching && ((!automatic && !rebuild) || agreesWithOcr) ? entry.word.symbols.map(symbol => symbol.bbox) : [];
-        if (!boxes.length) {
-          skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (chưa tách được ${chars.length} chữ; bấm “Khoanh lại vùng”)`);
-          continue;
-        }
-        mapped.push({ entry, chars });
-        for (const [i, char] of chars.entries()) {
-          if (!rebuild && glyphs.get(char)?.source === 'Ảnh mẫu') {
-            existing.add(char);
-            continue;
-          }
-          const score = matching ? entry.word.symbols[i].confidence ?? entry.word.confidence : 0;
-          if (scores.has(char) && scores.get(char) >= score) continue;
-          try {
-            message.textContent = `Đang lấy nét chữ ${char}…`;
-            const box = boxes[i];
-            const area = entry.settings?.crop;
-            const glyph = await traceSymbol(mask, box, char, entry.word.bbox);
-            glyph.reference = { index, crop: {
-              x: (area?.x ?? 0) + box.x0, y: (area?.y ?? 0) + box.y0, w: box.x1 - box.x0, h: box.y1 - box.y0
-            } };
-            added.set(char, glyph);
-            scores.set(char, score);
-            imported.add(index);
-          } catch {
-            failed.add(char);
-          }
-        }
-      }
-    }
-    const replaced = [...added.keys()].filter(char => rebuild && glyphs.has(char));
-    const newChars = [...added.keys()].filter(char => !replaced.includes(char));
-    for (const [char, glyph] of added) glyphs.set(char, glyph);
-    for (const { entry, chars } of mapped) {
-      if (chars.join('') === entry.input.value.normalize('NFC').replace(/\s/g, '') && chars.every(char => glyphs.has(char))) {
-        entry.done = true;
-        entry.include.checked = false;
-      }
-    }
-    for (const index of imported) {
-      const entry = references[index];
-      entry.settings = { ...entry.settings, used: true };
-    }
-    persistReferences();
-    updateComposed();
-    refresh();
-    const missing = [...failed].filter(char => !added.has(char));
-    message.textContent = rebuild
-      ? `Đã dựng lại ${replaced.length} và thêm ${newChars.length} ký tự. Các nét chưa dựng được vẫn dùng bản đã lưu.`
-      : added.size ? `Đã thêm ${added.size} ký tự từ ảnh gốc. Xem bộ ký tự và tải .TTF.` : 'Chưa có ký tự mới để thêm.';
-    if (missing.length) message.textContent += ' Cần khoanh lại: ' + missing.join(' ');
-    if (automatic) {
-      const pending = reviewedWords.filter(entry => !entry.done);
-      // Leave only unambiguous matches imported. Remaining rows need an explicit choice.
-      pending.forEach(entry => { entry.include.checked = false; });
-      message.textContent += ` Còn ${pending.length} vùng cần duyệt.`;
-      persistReferences();
-    } else if (skipped.length) message.textContent += '\nChưa lấy nét từ ' + skipped.length + ' vùng:\n' + skipped.join('\n');
-    return { added: newChars, existing: [...existing], replaced, skipped: skipped.length, failed: missing.length };
-  } finally {
-    setScanBusy(false);
-    refreshReviewVisibility();
-  }
-}
-
-$('rebuild-batch').addEventListener('click', async () => {
-  const output = $('batch-status');
-  output.textContent = 'Đang dựng lại các ký tự từ ảnh đã đọc…';
-  const result = await applyReviewedWords(false, undefined, true);
-  if (!result) { output.textContent = 'Chưa có vùng đã duyệt để dựng lại.'; return; }
-  const { added, replaced, skipped, failed } = result;
-  output.textContent = `Đã dựng lại ${replaced.length}, thêm ${added.length} ký tự.`
-    + (skipped || failed ? ` Có ${skipped} vùng và ${failed} ký tự chưa dựng được.` : '');
-  if (reviewedWords.some(entry => entry.ai)) summarizeGeminiScan(result);
-});
-
-$('ai-scan').addEventListener('click', () => scanReferences(true));
-$('scan').addEventListener('click', () => scanReferences());
-$('apply-scan').addEventListener('click', async () => {
-  const result = await applyReviewedWords();
-  if (result && reviewedWords.some(entry => entry.ai)) summarizeGeminiScan(result);
+$('ai-scan').addEventListener('click', designFont);
+$('stop-design').addEventListener('click', () => {
+  if (!designRun) return;
+  designRun.stop = true;
+  $('stop-design').disabled = true;
+  reportDesign('Sẽ dừng sau khi lưu nhóm đang chạy.');
 });
 
 document.addEventListener('paste', event => {
@@ -1305,16 +972,11 @@ async function restoreReferenceProject() {
     const { images, state } = await loadReferences();
     if (!images.length) return;
     references.push(...images.map((file, index) => ({ file, settings: state.settings?.[index] })));
-    for (const group of state.review ?? []) addReviewGroup(group.index, group.settings, group.rows);
-    $('ocr-review').hidden = !reviewGroups.length;
-    refreshReviewVisibility();
+    legacyReview = Array.isArray(state.review) ? state.review : [];
     const index = state.activeReference >= 0 && state.activeReference < references.length ? state.activeReference : 0;
     await showReference(index);
-    if (reviewedWords.some(entry => entry.ai)) {
-      const existing = [...new Set(reviewedWords.filter(entry => entry.done)
-        .flatMap(entry => [...entry.input.value.normalize('NFC')]).filter(char => glyphs.has(char)))];
-      summarizeGeminiScan({ existing });
-    }
+    const drafted = [...glyphs.values()].filter(modelDesigned).length;
+    if (drafted) reportDesign(`Đã lưu ${drafted}/${charset.length} ký tự do AI vẽ. Bấm nút AI để tiếp tục nếu còn thiếu.`);
     $('reference-storage').textContent = `Đã khôi phục ${images.length} ảnh và phần duyệt đã lưu.`;
   } catch {
     $('reference-storage').textContent = 'Không đọc được ảnh đã lưu trên trình duyệt này.';

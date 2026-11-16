@@ -9,11 +9,9 @@
     "build": "esbuild site/app.js --bundle --minify --format=iife --outfile=dist/app.js --external:node:fs --external:wawoff2 && node scripts/copy-static.cjs"
   },
   "dependencies": {
-    "@tesseract.js-data/vie": "1.0.0",
     "esm-potrace-wasm": "0.5.0",
     "svg2ttf": "6.0.3",
     "svgpath": "2.6.0",
-    "tesseract.js": "7.0.0",
     "ttf2woff": "3.0.0"
   },
   "devDependencies": {

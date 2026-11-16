@@ -51,13 +51,12 @@
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
         <div class="tool-row scan-actions">
-          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>AI đọc ảnh và dựng chữ</button>
-          <button id="scan" type="button">Quét OCR thủ công</button>
+          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>AI vẽ và hoàn thiện font</button>
+          <button id="stop-design" type="button" hidden>Dừng sau nhóm đang chạy</button>
         </div>
         <p id="ai-scan-help" class="help">Kiểm tra kết nối Gemini thành công để bật nút AI.</p>
         <div id="ai-scan-report" class="scan-report" hidden>
           <p id="ai-scan-result" role="status" aria-live="polite"></p>
-          <button id="jump-to-review" type="button" class="quiet" hidden>Xem vùng cần duyệt ↓</button>
         </div>
       </div>
       <div id="stage" hidden>
@@ -81,9 +80,9 @@
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
-      <div class="tool-row"><button id="rebuild-batch" type="button" disabled>Dựng lại cả lô</button><button id="accents">Tạo dấu tiếng Việt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
-      <p id="batch-status" class="help" role="status"></p>
-      <div class="glyph-legend"><span><i class="dot filled"></i> Ảnh mẫu</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
+      <div class="tool-row"><button id="accents">Tạo dấu tiếng Việt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
+
+      <div class="glyph-legend"><span><i class="dot filled"></i> Theo ảnh</span><span><i class="dot composed"></i> AI suy đoán / ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
       <h3 class="glyph-group">Chữ hoa và số</h3>
       <div id="glyphs" class="glyph-grid" aria-label="Chữ hoa và số"></div>
       <h3 class="glyph-group">Chữ thường</h3>
@@ -105,14 +104,7 @@
     </div>
     <p id="missing" class="help" aria-live="polite"></p>
   </section>
-      <section id="ocr-review" class="panel ocr-review" tabindex="-1" hidden aria-labelledby="ocr-title">
-        <h3 id="ocr-title">Duyệt vùng chữ</h3>
-        <label id="show-processed-row" class="check" hidden><input id="show-processed" type="checkbox"> Hiện cả các vùng đã xử lý</label>
-        <p class="help">Sửa chữ ở những vùng còn thiếu hoặc chưa rõ, rồi bấm lấy nét. Nếu số chữ thay đổi, Xưởng Font sẽ thử tách lại theo khoảng trống trong ảnh.</p>
-        <div id="ocr-results"></div>
-        <button id="apply-scan" class="primary" type="button">Lấy nét từ các từ đã chọn</button>
-        <p id="ocr-status" class="status" role="status" aria-live="polite"></p>
-      </section>
+
     </div>
   </div>
 </main>
@@ -150,17 +142,6 @@
     <p id="ai-review-action" class="help"></p>
   </section>
 </dialog>
-<dialog id="recrop-dialog" aria-labelledby="recrop-title">
-  <div class="viewer-toolbar">
-    <h2 id="recrop-title">Khoanh lại vùng chữ</h2>
-    <form method="dialog"><button type="submit">Đóng</button></form>
-  </div>
-  <div class="recrop-body">
-    <p id="recrop-help" class="help"></p>
-    <div class="recrop-scroll"><canvas id="recrop-canvas" aria-label="Kéo một khung từ đầu đến cuối từ cần lấy nét."></canvas></div>
-    <div class="buttons"><button id="apply-recrop" class="primary" type="button" disabled>Dùng vùng khoanh và lấy nét</button></div>
-    <p id="recrop-status" class="status" role="status" aria-live="polite"></p>
-  </div>
-</dialog>
+
 </body>
 </html>
