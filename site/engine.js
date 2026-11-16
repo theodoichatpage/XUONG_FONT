@@ -118,10 +118,17 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale) {
   const pad = PAD * scale;
   const img = new ImageData(w * scale + 2 * pad, h * scale + 2 * pad);
   img.data.fill(255);
-  function sample(x, y) {
+  function pixel(x, y) {
     if (x < 0 || x >= w || y < 0 || y >= h) return 0;
     const p = (blob.y0 + y) * imgWidth + blob.x0 + x;
     return coverage ? coverage[p] : ink[p] * 255;
+  }
+  function sample(x, y) {
+    const center = pixel(x, y);
+    if (!coverage || x <= 0 || y <= 0 || x >= w - 1 || y >= h - 1) return center;
+    // Reduce one-pixel edge steps without shifting the outside bounds.
+    return (center * 8 + pixel(x - 1, y) + pixel(x + 1, y)
+      + pixel(x, y - 1) + pixel(x, y + 1)) / 12;
   }
   for (let y = 0; y < h * scale; y++) {
     const sy = (y + .5) / scale - .5, top = Math.floor(sy), dy = sy - top;
@@ -147,13 +154,13 @@ async function traceCrop(img, scale) {
     turdsize: 0,
     alphamax: 0.86,
     opticurve: 1,
-    opttolerance: 0.14 * scale,
+    opttolerance: 0.38 * scale,
     extractcolors: false,
   });
-  const m = /d="([^"]+)"/.exec(svg);
-  if (!m) return '';
+  const outline = [...svg.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].map(match => match[1]).join(' ');
+  if (!outline) return '';
   // potrace SVG uses <g transform="translate(0,H) scale(0.1,-0.1)">; undo it
-  return svgpathLib(m[1]).scale(0.1, -0.1).translate(0, img.height).round(1).toString();
+  return svgpathLib(outline).scale(0.1, -0.1).translate(0, img.height).round(1).toString();
 }
 
 

@@ -95,16 +95,18 @@ export function wordInk(canvas, box, settings) {
 
 // A clean blank column is a visible boundary between two letters. Only
 // recover a word when the resulting boundaries agree with its corrected text.
-export function splitWordByGaps(mask, box, count) {
+export function splitWordByGaps(mask, box, count, bodyOnly = false) {
   const { frame: { x, y, w, h }, ink } = mask;
   const left = Math.max(0, box.x0 - x), right = Math.min(w, box.x1 - x);
   const top = Math.max(0, box.y0 - y), bottom = Math.min(h, box.y1 - y);
+  const bodyTop = bodyOnly ? top + Math.floor((bottom - top) * .42) : top;
+  const bodyBottom = bodyOnly ? bottom - Math.floor((bottom - top) * .12) : bottom;
   const boxes = [];
   let start = -1;
   for (let column = left; column <= right; column++) {
     let occupied = false;
     if (column < right) {
-      for (let row = top; row < bottom; row++) {
+      for (let row = bodyTop; row < bodyBottom; row++) {
         if (ink[row * w + column]) {
           occupied = true;
           break;
@@ -182,6 +184,11 @@ export function inkBox(mask, bbox) {
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 };
 }
 
+export function completeTildeO(glyph) {
+  // A separate tilde, the rounded body, and its counter each need a contour.
+  return !/^[õÕ]$/u.test(glyph.char) || (glyph.d.match(/M/gi)?.length ?? 0) >= 3;
+}
+
 export async function traceSymbol(mask, bbox, char, wordBox) {
   const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
@@ -210,6 +217,7 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
     }
   }
   const glyph = await makeGlyph(symbolInk, w, bounds, char, mask.coverage);
+  if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
   return { ...glyph, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
 }
