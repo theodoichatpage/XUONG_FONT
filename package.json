@@ -6,7 +6,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "esbuild site/app.js --bundle --minify --format=iife --outfile=dist/app.js --external:node:fs --external:wawoff2 && node scripts/copy-static.cjs"
+    "build": "esbuild site/app.js --bundle --minify --format=iife --outfile=dist/app.js --external:node:fs --external:wawoff2 && node scripts/copy-static.cjs",
+    "check:font": "fontbakery check-typenetwork -n -c outline_alignment_miss -c outline_colinear_vectors -c outline_jaggy_segments -c outline_semi_vertical -c outline_short_segments"
   },
   "dependencies": {
     "esm-potrace-wasm": "0.5.0",

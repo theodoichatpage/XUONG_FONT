@@ -31,3 +31,14 @@ Nhập khóa Gemini API do bạn quản lý và bấm **Gửi Gemini kiểm tra*
 ## Nguồn mã
 
 Các mô-đun vector hóa, tách vùng, định cỡ và xuất font được chuyển từ [draw-your-font](https://github.com/danilo-znamerovszkij/draw-your-font/tree/ef367bb2193b523a03e313b9219e31055558ae70). Thông báo MIT của mã gốc nằm trong `LICENSE`. Bản web dùng [esm-potrace-wasm 0.5.0](https://github.com/tomayac/esm-potrace-wasm) và Potrace theo GPL-2.0. Bản web đóng gói được phân phối theo GPL-2.0, xem `COPYING`. Bản đóng gói có đường dẫn về repo này để lấy mã nguồn và hướng dẫn dựng.
+
+## Kiểm định font xuất bằng Font Bakery
+
+Cài Font Bakery trong môi trường Python hoặc qua pipx, sau đó chạy lệnh trên file TTF đã tải từ Xưởng Font.
+
+```sh
+pipx install 'fontbakery[typenetwork]==1.1.0'
+npm run check:font -- --json font-audit.json path/to/font.ttf
+```
+
+Lệnh kiểm tra các điểm lệch đường chuẩn, đoạn thẳng cùng hướng, chỗ gãy, đường gần ngang hoặc gần đứng và đoạn rất ngắn. Đọc cảnh báo theo mã Unicode rồi đối chiếu với mẫu phóng lớn để giữ các góc và chi tiết có chủ ý của kiểu chữ.
