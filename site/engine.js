@@ -6,6 +6,7 @@ import { potrace, init as initPotrace } from 'esm-potrace-wasm';
 import svgpathLib from 'svgpath';
 const { connectedComponents, mergeParts, orderBlobs } = require('../src/blob-core');
 const { placeGlyph } = require('../src/metrics');
+const { refineOutline } = require('../src/refine-outline');
 const { buildTTF } = require('../src/assemble');
 
 // assemble.js wraps its result in Buffer.from(); give the browser a minimal stand-in
@@ -187,7 +188,8 @@ export async function makeGlyph(ink, width, box, char, coverage) {
   const crop = cropToImageData(ink, width, box, coverage, scale);
   const d = await traceCrop(crop, scale, Boolean(coverage));
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
-  return { char, ...placeGlyph(d, crop, PAD * scale, char), source: 'Ảnh mẫu' };
+  const glyph = placeGlyph(d, crop, PAD * scale, char);
+  return { char, ...glyph, d: refineOutline(glyph.d, char), source: 'Ảnh mẫu' };
 }
 
 export function exportFont(name, glyphs, spacing, metrics) {

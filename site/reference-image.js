@@ -1,6 +1,7 @@
 import svgpath from 'svgpath';
 import { MAX_SIDE, makeGlyph } from './engine.js';
 
+const { unifyReferenceA } = require('../src/refine-outline');
 const { band } = require('../src/metrics');
 
 export async function referenceCanvas(file, crop) {
@@ -249,7 +250,7 @@ export function alignReferenceGlyphs(words) {
     }
   }
   const side = Math.round(Math.max(18, Math.min(55, (median(gaps) || 80) / 2)));
-  return words.map(word => {
+  return unifyReferenceA(words.map(word => {
     const upright = word.filter(({ char }) => /^[A-ZĐ0-9bdfhkltđ]$/u.test(char));
     const stable = upright.length ? upright : word.filter(({ char }) => {
       const [base, ...marks] = char.normalize('NFD');
@@ -267,5 +268,5 @@ export function alignReferenceGlyphs(words) {
         advance: Math.round(crop.w * scale + 2 * side)
       };
     });
-  }).flat();
+  }).flat());
 }
