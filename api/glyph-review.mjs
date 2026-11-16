@@ -84,9 +84,10 @@ function geminiError(status) {
   return json({ error: 'Gemini chưa xử lý được yêu cầu' + suffix }, 502);
 }
 
-async function callGemini(key, body, preferred, testing) {
+async function callGemini(key, body, preferred, testing, inventory) {
   const order = models.includes(preferred) ? [preferred, ...models.filter(model => model !== preferred)] : models;
   const deadline = AbortSignal.timeout(testing ? 13000 : 27000);
+  const attemptTimeout = testing ? 4000 : inventory ? 9000 : 0;
   const request = JSON.parse(body);
   for (const model of order) {
     try {
@@ -99,12 +100,12 @@ async function callGemini(key, body, preferred, testing) {
             thinkingConfig: { thinkingLevel: model.endsWith('-lite') ? 'minimal' : 'low' }
           }
         }),
-        signal: testing ? AbortSignal.any([deadline, AbortSignal.timeout(4000)]) : deadline
+        signal: attemptTimeout ? AbortSignal.any([deadline, AbortSignal.timeout(attemptTimeout)]) : deadline
       });
       if (!retryStatuses.has(result.status) || model === order.at(-1)) return { result, model };
       await result.body?.cancel();
     } catch (error) {
-      if (!testing || error.name !== 'TimeoutError' || deadline.aborted || model === order.at(-1)) throw error;
+      if (!attemptTimeout || error.name !== 'TimeoutError' || deadline.aborted || model === order.at(-1)) throw error;
     }
   }
 }
@@ -157,7 +158,7 @@ export async function POST(request) {
         generationConfig: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 1024,
           thinkingConfig: { thinkingLevel: 'low' } }
       });
-    const { result, model } = await callGemini(key, body, preferredModel, testing);
+    const { result, model } = await callGemini(key, body, preferredModel, testing, inventory);
     if (!result.ok) return geminiError(result.status);
     const payload = await result.json();
     if (testing) {

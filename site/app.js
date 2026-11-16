@@ -171,7 +171,8 @@ function rememberReference() {
   if (!entry) return;
   entry.settings = {
     crop, chars: $('chars').value, polarity: $('polarity').value,
-    threshold: $('threshold').value, used: entry.settings?.used ?? false
+    threshold: $('threshold').value, used: entry.settings?.used ?? false,
+    detectedWords: entry.settings?.detectedWords
   };
 }
 
@@ -885,24 +886,33 @@ async function runFontJob(infer) {
         const saved = () => `Đã cập nhật ${accepted} ký tự.`;
         const started = performance.now();
         const waiting = () => reportDesign(`${progress} · Chờ Gemini ${Math.floor((performance.now() - started) / 1000)} giây. ${saved()}`);
-        waiting();
-        const timer = setInterval(waiting, 1000);
-        let image, result;
+        let image, detectedWords = entry.settings?.detectedWords;
         try {
           image = await referenceCanvas(entry.file);
           controller.signal.throwIfAborted();
-          result = await inventoryImage(image, key, model, controller.signal);
+          if (!detectedWords?.length) {
+            waiting();
+            const timer = setInterval(waiting, 1000);
+            try {
+              const result = await inventoryImage(image, key, model, controller.signal);
+              model = result.model ?? model;
+              detectedWords = result.words;
+              if (detectedWords.length) {
+                entry.settings = { ...entry.settings, detectedWords };
+                persistReferences();
+              }
+            } finally {
+              clearInterval(timer);
+            }
+          }
         } catch (error) {
           if (controller.signal.aborted) throw error;
           if (error.status && error.status < 500) throw new Error(`${progress} · ${error.message}`);
           skipped.push(`${progress} · ${error.message}`);
           continue;
-        } finally {
-          clearInterval(timer);
         }
         reportDesign(`${progress} · Đang dựng nét từ ảnh. ${saved()}`);
-        model = result.model ?? model;
-        const words = result.words.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
+        const words = detectedWords.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
         const neighbors = words.map(word => word.area);
         const imageGlyphs = [];
         for (const { text, area: original } of words) {
