@@ -87,13 +87,14 @@ export function composeVietnamese(glyphs, replace = () => false) {
 
 // Explicit application only replaces existing variants that can use an imported mark.
 export function applyReferenceMarks(glyphs, selection) {
-  const selectedMark = toneSamples.has(selection) ? selection : undefined;
-  const base = selectedMark ? undefined : selection?.normalize('NFD')[0];
-  if (selectedMark ? !glyphs.has(selectedMark) : !base || !glyphs.has(base)) return [];
+  const selectedMarks = Array.isArray(selection) ? selection.filter(mark => toneSamples.has(mark) && glyphs.has(mark))
+    : toneSamples.has(selection) ? [selection].filter(mark => glyphs.has(mark)) : undefined;
+  const base = selectedMarks ? undefined : selection?.normalize('NFD')[0];
+  if (selectedMarks ? !selectedMarks.length : !base || !glyphs.has(base)) return [];
   const targets = new Set(accented.filter(char => {
     if (!glyphs.has(char)) return false;
     const [root, ...marks] = char.normalize('NFD');
-    return selectedMark ? marks.includes(selectedMark) : root === base
+    return selectedMarks ? marks.some(mark => selectedMarks.includes(mark)) : root === base
       && marks.some(mark => toneSamples.has(mark) && glyphs.has(mark));
   }));
   return composeVietnamese(glyphs, char => targets.has(char)).filter(glyph => targets.has(glyph.char));

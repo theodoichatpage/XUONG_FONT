@@ -1074,6 +1074,46 @@ $('chars').addEventListener('input', () => persistReferences());
 $('trace-form').addEventListener('submit', event => { event.preventDefault(); trace(false); });
 $('single').addEventListener('click', () => trace(true));
 
+$('import-tone-sheet').addEventListener('click', async () => {
+  if (busy || loading || activeReference < 0) return status('Hãy mở ảnh bảng dấu trước.');
+  const index = activeReference;
+  const entry = references[index];
+  busy = true;
+  $('import-tone-sheet').disabled = true;
+  renderReferences();
+  try {
+    const image = await referenceCanvas(entry.file);
+    const area = { x0: 0, y0: 0, x1: image.width, y1: image.height };
+    const mask = wordInk(image, area);
+    const parts = splitWordByGaps(mask, area, 10);
+    if (!parts.length) parts.push(...splitWordByGaps(mask, area, 8));
+    if (!parts.length) throw new Error('Cần ảnh một hàng theo thứ tự: trăng, mũ, chấm, hỏi, ngã, nặng, sắc, huyền. Có thể có : và ; ở cuối.');
+    const order = ['\u0306', '\u0302', null, '\u0309', '\u0303', '\u0323', '\u0301', '\u0300'];
+    const samples = new Map();
+    for (const [i, mark] of order.entries()) {
+      if (!mark) continue;
+      const glyph = await traceSymbol(mask, parts[i], mark);
+      glyph.reference = { index, crop: glyph.pixelCrop };
+      samples.set(mark, glyph);
+    }
+    const next = new Map([...glyphs, ...samples]);
+    const generated = applyReferenceMarks(next, [...samples.keys()]);
+    for (const glyph of generated) next.set(glyph.char, glyph);
+    glyphs = next;
+    refresh();
+    const message = `Đã nhập ${samples.size} dấu mẫu và cập nhật ${generated.length} chữ có dấu.`;
+    status(message);
+    reportDesign(message);
+  } catch (error) {
+    status(error.message);
+    reportDesign(error.message);
+  } finally {
+    busy = false;
+    $('import-tone-sheet').disabled = false;
+    renderReferences();
+  }
+});
+
 $('apply-tone-samples').addEventListener('click', () => {
   if (busy || loading) return;
   const generated = applyReferenceMarks(glyphs, selected);
