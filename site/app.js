@@ -1,5 +1,5 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { core, lowercase, charset, toneSamples, composeVietnamese, applyReferenceMarks } from './vietnamese.js';
+import { core, lowercase, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -1116,6 +1116,17 @@ $('import-tone-sheet').addEventListener('click', async () => {
     $('import-tone-sheet').disabled = false;
     renderReferences();
   }
+});
+
+$('apply-lowercase-horns').addEventListener('click', () => {
+  if (busy || loading) return;
+  const generated = applyCompactLowercaseHorns(glyphs);
+  if (!generated.length) return status('Cần có chữ o hoặc u thường trước khi ghép râu.');
+  for (const glyph of generated) glyphs.set(glyph.char, glyph);
+  refresh();
+  const message = `Đã ghép râu đầu tròn cho: ${generated.map(glyph => glyph.char).join(' ')}.`;
+  status(message);
+  reportDesign(message);
 });
 
 $('apply-tone-samples').addEventListener('click', () => {

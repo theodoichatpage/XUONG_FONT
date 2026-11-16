@@ -26,6 +26,9 @@ const templates = {
   '\u0323': 'M41 0 A41 41 0 1 0 -41 0 A41 41 0 1 0 41 0 Z'
 };
 
+// Short curved neck and round terminal from the approved uppercase design.
+const compactHorn = 'M0 5 C17 10 31 20 39 34 C25 40 20 49 20 62 C20 80 34 94 52 94 C70 94 84 80 84 62 C84 40 69 26 47 15 L4 0 Z';
+
 function undotI(glyph) {
   const contours = [];
   for (const segment of svgpath(glyph.d).abs().segments) {
@@ -51,6 +54,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     const horned = (root + horn).normalize('NFC');
     const useHornedSample = !replaceHorn && marks.length > 1 && marks.includes(horn)
       && glyphs.get(horned)?.source === 'Ảnh mẫu';
+    const useCompactHorn = !replaceHorn && marks.includes(horn) && glyphs.get(horned)?.hornStyle === 'compact';
     const base = useHornedSample ? horned : root;
     if (useHornedSample) marks.splice(marks.indexOf(horn), 1);
     let original = glyphs.get(base);
@@ -64,6 +68,14 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
       let x = bounds.x + bounds.width / 2;
       let y = top;
+      if (mark === horn && useCompactHorn) {
+        const scale = Math.min(.9, bounds.width * .38 / 84);
+        const overlap = bounds.width * (root === 'o' ? .23 : .15);
+        const right = bounds.x + bounds.width;
+        paths.push(svgpath(compactHorn).scale(scale).translate(right - overlap, bodyTop - 35).round(1).toString());
+        advance += Math.max(0, Math.ceil(84 * scale - overlap));
+        continue;
+      }
       const sample = toneSamples.has(mark) ? glyphs.get(mark) : undefined;
       if (sample) {
         const source = glyphBounds(sample);
@@ -97,7 +109,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       } else top += 123;
       paths.push(svgpath(templates[mark]).unarc().translate(x, y).round(1).toString());
     }
-    result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', base });
+    result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', base,
+      ...(useCompactHorn && char === horned ? { hornStyle: 'compact' } : {}) });
   }
   return result;
 }
@@ -117,4 +130,19 @@ export function applyReferenceMarks(glyphs, selection) {
   return composeVietnamese(glyphs, char => targets.has(char), {
     replaceHorn: selectedMarks?.includes('\u031b')
   }).filter(glyph => targets.has(glyph.char));
+}
+
+export function applyCompactLowercaseHorns(glyphs) {
+  const drafts = new Map(glyphs);
+  const selected = new Set();
+  for (const [base, horned] of [['o', 'ơ'], ['u', 'ư']]) {
+    if (!glyphs.has(base)) continue;
+    selected.add(base);
+    drafts.set(horned, { ...drafts.get(horned), source: 'Ghép dấu', hornStyle: 'compact' });
+  }
+  const matches = char => {
+    const [base, ...marks] = char.normalize('NFD');
+    return selected.has(base) && marks.includes('\u031b');
+  };
+  return composeVietnamese(drafts, matches).filter(glyph => matches(glyph.char));
 }
