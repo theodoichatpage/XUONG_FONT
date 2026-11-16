@@ -42,11 +42,17 @@ function undotI(glyph) {
   return { ...glyph, d: stem.shape.d };
 }
 
-export function composeVietnamese(glyphs, replace = () => false) {
+export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false } = {}) {
   const result = [];
   for (const char of accented) {
     if (glyphs.get(char)?.source === 'Ảnh mẫu' && !replace(char)) continue;
-    const [base, ...marks] = char.normalize('NFD');
+    const [root, ...marks] = char.normalize('NFD');
+    const horn = '\u031b';
+    const horned = (root + horn).normalize('NFC');
+    const useHornedSample = !replaceHorn && marks.length > 1 && marks.includes(horn)
+      && glyphs.get(horned)?.source === 'Ảnh mẫu';
+    const base = useHornedSample ? horned : root;
+    if (useHornedSample) marks.splice(marks.indexOf(horn), 1);
     let original = glyphs.get(base);
     if (original && base === 'i' && !marks.includes('\u0323')) original = undotI(original);
     if (!original) continue;
@@ -108,5 +114,7 @@ export function applyReferenceMarks(glyphs, selection) {
     return selectedMarks ? marks.some(mark => selectedMarks.includes(mark)) : root === base
       && marks.some(mark => toneSamples.has(mark) && glyphs.has(mark));
   }));
-  return composeVietnamese(glyphs, char => targets.has(char)).filter(glyph => targets.has(glyph.char));
+  return composeVietnamese(glyphs, char => targets.has(char), {
+    replaceHorn: selectedMarks?.includes('\u031b')
+  }).filter(glyph => targets.has(glyph.char));
 }
