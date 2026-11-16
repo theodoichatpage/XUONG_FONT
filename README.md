@@ -14,13 +14,13 @@ Start-Process .\dist\xuong-font.html
 
 `dist/xuong-font.html` là bản mở trực tiếp. Để đưa lên hosting tĩnh, dùng thư mục `dist` với trang chính `index.html`.
 
-## AI vẽ và hoàn thiện font
+## Dựng chữ theo ảnh trước, suy đoán sau
 
-1. Thêm ảnh mẫu, kiểm tra kết nối Gemini rồi bấm **AI vẽ và hoàn thiện font**.
-2. Gemini nhận các ảnh mẫu và trả đường viền SVG cho từng ký tự theo nhóm. Ô **AI theo ảnh** là ký tự Gemini cho biết có mẫu trực tiếp. **AI suy đoán** là nét thiết kế từ phong cách chung. Xưởng Font kiểm tra cú pháp đường viền, lưu nhóm hợp lệ rồi dùng các nét đó để xuất TrueType.
-3. Nếu dừng hoặc chạm hạn mức, bấm nút AI để tiếp tục từ các ký tự chưa có bản dựng AI. Kiểm tra dáng chữ bằng phần **Thử tiêu đề** trước khi tải `.TTF`.
+1. Thêm ảnh mẫu, kiểm tra kết nối Gemini rồi bấm **1. Dựng chữ có mẫu**. Gemini đọc ảnh và định vị chữ thực sự nhìn thấy. Xưởng Font dùng vùng ảnh gốc để lấy đường viền. Ký tự đọc được nhưng chưa tách rõ vẫn nằm trong danh sách có mẫu.
+2. Khi không còn ảnh bổ sung, bấm **2. Suy đoán chữ thiếu**. Gemini dùng đường viền các ký tự đã lấy nét làm mẫu neo và thiết kế các ký tự chưa thấy. Các nét AI cũ thiếu vùng đối chiếu không làm mẫu neo.
+3. Nếu dừng giữa phần suy đoán, bấm lại nút đó để tiếp tục. Kiểm tra dáng chữ trong **Thử tiêu đề** trước khi tải `.TTF`.
 
-Ảnh mẫu và phần nét đã lưu được giữ trên cùng trình duyệt. Khi bấm dựng bằng AI, các ảnh mẫu được gửi đến Gemini. Có thể lấy nét thủ công từ một vùng ảnh khi cần thay một ký tự.
+**Xem chỉ dẫn gửi Gemini** hiển thị đúng câu lệnh của hai bước. Những ảnh mẫu dùng để xử lý được gửi tới Gemini khi bấm nút tương ứng.
 
 ## AI kiểm tra nét
 

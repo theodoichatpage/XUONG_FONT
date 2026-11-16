@@ -1,11 +1,14 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { referenceCanvas, wordInk, traceSymbol } from './reference-image.js';
-import { designReferences, draftSources, requestGlyphDesign } from './ai-design.js';
+import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol } from './reference-image.js';
+import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
+import { inventoryInstruction, designInstruction } from '../src/gemini-font-prompts.mjs';
 import { prepareGlyphReview } from './glyph-review.js';
 
 const $ = id => document.getElementById(id);
+$('inventory-instruction').textContent = inventoryInstruction;
+$('design-instruction').textContent = designInstruction;
 const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
@@ -21,6 +24,7 @@ let loadingRevision = 0;
 const references = [];
 let legacyReview = [];
 let designRun;
+let inventory;
 let activeReference = -1;
 let loading = false;
 let busy = false;
@@ -38,7 +42,7 @@ function persistReferences(withImages = false) {
   const state = {
     activeReference,
     settings: references.map(entry => entry.settings),
-    review: legacyReview
+    review: legacyReview, inventory
   };
   saveReferences(state, withImages ? references.map(entry => entry.file) : undefined)
     .then(() => {
@@ -152,9 +156,10 @@ function renderReferences() {
   $('gemini-badge').dataset.state = state;
   $('gemini-badge-label').textContent = 'Gemini: ' + (state === 'ready' ? 'Đã kết nối' : state === 'loading' ? 'Đang kiểm tra' : 'Chưa kết nối');
   $('ai-scan').disabled = busy || loading || !references.length || !connectedGeminiModel || !!connectionRequest;
+  $('infer-missing').disabled = $('ai-scan').disabled || !inventory || !inventory.traced.length;
   $('ai-scan-help').textContent = connectedGeminiModel
-    ? 'Gemini vẽ đường viền theo ảnh và thiết kế các chữ còn thiếu. Ảnh mẫu được gửi đến Gemini khi bấm nút.'
-    : 'Kiểm tra kết nối Gemini thành công để bật nút AI.';
+    ? 'Thêm đủ ảnh và dựng chữ có mẫu trước. Chỉ bấm suy đoán khi bạn không còn mẫu để bổ sung.'
+    : 'Kiểm tra kết nối Gemini thành công để bật bước dựng chữ.';
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
 }
@@ -207,6 +212,7 @@ async function removeActiveReference() {
   if (busy || loading || restoring || activeReference < 0) return;
   const index = activeReference;
   const [removed] = references.splice(index, 1);
+  inventory = undefined;
   if (!removed) return;
   activeReference = -1;
   source = crop = undefined;
@@ -238,6 +244,9 @@ function addFiles(files) {
   if (!images.length) return status('Hãy chọn ảnh PNG, JPG hoặc WebP.');
   const firstNew = references.length;
   references.push(...images.map(file => ({ file })));
+  inventory = undefined;
+  $('ai-scan-report').hidden = true;
+  refresh();
   persistReferences(true);
   showReference(firstNew);
 }
@@ -536,7 +545,7 @@ function openViewer(url, width, height, title, glyph) {
 }
 
 function zoomGlyph(char) {
-  const glyph = glyphs.get(char);
+  const glyph = usableGlyph(char);
   if (!glyph) return;
   const width = 270, height = 320;
   const viewWidth = Math.max(1, glyph.advance);
@@ -691,7 +700,7 @@ for (const char of charset) {
 
 function renderGlyphs() {
   for (const [char, tile] of tiles) {
-    const glyph = glyphs.get(char);
+    const glyph = usableGlyph(char);
     tile.className = 'glyph' + (glyph ? (glyph.source === 'Ảnh mẫu' || glyph.source === draftSources.reference) ? ' ready' : ' generated' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
     tile.setAttribute('aria-label', char + ' · ' + (glyph?.source ?? 'Còn thiếu'));
@@ -711,7 +720,7 @@ function renderGlyphs() {
     label.textContent = char;
     tile.append(svg, label);
   }
-  $('count').textContent = `${glyphs.size} / ${charset.length} ký tự`;
+  $('count').textContent = `${charset.filter(char => usableGlyph(char)).length} / ${charset.length} ký tự`;
   $('selected').textContent = selected ? `${selected} · ${glyphs.get(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
   $('remove').disabled = !glyphs.has(selected);
   $('reset').disabled = !glyphs.size;
@@ -726,7 +735,7 @@ function renderPreview() {
   $('spacing-value').value = $('spacing').value;
   output.replaceChildren();
   for (const char of sample) {
-    if (!/\s/u.test(char) && !glyphs.has(char)) {
+    if (!/\s/u.test(char) && !usableGlyph(char)) {
       absent.add(char);
       const marker = document.createElement('span');
       marker.className = 'missing-glyph';
@@ -746,7 +755,8 @@ function scheduleFont() {
   download.removeAttribute('href');
   download.setAttribute('aria-disabled', 'true');
   debounce = setTimeout(async () => {
-    if (!glyphs.size) {
+    const active = charset.map(usableGlyph).filter(Boolean);
+    if (!active.length) {
       if (fontFace) document.fonts.delete(fontFace);
       fontFace = undefined;
       $('preview').style.removeProperty('font-family');
@@ -754,7 +764,7 @@ function scheduleFont() {
     }
     try {
       const name = $('name').value.trim() || 'Xuong Font';
-      const ttf = exportFont(name, [...glyphs.values()], Number($('spacing').value));
+      const ttf = exportFont(name, active, Number($('spacing').value));
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;
@@ -785,35 +795,37 @@ function reportDesign(message) {
   $('ai-scan-result').textContent = message;
 }
 
-function modelDesigned(glyph) {
-  return glyph?.source === draftSources.reference || glyph?.source === draftSources.inferred;
+function usableGlyph(char) {
+  const glyph = glyphs.get(char);
+  if (!glyph) return undefined;
+  if (glyph.source === draftSources.reference) return undefined;
+  if (glyph.source === draftSources.inferred && glyph.inventoryId !== inventory?.id) return undefined;
+  if (glyph.source === draftSources.inferred && !glyph.inventoryId) return undefined;
+  return glyph;
+}
+
+function inventoryReport(prefix = '') {
+  const present = inventory.observed.length;
+  const missing = charset.length - present;
+  const unresolved = present - inventory.traced.length;
+  reportDesign(prefix + `Có mẫu: ${present} ký tự. Đã dựng từ ảnh: ${inventory.traced.length}.`
+    + (unresolved ? ` Chưa tách được: ${inventory.observed.filter(char => !inventory.traced.includes(char)).join(' ')}.` : '')
+    + ` Chưa thấy mẫu: ${missing}. Chỉ bấm suy đoán khi không còn ảnh bổ sung.`);
 }
 
 function designAnchors() {
-  const anchors = [...glyphs.values()].filter(glyph => glyph.source === draftSources.reference);
-  const chosen = anchors.slice(0, 5).map(({ char, advance, d }) => ({ char, advance, path: d }));
+  const chosen = (inventory?.traced ?? []).map(usableGlyph).filter(glyph => glyph?.source === 'Ảnh mẫu' && glyph.reference).slice(0, 8)
+    .map(({ char, advance, d }) => ({ char, advance, path: d }));
   while (chosen.length && JSON.stringify(chosen).length > 10500) chosen.pop();
   return chosen.length ? JSON.stringify(chosen) : '';
 }
 
-async function designFont() {
+async function runFontJob(infer) {
   if (busy || loading || !references.length || !connectedGeminiModel || connectionRequest) return;
   const key = geminiKey.value.trim();
   if (!key) return;
-  const draftOrder = new Set();
-  for (const group of legacyReview) {
-    for (const row of group.rows ?? []) {
-      for (const char of [...(row.text ?? '').normalize('NFC')]) {
-        if (charset.includes(char)) draftOrder.add(char);
-      }
-    }
-  }
-  for (const char of charset) draftOrder.add(char);
-  const pending = [...draftOrder].filter(char => !modelDesigned(glyphs.get(char)));
-  if (!pending.length) {
-    reportDesign('Tất cả ký tự đã có bản dựng AI. Bấm ký tự để xem nét hoặc tải font .TTF.');
-    return;
-  }
+  const anchors = infer ? designAnchors() : '';
+  if (infer && (!inventory || !anchors)) return;
   const controller = new AbortController();
   designRun = { controller, stop: false };
   busy = true;
@@ -822,31 +834,75 @@ async function designFont() {
   connectionButton.disabled = true;
   $('stop-design').hidden = false;
   $('stop-design').disabled = false;
-  reportDesign(`Đang chuẩn bị ${references.length} ảnh mẫu…`);
-  let accepted = 0;
   let model = connectedGeminiModel;
+  let accepted = 0;
   try {
-    rememberReference();
-    const samples = await designReferences(references, referenceCanvas, controller.signal);
-    for (let start = 0; start < pending.length && !designRun.stop; start += 8) {
-      if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi bấm tiếp tục.');
-      const chars = pending.slice(start, start + 8);
-      reportDesign(`Đang vẽ ${chars.join(' ')} · ${accepted}/${pending.length} ký tự của lượt này đã lưu.`);
-      const result = await requestGlyphDesign({ chars, samples, key, model, anchors: designAnchors(), signal: controller.signal });
-      model = result.model ?? model;
-      for (const glyph of result.glyphs) glyphs.set(glyph.char, glyph);
-      accepted += result.glyphs.length;
+    if (infer) {
+      const pending = charset.filter(char => !inventory.observed.includes(char) && !usableGlyph(char));
+      const samples = pending.length ? await designReferences(references, referenceCanvas, controller.signal) : [];
+      for (let start = 0; start < pending.length && !designRun.stop; start += 8) {
+        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+        const chars = pending.slice(start, start + 8);
+        reportDesign(`Đang suy đoán ${chars.join(' ')} · ${accepted}/${pending.length} ký tự đã lưu.`);
+        const result = await requestGlyphDesign({ chars, samples, key, model, anchors, signal: controller.signal });
+        model = result.model ?? model;
+        for (const glyph of result.glyphs) {
+          if (glyph.source !== draftSources.inferred) continue;
+          glyphs.set(glyph.char, { ...glyph, inventoryId: inventory.id });
+          accepted++;
+        }
+        refresh();
+      }
+      const remaining = pending.length - accepted;
+      inventoryReport(`Đã suy đoán thêm ${accepted} ký tự.` + (remaining ? ` Còn ${remaining} ký tự có thể suy đoán. ` : ' '));
+    } else {
+      const observed = new Set();
+      const traced = new Map();
+      for (const [index, entry] of references.entries()) {
+        if (designRun.stop) break;
+        if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+        reportDesign(`Đang đọc ảnh ${index + 1}/${references.length}. Chưa vẽ chữ thiếu.`);
+        const image = await referenceCanvas(entry.file);
+        const result = await inventoryImage(image, key, model, controller.signal);
+        model = result.model ?? model;
+        for (const { text, box } of result.words) {
+          const chars = [...text.normalize('NFC').replace(/\s/g, '')];
+          for (const char of chars) if (charset.includes(char)) observed.add(char);
+          if (chars.some(char => !charset.includes(char))) continue;
+          const [top, left, bottom, right] = box;
+          const area = { x0: Math.floor(left * image.width / 1000), y0: Math.floor(top * image.height / 1000),
+            x1: Math.ceil(right * image.width / 1000), y1: Math.ceil(bottom * image.height / 1000) };
+          const mask = wordInk(image, area);
+          const parts = chars.length === 1 ? [area] : splitWordByGaps(mask, area, chars.length);
+          for (const [offset, part] of parts.entries()) {
+            const char = chars[offset];
+            const pixels = (part.x1 - part.x0) * (part.y1 - part.y0);
+            if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
+            try {
+              const glyph = await traceSymbol(mask, part, char, area);
+              glyph.reference = { index, crop: { x: part.x0, y: part.y0, w: part.x1 - part.x0, h: part.y1 - part.y0 } };
+              traced.set(char, { glyph, pixels });
+            } catch { /* Keep the letter listed as observed even if tracing fails. */ }
+          }
+        }
+      }
+      if (designRun.stop) {
+        reportDesign('Đã dừng trước khi đọc hết ảnh. Bộ font và danh sách mẫu trước đó vẫn dùng được.');
+        return;
+      }
+      if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
+      inventory = { id: crypto.randomUUID(), observed: [...observed], traced: [...traced.keys()] };
+      for (const [char, { glyph }] of traced) glyphs.set(char, glyph);
+      persistReferences();
       refresh();
+      inventoryReport();
     }
     if (geminiKey.value.trim() === key) {
       connectedGeminiModel = model;
       saveGeminiPreference();
     }
-    const remaining = pending.length - accepted;
-    reportDesign(`Đã lưu ${accepted} ký tự trong lượt này.`
-      + (remaining ? ` Còn ${remaining} ký tự cần dựng. Bấm AI vẽ và hoàn thiện font để tiếp tục.` : ' Đã có bản dựng AI cho toàn bộ bảng. Có thể xem thử và tải .TTF.'));
   } catch (error) {
-    reportDesign(`Đã lưu ${accepted} ký tự trước khi dừng. ${error.message} Bạn có thể bấm nút AI để tiếp tục.`);
+    reportDesign((infer ? `Đã lưu ${accepted} ký tự trước khi dừng. ` : 'Dừng đọc ảnh trước khi cập nhật bộ font. ') + error.message);
   } finally {
     designRun = undefined;
     busy = false;
@@ -857,12 +913,13 @@ async function designFont() {
   }
 }
 
-$('ai-scan').addEventListener('click', designFont);
+$('ai-scan').addEventListener('click', () => runFontJob(false));
+$('infer-missing').addEventListener('click', () => runFontJob(true));
 $('stop-design').addEventListener('click', () => {
   if (!designRun) return;
   designRun.stop = true;
   $('stop-design').disabled = true;
-  reportDesign('Sẽ dừng sau khi lưu nhóm đang chạy.');
+  reportDesign('Sẽ dừng sau yêu cầu đang chạy.');
 });
 
 document.addEventListener('paste', event => {
@@ -973,10 +1030,11 @@ async function restoreReferenceProject() {
     if (!images.length) return;
     references.push(...images.map((file, index) => ({ file, settings: state.settings?.[index] })));
     legacyReview = Array.isArray(state.review) ? state.review : [];
+    inventory = state.inventory;
     const index = state.activeReference >= 0 && state.activeReference < references.length ? state.activeReference : 0;
     await showReference(index);
-    const drafted = [...glyphs.values()].filter(modelDesigned).length;
-    if (drafted) reportDesign(`Đã lưu ${drafted}/${charset.length} ký tự do AI vẽ. Bấm nút AI để tiếp tục nếu còn thiếu.`);
+    if (inventory) inventoryReport();
+    refresh();
     $('reference-storage').textContent = `Đã khôi phục ${images.length} ảnh và phần duyệt đã lưu.`;
   } catch {
     $('reference-storage').textContent = 'Không đọc được ảnh đã lưu trên trình duyệt này.';

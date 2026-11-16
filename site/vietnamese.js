@@ -2,7 +2,7 @@ import svgpath from 'svgpath';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
-export const punctuation = [...'.,:;!?-–—()“”‘’/'];
+export const punctuation = [...'.,:;!?-–—()“”‘’/+'];
 const vowels = [...'AĂÂEÊIOÔƠUƯYaăâeêioôơuưy'];
 const tones = ['', '\u0300', '\u0301', '\u0309', '\u0303', '\u0323'];
 export const accented = [...new Set(vowels.flatMap(vowel => tones.map(tone => (vowel + tone).normalize('NFC'))))]

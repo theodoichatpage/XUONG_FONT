@@ -88,3 +88,23 @@ export async function requestGlyphDesign({ chars, samples, key, model, anchors, 
   }
   return { glyphs: [...byChar.values()].filter(glyph => !duplicates.has(glyph.char)), model: data.model };
 }
+
+
+export async function inventoryImage(image, key, model, signal) {
+  const proof = document.createElement('canvas');
+  const scale = Math.min(2, 1200 / Math.max(image.width, image.height));
+  proof.width = Math.max(1, Math.round(image.width * scale));
+  proof.height = Math.max(1, Math.round(image.height * scale));
+  const ctx = proof.getContext('2d');
+  ctx.imageSmoothingEnabled = scale < 1;
+  ctx.drawImage(image, 0, 0, proof.width, proof.height);
+  const response = await fetch('/api/glyph-review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-gemini-key': key },
+    body: JSON.stringify({ mode: 'inventory', preferredModel: model, image: proof.toDataURL('image/jpeg', .91).split(',')[1] }),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(42000)])
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error ?? 'Gemini chưa đọc được ảnh mẫu.');
+  return { words: data.words, model: data.model };
+}

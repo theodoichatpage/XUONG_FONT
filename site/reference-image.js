@@ -87,6 +87,37 @@ export function wordInk(canvas, box, settings) {
   return { frame, ink, detailInk };
 }
 
+// A clean blank column is a visible boundary between two letters. Only
+// recover a word when the resulting boundaries agree with its corrected text.
+export function splitWordByGaps(mask, box, count) {
+  const { frame: { x, y, w, h }, ink } = mask;
+  const left = Math.max(0, box.x0 - x), right = Math.min(w, box.x1 - x);
+  const top = Math.max(0, box.y0 - y), bottom = Math.min(h, box.y1 - y);
+  const boxes = [];
+  let start = -1;
+  for (let column = left; column <= right; column++) {
+    let occupied = false;
+    if (column < right) {
+      for (let row = top; row < bottom; row++) {
+        if (ink[row * w + column]) {
+          occupied = true;
+          break;
+        }
+      }
+    }
+    if (occupied && start < 0) start = column;
+    if (!occupied && start >= 0) {
+      boxes.push({ x0: x + start, x1: x + column, y0: y + top, y1: y + bottom });
+      start = -1;
+    }
+  }
+  if (boxes.length !== count) return [];
+  const cuts = boxes.slice(1).map((next, index) => Math.round((boxes[index].x1 + next.x0) / 2));
+  return boxes.map((box, index) => ({
+    ...box, x0: cuts[index - 1] ?? x + left, x1: cuts[index] ?? x + right
+  }));
+}
+
 export async function traceSymbol(mask, bbox, char, wordBox) {
   const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);

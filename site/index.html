@@ -51,10 +51,18 @@
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
         <div class="tool-row scan-actions">
-          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>AI vẽ và hoàn thiện font</button>
-          <button id="stop-design" type="button" hidden>Dừng sau nhóm đang chạy</button>
+          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>1. Dựng chữ có mẫu</button>
+          <button id="infer-missing" type="button" disabled>2. Suy đoán chữ thiếu</button>
+          <button id="stop-design" type="button" hidden>Dừng sau yêu cầu đang chạy</button>
         </div>
-        <p id="ai-scan-help" class="help">Kiểm tra kết nối Gemini thành công để bật nút AI.</p>
+        <p id="ai-scan-help" class="help">Thêm đủ ảnh rồi dựng chữ có mẫu trước.</p>
+        <details class="ai-instructions">
+          <summary>Xem chỉ dẫn gửi Gemini</summary>
+          <strong>Bước 1 · Đọc ảnh mẫu</strong>
+          <p id="inventory-instruction" class="help"></p>
+          <strong>Bước 2 · Thiết kế chữ thiếu</strong>
+          <p id="design-instruction" class="help"></p>
+        </details>
         <div id="ai-scan-report" class="scan-report" hidden>
           <p id="ai-scan-result" role="status" aria-live="polite"></p>
         </div>
