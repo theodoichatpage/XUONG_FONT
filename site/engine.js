@@ -6,6 +6,7 @@ import { potrace, init as initPotrace } from 'esm-potrace-wasm';
 import svgpathLib from 'svgpath';
 const { connectedComponents, mergeParts, orderBlobs } = require('../src/blob-core');
 const { placeGlyph } = require('../src/metrics');
+const { fitLetterU } = require('../src/fit-letter-u');
 const { fitLetterM } = require('../src/fit-letter-m');
 const { refineOutline } = require('../src/refine-outline');
 const { buildTTF } = require('../src/assemble');
@@ -188,7 +189,9 @@ export async function makeGlyph(ink, width, box, char, coverage) {
   const scale = Math.max(1, Math.min(coverage ? 2 : 3, Math.floor(900 / size)));
   const crop = cropToImageData(ink, width, box, coverage, scale);
   const fitted = char === 'm' ? fitLetterM(crop, PAD * scale) : null;
-  const d = fitted ?? await traceCrop(crop, scale, Boolean(coverage));
+  const traced = fitted ?? await traceCrop(crop, scale, Boolean(coverage));
+  const d = traced && /^u[\u0300\u0301\u0303\u0309]?$/u.test(char.normalize('NFD'))
+    ? fitLetterU(crop, PAD * scale, traced) : traced;
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
   const glyph = placeGlyph(d, crop, PAD * scale, char);
   return { char, ...glyph, d: fitted ? glyph.d : refineOutline(glyph.d, char), source: 'Ảnh mẫu' };
