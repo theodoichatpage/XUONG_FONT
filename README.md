@@ -16,12 +16,12 @@ Start-Process .\dist\xuong-font.html
 
 ## Từ ảnh đến font
 
-1. Chọn ảnh PNG, JPG hoặc WebP. Với ảnh tiêu đề video, kéo trên ảnh để khoanh dòng chữ. Chọn chữ sáng hoặc tối rồi bật **Xem nét đã tách** để chỉnh ngưỡng.
+1. Chọn hoặc kéo nhiều ảnh PNG, JPG hoặc WebP cùng lúc. Dùng danh sách **Ảnh đang xử lý** hoặc hai nút mũi tên để chuyển ảnh. Khung chọn, chữ đã nhập và ngưỡng được giữ riêng cho từng ảnh trong phiên đang mở. Với ảnh tiêu đề video, kéo trên ảnh để khoanh dòng chữ. Chọn chữ sáng hoặc tối rồi bật **Xem nét đã tách** để chỉnh ngưỡng.
 2. Nhập chính xác các ký tự có mặt theo thứ tự đọc và chọn **Tách và thêm chữ**. Nếu nét dính nhau hoặc có dấu rời, khoanh riêng một chữ và dùng **Thêm một chữ**. Có thể lần lượt thêm chữ từ nhiều ảnh.
 3. Chọn **Tạo dấu tiếng Việt** để ghép dấu từ các nguyên âm đã nhập. Dấu ghép dùng hình mẫu dựng sẵn và có thể thay bằng ký tự lấy trực tiếp từ ảnh. Chữ Đ, những thân chữ còn thiếu, số và dấu câu lấy từ ảnh riêng.
 4. Thử tiêu đề, chỉnh khoảng cách và tải `.ttf`. Chữ thiếu được gạch chân chấm trong bản xem trước. Công cụ vẫn cho phép xuất bộ font đang làm dở.
 
-Trình duyệt lưu nét chữ, tên font, tiêu đề thử và khoảng cách chữ nếu cho phép lưu cục bộ. Ảnh gốc cần mở lại sau khi tải lại trang.
+Trình duyệt lưu nét chữ, tên font, tiêu đề thử và khoảng cách chữ nếu cho phép lưu cục bộ. Danh sách ảnh gốc cần mở lại sau khi tải lại trang.
 
 Để thử nhanh, chọn **Thử ảnh mẫu → Tách và thêm chữ → Tạo dấu tiếng Việt → Tải font .TTF**.
 

@@ -14,6 +14,9 @@ let fontFace;
 let downloadURL;
 let revision = 0;
 let loadingRevision = 0;
+const references = [];
+let activeReference = -1;
+let loading = false;
 let busy = false;
 let debounce;
 
@@ -97,17 +100,71 @@ function useImage(image, name) {
   renderSource();
 }
 
-async function loadFile(file) {
-  if (!file || busy) return;
+function renderReferences() {
+  $('references').hidden = references.length === 0;
+  const select = $('reference');
+  select.replaceChildren(...references.map(({ file, settings }, index) =>
+    new Option((settings?.used ? '✓ ' : '') + file.name, index)
+  ));
+  select.value = String(activeReference);
+  $('reference-count').textContent = activeReference >= 0
+    ? `${activeReference + 1}/${references.length}` : `${references.length} ảnh`;
+  select.disabled = busy || loading;
+  $('previous-reference').disabled = busy || loading || activeReference <= 0;
+  $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
+}
+
+function rememberReference() {
+  const entry = references[activeReference];
+  if (!entry) return;
+  entry.settings = {
+    crop, chars: $('chars').value, polarity: $('polarity').value,
+    threshold: $('threshold').value, used: entry.settings?.used ?? false
+  };
+}
+
+async function showReference(index) {
+  const entry = references[index];
+  if (!entry || busy || index === activeReference) return;
+  rememberReference();
   const request = ++loadingRevision;
+  loading = true;
+  renderReferences();
   try {
-    const image = await createImageBitmap(file);
+    const image = await createImageBitmap(entry.file);
     try {
-      if (request === loadingRevision && !busy) useImage(image, file.name);
+      if (request !== loadingRevision) return;
+      const settings = entry.settings;
+      $('polarity').value = settings?.polarity ?? 'adaptive';
+      setThreshold();
+      if (settings) {
+        $('threshold').value = settings.threshold;
+        $('threshold-value').value = settings.threshold;
+      }
+      $('chars').value = settings?.chars ?? '';
+      activeReference = index;
+      useImage(image, entry.file.name);
+      crop = settings?.crop;
+      renderSource();
     } finally { image.close(); }
   } catch {
-    if (request === loadingRevision) status('Không mở được ảnh. Hãy chọn tệp PNG, JPG hoặc WebP.');
+    if (request === loadingRevision) status('Không mở được ảnh “' + entry.file.name + '”. Hãy chọn một ảnh khác trong danh sách.');
+  } finally {
+    if (request === loadingRevision) {
+      loading = false;
+      renderReferences();
+    }
   }
+}
+
+function addFiles(files) {
+  if (busy) return;
+  const images = [...files].filter(file => /\.(png|jpe?g|webp)$/i.test(file.name)
+    || ['image/png', 'image/jpeg', 'image/webp'].includes(file.type));
+  if (!images.length) return status('Hãy chọn ảnh PNG, JPG hoặc WebP.');
+  const firstNew = references.length;
+  references.push(...images.map(file => ({ file })));
+  showReference(firstNew);
 }
 
 function point(event) {
@@ -119,7 +176,7 @@ function point(event) {
 }
 
 canvas.addEventListener('pointerdown', event => {
-  if (busy || event.button !== 0) return;
+  if (busy || loading || event.button !== 0) return;
   canvas.setPointerCapture(event.pointerId);
   dragStart = point(event);
 });
@@ -158,13 +215,14 @@ function updateComposed() {
 }
 
 async function trace(single) {
-  if (busy) return;
+  if (busy || loading) return;
   const chars = [...$('chars').value.normalize('NFC').replace(/\s/g, '')];
   if (!source || !chars.length) return status('Hãy chọn ảnh và nhập chữ trong vùng đã khoanh.');
   if (chars.some(char => !charset.includes(char))) return status('Bản này hỗ trợ chữ in hoa tiếng Việt, số và dấu câu trong bảng.');
   if (single && chars.length !== 1) return status('Hãy khoanh một chữ và nhập đúng một ký tự.');
   busy = true;
   $('trace').disabled = $('single').disabled = true;
+  renderReferences();
   try {
     const { ink, blobs, width } = segmentation();
     const boxes = single ? inkBounds(ink, width) : blobs;
@@ -182,6 +240,8 @@ async function trace(single) {
       return status('Đã hủy thay nét.');
     }
     for (const [char, glyph] of traced) glyphs.set(char, glyph);
+    rememberReference();
+    if (references[activeReference]) references[activeReference].settings.used = true;
     updateComposed();
     refresh();
     status(`Đã thêm ${traced.size} ký tự từ ảnh mẫu.`);
@@ -189,6 +249,7 @@ async function trace(single) {
   finally {
     busy = false;
     $('trace').disabled = $('single').disabled = false;
+    renderReferences();
   }
 }
 
@@ -297,7 +358,7 @@ function refresh() {
 }
 
 $('file').addEventListener('change', event => {
-  loadFile(event.target.files[0]);
+  addFiles(event.target.files);
   event.target.value = '';
 });
 $('drop').addEventListener('dragover', event => { event.preventDefault(); $('drop').classList.add('over'); });
@@ -305,12 +366,18 @@ $('drop').addEventListener('dragleave', () => $('drop').classList.remove('over')
 $('drop').addEventListener('drop', event => {
   event.preventDefault();
   $('drop').classList.remove('over');
-  loadFile(event.dataTransfer.files[0]);
+  addFiles(event.dataTransfer.files);
 });
 
+$('reference').addEventListener('change', event => showReference(Number(event.target.value)));
+$('previous-reference').addEventListener('click', () => showReference(activeReference - 1));
+$('next-reference').addEventListener('click', () => showReference(activeReference + 1));
+
 $('demo').addEventListener('click', () => {
-  if (busy) return;
-  loadingRevision++;
+  if (busy || loading) return;
+  rememberReference();
+  activeReference = -1;
+  renderReferences();
   const demo = document.createElement('canvas');
   demo.width = 720;
   demo.height = 170;

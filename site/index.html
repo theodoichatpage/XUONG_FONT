@@ -21,8 +21,16 @@
   <div class="workspace">
     <section class="panel source" aria-labelledby="source-title">
       <div class="panel-title"><h2 id="source-title">Ảnh mẫu</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
-      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn hoặc kéo ảnh vào đây</strong><small id="filename">PNG, JPG, WebP</small></label>
-      <input id="file" type="file" accept="image/png,image/jpeg,image/webp" class="visually-hidden">
+      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn hoặc kéo nhiều ảnh vào đây</strong><small id="filename">PNG, JPG, WebP</small></label>
+      <input id="file" type="file" multiple accept="image/png,image/jpeg,image/webp" class="visually-hidden">
+      <div id="references" class="reference-list" hidden>
+        <label for="reference">Ảnh đang xử lý <span id="reference-count"></span></label>
+        <div class="reference-controls">
+          <button id="previous-reference" type="button" aria-label="Ảnh trước">‹</button>
+          <select id="reference"></select>
+          <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
+        </div>
+      </div>
       <div id="stage" hidden>
         <canvas id="image" aria-label="Ảnh mẫu. Kéo trên ảnh để khoanh vùng chữ."></canvas>
         <div class="inline"><small>Kéo trên ảnh để khoanh dòng hoặc một chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
