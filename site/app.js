@@ -747,6 +747,83 @@ function setScanBusy(value) {
   renderReferences();
 }
 
+const recropDialog = $('recrop-dialog');
+const recropCanvas = $('recrop-canvas');
+const recropContext = recropCanvas.getContext('2d');
+let recropEntry;
+let recropImage;
+let recropBox;
+let recropStart;
+
+function drawRecrop() {
+  recropContext.drawImage(recropImage, 0, 0);
+  recropContext.lineWidth = Math.max(1, recropCanvas.width / 400);
+  recropContext.strokeStyle = '#ff4b3a';
+  recropContext.strokeRect(recropBox.x0, recropBox.y0, recropBox.x1 - recropBox.x0, recropBox.y1 - recropBox.y0);
+}
+
+async function openRecrop(entry) {
+  if (busy || loading || recropDialog.open || !references[entry.index]) return;
+  recropEntry = entry;
+  recropImage = recropBox = undefined;
+  $('apply-recrop').disabled = true;
+  $('recrop-help').textContent = `Kéo khung ôm trọn “${entry.input.value}”, gồm cả dấu và chân chữ. Tránh chạm dòng bên dưới.`;
+  $('recrop-status').textContent = 'Đang mở ảnh mẫu…';
+  recropCanvas.hidden = true;
+  recropDialog.showModal();
+  try {
+    const image = await referenceCanvas(references[entry.index].file, entry.settings?.crop);
+    if (!recropDialog.open || recropEntry !== entry) return;
+    recropImage = image;
+    recropCanvas.width = image.width;
+    recropCanvas.height = image.height;
+    recropCanvas.hidden = false;
+    recropBox = { ...entry.word.bbox };
+    drawRecrop();
+    $('recrop-status').textContent = '';
+  } catch {
+    $('recrop-status').textContent = 'Chưa mở được ảnh cho dòng này.';
+  }
+}
+
+function recropPoint(event) {
+  const area = recropCanvas.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(recropCanvas.width, Math.round((event.clientX - area.left) * recropCanvas.width / area.width))),
+    y: Math.max(0, Math.min(recropCanvas.height, Math.round((event.clientY - area.top) * recropCanvas.height / area.height)))
+  };
+}
+
+recropCanvas.addEventListener('pointerdown', event => {
+  if (!recropImage || event.button !== 0) return;
+  recropCanvas.setPointerCapture(event.pointerId);
+  recropStart = recropPoint(event);
+});
+recropCanvas.addEventListener('pointermove', event => {
+  if (!recropStart) return;
+  const { x, y } = recropPoint(event);
+  if (Math.abs(x - recropStart.x) < 3 || Math.abs(y - recropStart.y) < 3) return;
+  recropBox = { x0: Math.min(x, recropStart.x), x1: Math.max(x, recropStart.x),
+    y0: Math.min(y, recropStart.y), y1: Math.max(y, recropStart.y) };
+  drawRecrop();
+  $('apply-recrop').disabled = false;
+});
+for (const event of ['pointerup', 'pointercancel']) recropCanvas.addEventListener(event, () => { recropStart = undefined; });
+recropDialog.addEventListener('close', () => { recropEntry = recropImage = recropBox = recropStart = undefined; });
+$('apply-recrop').addEventListener('click', async () => {
+  const entry = recropEntry;
+  if (!entry || !recropImage || !recropBox || busy || loading) return;
+  entry.word = { ...entry.word, bbox: recropBox, symbols: [] };
+  entry.thumbnail = wordThumbnail(recropImage, recropBox).toDataURL();
+  entry.preview.src = entry.thumbnail;
+  entry.done = false;
+  entry.include.checked = true;
+  persistReferences();
+  recropDialog.close();
+  const result = await applyReviewedWords(false, entry);
+  if (result && entry.ai) summarizeGeminiScan(result);
+});
+
 function addReviewGroup(index, settings, rows) {
   const entry = references[index];
   if (!entry) return;
@@ -794,9 +871,14 @@ function addReviewGroup(index, settings, rows) {
       if (preview.naturalWidth) openViewer(preview.src, preview.naturalWidth, preview.naturalHeight, 'Ảnh chữ · ' + input.value);
     });
     enlarge.append(preview);
-    row.append(include, enlarge, input, score);
+    const recrop = document.createElement('button');
+    recrop.type = 'button';
+    recrop.className = 'quiet recrop-button';
+    recrop.textContent = 'Khoanh lại vùng';
+    recrop.addEventListener('click', () => openRecrop(item));
+    row.append(include, enlarge, input, score, recrop);
     group.append(row);
-    const item = { index, word, thumbnail, input, include, settings, ai, done: done ?? false, element: row };
+    const item = { index, word, thumbnail, input, include, settings, ai, done: done ?? false, element: row, preview };
     reviewed.rows.push(item);
     reviewedWords.push(item);
   }
@@ -932,9 +1014,9 @@ async function scanReferences(useAI = false) {
   }
 }
 
-async function applyReviewedWords(automatic = false) {
+async function applyReviewedWords(automatic = false, onlyEntry) {
   if (busy || loading) return;
-  const chosen = reviewedWords.filter(entry => entry.include.checked && !entry.done && (!automatic || entry.ai?.clear));
+  const chosen = reviewedWords.filter(entry => entry.include.checked && !entry.done && (!onlyEntry || entry === onlyEntry) && (!automatic || entry.ai?.clear));
   const message = $('ocr-status');
   if (!chosen.length) {
     message.textContent = 'Chọn ít nhất một từ để lấy nét.';
@@ -976,7 +1058,7 @@ async function applyReviewedWords(automatic = false) {
         const boxes = separated.length ? separated
           : matching && (!automatic || agreesWithOcr) ? entry.word.symbols.map(symbol => symbol.bbox) : [];
         if (!boxes.length) {
-          skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (${entry.word.symbols.length} vùng OCR cho ${chars.length} chữ)`);
+          skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (chưa tách được ${chars.length} chữ; bấm “Khoanh lại vùng”)`);
           continue;
         }
         mapped.push({ entry, chars });

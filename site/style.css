@@ -114,3 +114,8 @@ dialog::backdrop{background:#221a17bd}
 .scan-report .quiet{padding:4px 0;margin-top:2px}
 
 #gemini-key-field .remember-gemini{margin:6px 0 0}
+
+.ocr-word .recrop-button{grid-column:3;justify-self:start;padding:3px 7px;font-size:12px}
+.recrop-body{padding:12px 16px}
+.recrop-scroll{overflow:auto;max-height:59vh;background:#29211d;margin-top:8px}
+#recrop-canvas{display:block;width:auto;height:auto;max-width:100%;max-height:56vh;margin:auto;cursor:crosshair;touch-action:none;image-rendering:pixelated}

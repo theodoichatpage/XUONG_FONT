@@ -132,5 +132,17 @@
     <p id="ai-review-action" class="help"></p>
   </section>
 </dialog>
+<dialog id="recrop-dialog" aria-labelledby="recrop-title">
+  <div class="viewer-toolbar">
+    <h2 id="recrop-title">Khoanh lại vùng chữ</h2>
+    <form method="dialog"><button type="submit">Đóng</button></form>
+  </div>
+  <div class="recrop-body">
+    <p id="recrop-help" class="help"></p>
+    <div class="recrop-scroll"><canvas id="recrop-canvas" aria-label="Kéo một khung từ đầu đến cuối từ cần lấy nét."></canvas></div>
+    <div class="buttons"><button id="apply-recrop" class="primary" type="button" disabled>Dùng vùng khoanh và lấy nét</button></div>
+    <p id="recrop-status" class="status" role="status" aria-live="polite"></p>
+  </div>
+</dialog>
 </body>
 </html>
