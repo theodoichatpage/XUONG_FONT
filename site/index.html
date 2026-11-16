@@ -34,8 +34,8 @@
         <button id="scan" class="scan-button" type="button">Quét tất cả ảnh</button>
       </div>
       <div id="stage" hidden>
-        <canvas id="image" aria-label="Ảnh mẫu. Kéo trên ảnh để khoanh vùng chữ."></canvas>
-        <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><div><button id="zoom-source" class="quiet" type="button">Phóng to</button><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div></div>
+        <canvas id="image" tabindex="0" role="button" aria-haspopup="dialog" aria-label="Ảnh mẫu. Bấm để xem lớn, kéo để khoanh vùng chữ."></canvas>
+        <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
       </div>
       <div class="field-row">
         <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
@@ -64,10 +64,7 @@
       <details><summary>Chữ thường</summary><div id="lower-glyphs" class="glyph-grid"></div></details>
       <details><summary id="more-label">Chữ có dấu và dấu câu</summary><div id="more-glyphs" class="glyph-grid"></div></details>
       <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
-      <div class="tool-row">
-        <button id="zoom-glyph" class="quiet" type="button" disabled>Phóng to ký tự</button>
-        <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
-      </div>
+      <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
     </section>
   </div>
   <section class="panel proof" aria-labelledby="proof-title">

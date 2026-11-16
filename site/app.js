@@ -246,8 +246,6 @@ function zoomGlyph(char) {
   openViewer('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(outline), width, height, `Ký tự ${char} · ${glyph.source}`);
 }
 
-$('zoom-glyph').addEventListener('click', () => zoomGlyph(selected));
-
 function zoomSource() {
   if (!source) return;
   const original = document.createElement('canvas');
@@ -257,7 +255,11 @@ function zoomSource() {
   openViewer(original.toDataURL(), source.width, source.height, 'Ảnh mẫu');
 }
 
-$('zoom-source').addEventListener('click', zoomSource);
+canvas.addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  zoomSource();
+});
 $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.3));
 $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.3));
 
@@ -401,7 +403,7 @@ function renderGlyphs() {
   }
   $('count').textContent = `${glyphs.size} / ${charset.length} ký tự`;
   $('selected').textContent = selected ? `${selected} · ${glyphs.get(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
-  $('remove').disabled = $('zoom-glyph').disabled = !glyphs.has(selected);
+  $('remove').disabled = !glyphs.has(selected);
   $('reset').disabled = !glyphs.size;
 }
 
