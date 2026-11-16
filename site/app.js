@@ -1,6 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
-import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol } from './reference-image.js';
+import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox } from './reference-image.js';
 import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { inventoryInstruction, designInstruction } from '../src/gemini-font-prompts.mjs';
@@ -292,6 +292,12 @@ function resetGlyphReview(glyph) {
   $('ai-review-action').textContent = '';
 }
 
+function proofForSource(image, box, glyph) {
+  const rect = { x0: box.x, y0: box.y, x1: box.x + box.w, y1: box.y + box.h };
+  const measured = inkBox(wordInk(image, rect), rect);
+  return prepareGlyphReview(image, measured ?? box, glyph);
+}
+
 async function openGlyphReview() {
   if (!reviewGlyph) return;
   $('viewer-scroll').hidden = true;
@@ -326,9 +332,9 @@ async function openGlyphReview() {
       return;
     }
     retraceSource = { image, box, origin };
-    showGlyphProof(prepareGlyphReview(image, box, glyph));
+    showGlyphProof(proofForSource(image, box, glyph));
     $('retrace-actions').hidden = false;
-    $('ai-reference-note').textContent = label + ' Hai hình được căn theo khung nét. Hãy xác nhận ảnh gốc chỉ chứa chữ ' + glyph.char + '.';
+    $('ai-reference-note').textContent = label + ' Hai hình được căn theo phần có nét, bỏ khoảng nền trống. Hãy xác nhận ảnh gốc chỉ chứa chữ ' + glyph.char + '.';
     $('ai-review-run').disabled = false;
   } catch (error) {
     if (turn === reviewVersion) $('ai-reference-note').textContent = error.message;
@@ -345,9 +351,12 @@ $('retrace-glyph').addEventListener('click', async () => {
   try {
     const glyph = await traceSymbol(wordInk(image, bounds), bounds, char);
     if (turn !== reviewVersion) return;
-    if (origin) glyph.reference = origin;
+    if (origin) glyph.reference = { index: origin.index, crop: {
+      ...glyph.pixelCrop,
+      x: origin.crop.x + glyph.pixelCrop.x - box.x, y: origin.crop.y + glyph.pixelCrop.y - box.y
+    } };
     retraceCandidate = glyph;
-    showGlyphProof(prepareGlyphReview(image, box, glyph));
+    showGlyphProof(proofForSource(image, box, glyph));
     $('accept-retrace').hidden = $('cancel-retrace').hidden = false;
     $('retrace-status').textContent = 'Đang xem nét mới. So sánh với ảnh gốc trước khi thay.';
   } catch (error) {
@@ -370,7 +379,7 @@ $('cancel-retrace').addEventListener('click', () => {
   retraceCandidate = undefined;
   $('accept-retrace').hidden = $('cancel-retrace').hidden = true;
   $('retrace-status').textContent = 'Đang xem nét cũ.';
-  showGlyphProof(prepareGlyphReview(retraceSource.image, retraceSource.box, reviewGlyph));
+  showGlyphProof(proofForSource(retraceSource.image, retraceSource.box, reviewGlyph));
 });
 
 async function runGlyphReview() {
@@ -865,22 +874,29 @@ async function runFontJob(infer) {
         const image = await referenceCanvas(entry.file);
         const result = await inventoryImage(image, key, model, controller.signal);
         model = result.model ?? model;
-        for (const { text, box } of result.words) {
+        const words = result.words.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
+        const neighbors = words.map(word => word.area);
+        for (const { text, area: original } of words) {
           const chars = [...text.normalize('NFC').replace(/\s/g, '')];
           for (const char of chars) if (charset.includes(char)) observed.add(char);
           if (chars.some(char => !charset.includes(char))) continue;
-          const [top, left, bottom, right] = box;
-          const area = { x0: Math.floor(left * image.width / 1000), y0: Math.floor(top * image.height / 1000),
-            x1: Math.ceil(right * image.width / 1000), y1: Math.ceil(bottom * image.height / 1000) };
-          const mask = wordInk(image, area);
-          const parts = chars.length === 1 ? [area] : splitWordByGaps(mask, area, chars.length);
+          const expanded = expandWordBox(original, neighbors, image);
+          let area = expanded;
+          let mask = wordInk(image, area);
+          let parts = chars.length === 1 ? [area] : splitWordByGaps(mask, area, chars.length);
+          if (!parts.length || inkCrossesBox(mask, area)) {
+            area = original;
+            mask = wordInk(image, area);
+            if (inkCrossesBox(mask, area)) continue;
+            parts = chars.length === 1 ? [area] : splitWordByGaps(mask, area, chars.length);
+          }
           for (const [offset, part] of parts.entries()) {
             const char = chars[offset];
             const pixels = (part.x1 - part.x0) * (part.y1 - part.y0);
             if ((traced.get(char)?.pixels ?? 0) >= pixels) continue;
             try {
               const glyph = await traceSymbol(mask, part, char, area);
-              glyph.reference = { index, crop: { x: part.x0, y: part.y0, w: part.x1 - part.x0, h: part.y1 - part.y0 } };
+              glyph.reference = { index, crop: glyph.pixelCrop };
               traced.set(char, { glyph, pixels });
             } catch { /* Keep the letter listed as observed even if tracing fails. */ }
           }

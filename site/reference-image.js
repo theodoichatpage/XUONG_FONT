@@ -84,7 +84,13 @@ export function wordInk(canvas, box, settings) {
       });
     }
   }
-  return { frame, ink, detailInk };
+  const contourThreshold = Math.abs(threshold - background) >= 14 ? detailThreshold : threshold;
+  const coverage = pixels.map((value, p) => {
+    const signed = (light ? value - contourThreshold : contourThreshold - value) * 6;
+    return detailInk[p] ? Math.max(129, Math.min(255, 128 + signed))
+      : Math.max(0, Math.min(127, 128 + signed));
+  });
+  return { frame, ink, detailInk, coverage };
 }
 
 // A clean blank column is a visible boundary between two letters. Only
@@ -118,6 +124,64 @@ export function splitWordByGaps(mask, box, count) {
   }));
 }
 
+export function pixelBox(box, image) {
+  const [top, left, bottom, right] = box;
+  return { x0: Math.floor(left * image.width / 1000), y0: Math.floor(top * image.height / 1000),
+    x1: Math.ceil(right * image.width / 1000), y1: Math.ceil(bottom * image.height / 1000) };
+}
+
+export function expandWordBox(box, neighbors, image) {
+  const height = box.y1 - box.y0;
+  const dx = Math.max(2, Math.ceil(height * .10)), dy = Math.max(3, Math.ceil(height * .16));
+  const area = {
+    x0: Math.max(0, box.x0 - dx), y0: Math.max(0, box.y0 - dy),
+    x1: Math.min(image.width, box.x1 + dx), y1: Math.min(image.height, box.y1 + dy)
+  };
+  for (const other of neighbors) {
+    if (other === box) continue;
+    const shareX = Math.min(box.x1, other.x1) > Math.max(box.x0, other.x0);
+    const shareY = Math.min(box.y1, other.y1) > Math.max(box.y0, other.y0);
+    if (shareX && other.y1 <= box.y0) area.y0 = Math.max(area.y0, Math.ceil((other.y1 + box.y0) / 2));
+    if (shareX && other.y0 >= box.y1) area.y1 = Math.min(area.y1, Math.floor((other.y0 + box.y1) / 2));
+    if (shareY && other.x1 <= box.x0) area.x0 = Math.max(area.x0, Math.ceil((other.x1 + box.x0) / 2));
+    if (shareY && other.x0 >= box.x1) area.x1 = Math.min(area.x1, Math.floor((other.x0 + box.x1) / 2));
+  }
+  return area;
+}
+
+export function inkCrossesBox(mask, box) {
+  const { frame, ink } = mask;
+  function at(x, y) {
+    const px = x - frame.x, py = y - frame.y;
+    return px >= 0 && px < frame.w && py >= 0 && py < frame.h && ink[py * frame.w + px];
+  }
+  for (let x = box.x0; x < box.x1; x++) {
+    if ((at(x, box.y0) && at(x, box.y0 - 1)) || (at(x, box.y1 - 1) && at(x, box.y1))) return true;
+  }
+  for (let y = box.y0; y < box.y1; y++) {
+    if ((at(box.x0, y) && at(box.x0 - 1, y)) || (at(box.x1 - 1, y) && at(box.x1, y))) return true;
+  }
+  return false;
+}
+
+export function inkBox(mask, bbox) {
+  const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
+  const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
+  const x1 = Math.min(w, bbox.x1 - x), y1 = Math.min(h, bbox.y1 - y);
+  const bounds = { x0: w, y0: h, x1: -1, y1: -1 };
+  for (let py = y0; py < y1; py++) {
+    for (let px = x0; px < x1; px++) {
+      if (!detailInk[py * w + px]) continue;
+      bounds.x0 = Math.min(bounds.x0, px);
+      bounds.x1 = Math.max(bounds.x1, px);
+      bounds.y0 = Math.min(bounds.y0, py);
+      bounds.y1 = Math.max(bounds.y1, py);
+    }
+  }
+  return bounds.x1 < bounds.x0 ? undefined : { x: x + bounds.x0, y: y + bounds.y0,
+    w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 };
+}
+
 export async function traceSymbol(mask, bbox, char, wordBox) {
   const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
@@ -142,8 +206,10 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
     const reachesBody = y + bounds.y1 >= wordBox.y0 + wordHeight * 0.58
       && y + bounds.y0 < wordBox.y0 + wordHeight * 0.62;
     if (inkHeight < wordHeight * 0.42 || !reachesBody) {
-      throw new Error('Vùng OCR chỉ chứa dấu hoặc thiếu thân chữ.');
+      throw new Error('Vùng ảnh chỉ chứa dấu hoặc thiếu thân chữ.');
     }
   }
-  return makeGlyph(symbolInk, w, bounds, char);
+  const glyph = await makeGlyph(symbolInk, w, bounds, char, mask.coverage);
+  return { ...glyph, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
+    w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
 }

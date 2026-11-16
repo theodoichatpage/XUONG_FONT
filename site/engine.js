@@ -113,16 +113,24 @@ export function segmentImage(imgData, sensitivity, polarity) {
   return { ink, blobs: orderBlobs(boxes), width };
 }
 
-function cropToImageData(ink, imgWidth, blob) {
+function cropToImageData(ink, imgWidth, blob, coverage, scale) {
   const w = blob.x1 - blob.x0 + 1, h = blob.y1 - blob.y0 + 1;
-  const cw = w + 2 * PAD, ch = h + 2 * PAD;
-  const img = new ImageData(cw, ch);
+  const pad = PAD * scale;
+  const img = new ImageData(w * scale + 2 * pad, h * scale + 2 * pad);
   img.data.fill(255);
-  for (let y = 0; y < h; y++) {
-    const src = (blob.y0 + y) * imgWidth + blob.x0;
-    for (let x = 0; x < w; x++) {
-      if (ink[src + x]) {
-        const p = ((y + PAD) * cw + (x + PAD)) * 4;
+  function sample(x, y) {
+    if (x < 0 || x >= w || y < 0 || y >= h) return 0;
+    const p = (blob.y0 + y) * imgWidth + blob.x0 + x;
+    return coverage ? coverage[p] : ink[p] * 255;
+  }
+  for (let y = 0; y < h * scale; y++) {
+    const sy = (y + .5) / scale - .5, top = Math.floor(sy), dy = sy - top;
+    for (let x = 0; x < w * scale; x++) {
+      const sx = (x + .5) / scale - .5, left = Math.floor(sx), dx = sx - left;
+      const a = sample(left, top) * (1 - dx) + sample(left + 1, top) * dx;
+      const b = sample(left, top + 1) * (1 - dx) + sample(left + 1, top + 1) * dx;
+      if (a * (1 - dy) + b * dy >= 128) {
+        const p = ((y + pad) * img.width + x + pad) * 4;
         img.data[p] = img.data[p + 1] = img.data[p + 2] = 0;
       }
     }
@@ -132,14 +140,14 @@ function cropToImageData(ink, imgWidth, blob) {
 
 // ---------- trace + build ----------
 
-async function traceCrop(img) {
+async function traceCrop(img, scale) {
   traceReady ??= initPotrace();
   await traceReady;
   const svg = await potrace(img, {
     turdsize: 0,
-    alphamax: 0.65,
+    alphamax: 0.86,
     opticurve: 1,
-    opttolerance: 0.08,
+    opttolerance: 0.14 * scale,
     extractcolors: false,
   });
   const m = /d="([^"]+)"/.exec(svg);
@@ -149,11 +157,13 @@ async function traceCrop(img) {
 }
 
 
-export async function makeGlyph(ink, width, box, char) {
-  const crop = cropToImageData(ink, width, box);
-  const d = await traceCrop(crop);
+export async function makeGlyph(ink, width, box, char, coverage) {
+  const size = Math.max(box.x1 - box.x0 + 1, box.y1 - box.y0 + 1);
+  const scale = Math.max(1, Math.min(3, Math.floor(900 / size)));
+  const crop = cropToImageData(ink, width, box, coverage, scale);
+  const d = await traceCrop(crop, scale);
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
-  return { char, ...placeGlyph(d, crop, PAD, char), source: 'Ảnh mẫu' };
+  return { char, ...placeGlyph(d, crop, PAD * scale, char), source: 'Ảnh mẫu' };
 }
 
 export function exportFont(name, glyphs, spacing) {
