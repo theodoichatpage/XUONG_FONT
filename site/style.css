@@ -119,6 +119,3 @@ dialog::backdrop{background:#221a17bd}
 .glyph-group{font-size:13px;color:var(--muted);margin:12px 0 5px}
 .glyph-group:first-of-type{margin-top:0}
 @media(max-width:440px){.masthead-actions .privacy{display:none}}
-
-.ai-instructions{margin:5px 0 8px}
-.ai-instructions strong,.ai-instructions p{display:block;margin-top:5px}

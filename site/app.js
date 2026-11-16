@@ -3,14 +3,11 @@ import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { designReferences, draftSources, inventoryImage, requestGlyphDesign } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
-import { inventoryInstruction, designInstruction } from '../src/gemini-font-prompts.mjs';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
 
 const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
 const $ = id => document.getElementById(id);
-$('inventory-instruction').textContent = inventoryInstruction;
-$('design-instruction').textContent = designInstruction;
 const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
