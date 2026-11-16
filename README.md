@@ -30,7 +30,7 @@ Tesseract.js nhận diện tiếng Việt trong trình duyệt. Tệp chương t
 3. Chọn **Tạo dấu tiếng Việt** để ghép dấu từ các nguyên âm đã nhập. Dấu ghép dùng hình mẫu dựng sẵn và có thể thay bằng ký tự lấy trực tiếp từ ảnh. Chữ Đ, những thân chữ còn thiếu, số và dấu câu lấy từ ảnh riêng.
 4. Thử tiêu đề, chỉnh khoảng cách và tải `.ttf`. Chữ thiếu được gạch chân chấm trong bản xem trước. Công cụ vẫn cho phép xuất bộ font đang làm dở.
 
-Trình duyệt lưu nét chữ, tên font, tiêu đề thử và khoảng cách chữ nếu cho phép lưu cục bộ. Danh sách ảnh gốc cần mở lại sau khi tải lại trang.
+Trình duyệt lưu nét chữ, tên font, tiêu đề thử và khoảng cách chữ nếu cho phép lưu cục bộ. Ảnh mẫu, vùng chọn và phần duyệt OCR được lưu trên cùng trình duyệt để mở lại sau khi tải trang.
 
 Để thử nhanh, chọn **Thử ảnh mẫu → Tách và thêm chữ → Tạo dấu tiếng Việt → Tải font .TTF**.
 

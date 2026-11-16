@@ -143,7 +143,7 @@ export function splitWordByGaps(mask, box, count) {
   return boxes.length === count ? boxes : [];
 }
 
-export async function traceSymbol(mask, bbox, char) {
+export async function traceSymbol(mask, bbox, char, wordBox) {
   const { frame: { x, y, w, h }, ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
   const x1 = Math.min(w, bbox.x1 - x), y1 = Math.min(h, bbox.y1 - y);
@@ -161,5 +161,14 @@ export async function traceSymbol(mask, bbox, char) {
     }
   }
   if (bounds.x1 < bounds.x0 || bounds.y1 < bounds.y0) throw new Error('Không thấy nét chữ.');
+  if (wordBox && /\p{L}/u.test(char) && [...char.normalize('NFD')].length > 1) {
+    const wordHeight = wordBox.y1 - wordBox.y0;
+    const inkHeight = bounds.y1 - bounds.y0 + 1;
+    const reachesBody = y + bounds.y1 >= wordBox.y0 + wordHeight * 0.58
+      && y + bounds.y0 < wordBox.y0 + wordHeight * 0.62;
+    if (inkHeight < wordHeight * 0.42 || !reachesBody) {
+      throw new Error('Vùng OCR chỉ chứa dấu hoặc thiếu thân chữ.');
+    }
+  }
   return makeGlyph(symbolInk, w, bounds, char);
 }

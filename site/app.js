@@ -1,6 +1,7 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
 import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, splitWordByGaps, traceSymbol } from './ocr.js';
+import { loadReferences, saveReferences } from './reference-storage.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('image');
@@ -20,6 +21,41 @@ let activeReference = -1;
 let loading = false;
 let busy = false;
 let debounce;
+let restoring = true;
+let storageRevision = 0;
+
+function persistReferences(withImages = false) {
+  if (restoring || !references.length) return;
+  rememberReference();
+  withImages ||= referenceImagesNeedSave;
+  const turn = ++storageRevision;
+  const indicator = $('reference-storage');
+  indicator.textContent = 'Đang lưu ảnh và phần duyệt…';
+  const state = {
+    activeReference,
+    settings: references.map(entry => entry.settings),
+    review: reviewGroups.map(group => ({
+      index: group.index, settings: group.settings,
+      rows: group.rows.map(row => ({
+        word: row.word, thumbnail: row.thumbnail, text: row.input.value, checked: row.include.checked
+      }))
+    }))
+  };
+  saveReferences(state, withImages ? references.map(entry => entry.file) : undefined)
+    .then(() => {
+      if (withImages) referenceImagesNeedSave = false;
+      if (turn === storageRevision && !referenceImagesNeedSave) indicator.textContent = `Đã lưu ${references.length} ảnh trên trình duyệt này.`;
+    })
+    .catch(() => {
+      // A later metadata write cannot confirm a failed image write.
+      if (withImages) referenceImagesNeedSave = true;
+      if (turn === storageRevision || withImages) {
+        indicator.textContent = 'Không lưu được ảnh và phần duyệt. Hãy giữ tab này mở.';
+      }
+    });
+}
+
+let referenceImagesNeedSave = false;
 
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey));
@@ -155,17 +191,20 @@ async function showReference(index) {
     if (request === loadingRevision) {
       loading = false;
       renderReferences();
+      persistReferences();
     }
   }
 }
 
 function addFiles(files) {
+  if (restoring) return status('Đang khôi phục ảnh. Hãy thử lại sau khi hoàn tất.');
   if (busy) return;
   const images = [...files].filter(file => /\.(png|jpe?g|webp)$/i.test(file.name)
     || ['image/png', 'image/jpeg', 'image/webp'].includes(file.type));
   if (!images.length) return status('Hãy chọn ảnh PNG, JPG hoặc WebP.');
   const firstNew = references.length;
   references.push(...images.map(file => ({ file })));
+  persistReferences(true);
   showReference(firstNew);
 }
 
@@ -190,7 +229,7 @@ canvas.addEventListener('pointermove', event => {
   crop = { x: Math.min(p.x, dragStart.x), y: Math.min(p.y, dragStart.y), w, h };
   renderSource();
 });
-for (const event of ['pointerup', 'pointercancel']) canvas.addEventListener(event, () => { dragStart = undefined; });
+for (const event of ['pointerup', 'pointercancel']) canvas.addEventListener(event, () => { if (dragStart) persistReferences(); dragStart = undefined; });
 
 function inkBounds(ink, width) {
   const height = ink.length / width;
@@ -244,6 +283,7 @@ async function trace(single) {
     for (const [char, glyph] of traced) glyphs.set(char, glyph);
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
+    persistReferences();
     updateComposed();
     refresh();
     status(`Đã thêm ${traced.size} ký tự từ ảnh mẫu.`);
@@ -263,6 +303,7 @@ for (const char of charset) {
   button.addEventListener('click', () => {
     selected = char;
     $('chars').value = char;
+    persistReferences();
     renderGlyphs();
   });
   const grid = lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
@@ -361,6 +402,7 @@ function refresh() {
 }
 
 let reviewedWords = [];
+let reviewGroups = [];
 
 function setScanBusy(value) {
   busy = value;
@@ -369,33 +411,44 @@ function setScanBusy(value) {
   renderReferences();
 }
 
-function addReviewGroup(index, entry, image, words) {
+function addReviewGroup(index, settings, rows) {
+  const entry = references[index];
+  if (!entry) return;
+  const reviewed = { index, settings, rows: [] };
+  reviewGroups.push(reviewed);
   const group = document.createElement('fieldset');
   const title = document.createElement('legend');
   title.textContent = `Ảnh ${index + 1} · ${entry.file.name}`;
   group.append(title);
-  if (!words.length) {
+  if (!rows.length) {
     const empty = document.createElement('p');
     empty.className = 'help';
     empty.textContent = 'Chưa đọc được chữ. Bạn có thể khoanh sát chữ hơn hoặc lấy nét thủ công.';
     group.append(empty);
   }
-  for (const word of words) {
+  for (const { word, thumbnail, text, checked } of rows) {
     const row = document.createElement('div');
     row.className = 'ocr-word';
     const include = document.createElement('input');
     include.type = 'checkbox';
-    include.checked = word.confidence >= 70 && [...word.text.normalize('NFC')].length === word.symbols.length;
+    include.checked = checked ?? (word.confidence >= 70 && [...word.text.normalize('NFC')].length === word.symbols.length);
     include.setAttribute('aria-label', 'Dùng từ ' + word.text);
     const input = document.createElement('input');
-    input.value = word.text.normalize('NFC');
+    input.value = text ?? word.text.normalize('NFC');
     input.setAttribute('aria-label', 'Sửa từ ' + word.text);
     input.spellcheck = false;
     const score = document.createElement('small');
     score.textContent = 'Độ tin cậy ' + Math.round(word.confidence) + '%';
-    row.append(include, wordThumbnail(image, word.bbox), input, score);
+    const preview = document.createElement('img');
+    preview.alt = '';
+    preview.src = thumbnail;
+    input.addEventListener('input', () => persistReferences());
+    include.addEventListener('change', () => persistReferences());
+    row.append(include, preview, input, score);
     group.append(row);
-    reviewedWords.push({ index, word, input, include, settings: entry.settings });
+    const item = { index, word, thumbnail, input, include, settings };
+    reviewed.rows.push(item);
+    reviewedWords.push(item);
   }
   $('ocr-results').append(group);
 }
@@ -404,6 +457,7 @@ async function scanReferences() {
   if (busy || loading || !references.length) return;
   rememberReference();
   reviewedWords = [];
+  reviewGroups = [];
   $('ocr-results').replaceChildren();
   $('ocr-status').textContent = '';
   $('ocr-review').hidden = true;
@@ -418,7 +472,11 @@ async function scanReferences() {
       try {
         const image = await referenceCanvas(entry.file, entry.settings?.crop);
         const words = await detectWords(worker, image);
-        addReviewGroup(index, entry, image, words);
+        const rows = words.map(({ text, confidence, bbox, symbols }) => ({
+          word: { text, confidence, bbox, symbols: symbols.map(symbol => ({ bbox: symbol.bbox, confidence: symbol.confidence })) },
+          thumbnail: wordThumbnail(image, bbox).toDataURL()
+        }));
+        addReviewGroup(index, entry.settings, rows);
       } catch {
         failures++;
         const note = document.createElement('p');
@@ -428,6 +486,7 @@ async function scanReferences() {
       }
     }
     $('ocr-review').hidden = false;
+    persistReferences();
     status(`Tìm được ${reviewedWords.length} từ trong ${references.length - failures}/${references.length} ảnh đã quét. Hãy duyệt kết quả bên dưới.`);
   } catch (error) {
     status('Quét ảnh chưa hoàn tất. ' + error.message);
@@ -473,8 +532,9 @@ async function applyReviewedWords() {
       for (const { entry, chars } of group) {
         const mask = wordInk(image, entry.word.bbox, entry.settings);
         const matching = chars.length === entry.word.symbols.length;
-        const boxes = matching ? entry.word.symbols.map(symbol => symbol.bbox)
-          : splitWordByGaps(mask, entry.word.bbox, chars.length);
+        const separated = splitWordByGaps(mask, entry.word.bbox, chars.length);
+        const boxes = separated.length ? separated
+          : matching ? entry.word.symbols.map(symbol => symbol.bbox) : [];
         if (!boxes.length) {
           skipped.push(`Ảnh ${index + 1}: “${chars.join('')}” (${entry.word.symbols.length} vùng OCR cho ${chars.length} chữ)`);
           continue;
@@ -485,7 +545,7 @@ async function applyReviewedWords() {
           if (scores.has(char) && scores.get(char) >= score) continue;
           try {
             message.textContent = `Đang lấy nét chữ ${char}…`;
-            added.set(char, await traceSymbol(mask, boxes[i], char));
+            added.set(char, await traceSymbol(mask, boxes[i], char, entry.word.bbox));
             scores.set(char, score);
             imported.add(index);
           } catch {
@@ -499,6 +559,7 @@ async function applyReviewedWords() {
       const entry = references[index];
       entry.settings = { ...entry.settings, used: true };
     }
+    persistReferences();
     updateComposed();
     refresh();
     const missing = [...failed].filter(char => !added.has(char));
@@ -545,10 +606,11 @@ $('previous-reference').addEventListener('click', () => showReference(activeRefe
 $('next-reference').addEventListener('click', () => showReference(activeReference + 1));
 
 $('demo').addEventListener('click', () => {
-  if (busy || loading) return;
+  if (busy || loading || restoring) return;
   rememberReference();
   activeReference = -1;
   renderReferences();
+  persistReferences();
   const demo = document.createElement('canvas');
   demo.width = 720;
   demo.height = 170;
@@ -577,10 +639,11 @@ function setThreshold() {
   threshold.value = adaptive ? 40 : $('polarity').value === 'light' ? 192 : 128;
   $('threshold-value').value = threshold.value;
 }
-$('polarity').addEventListener('change', () => { setThreshold(); renderSource(); });
-$('threshold').addEventListener('input', () => { $('threshold-value').value = $('threshold').value; renderSource(); });
+$('polarity').addEventListener('change', () => { setThreshold(); renderSource(); persistReferences(); });
+$('threshold').addEventListener('input', () => { $('threshold-value').value = $('threshold').value; renderSource(); persistReferences(); });
 $('mask').addEventListener('change', renderSource);
-$('clear-crop').addEventListener('click', () => { crop = undefined; renderSource(); });
+$('clear-crop').addEventListener('click', () => { crop = undefined; renderSource(); persistReferences(); });
+$('chars').addEventListener('input', () => persistReferences());
 $('trace-form').addEventListener('submit', event => { event.preventDefault(); trace(false); });
 $('single').addEventListener('click', () => trace(true));
 
@@ -612,3 +675,24 @@ $('spacing').addEventListener('input', () => { save(); renderPreview(); schedule
 renderGlyphs();
 renderPreview();
 scheduleFont();
+
+async function restoreReferenceProject() {
+  try {
+    const { images, state } = await loadReferences();
+    if (!images.length) return;
+    references.push(...images.map((file, index) => ({ file, settings: state.settings?.[index] })));
+    for (const group of state.review ?? []) addReviewGroup(group.index, group.settings, group.rows);
+    $('ocr-review').hidden = !reviewGroups.length;
+    $('apply-scan').disabled = !reviewedWords.length;
+    const index = state.activeReference >= 0 && state.activeReference < references.length ? state.activeReference : 0;
+    await showReference(index);
+    $('reference-storage').textContent = `Đã khôi phục ${images.length} ảnh và phần duyệt đã lưu.`;
+  } catch {
+    $('reference-storage').textContent = 'Không đọc được ảnh đã lưu trên trình duyệt này.';
+  } finally {
+    restoring = false;
+    renderReferences();
+  }
+}
+
+restoreReferenceProject();
