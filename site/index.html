@@ -23,7 +23,8 @@
         <div id="gemini-key-field">
           <label for="gemini-key">Khóa Gemini API</label>
           <input id="gemini-key" type="password" placeholder="Dán khóa Gemini API tại đây" autocomplete="off" spellcheck="false" aria-describedby="gemini-key-help">
-          <p id="gemini-key-help" class="help">Khóa được giữ trong phiên mở trang. Lượt kiểm tra dùng một yêu cầu ngắn, không gửi ảnh.</p>
+          <label class="check remember-gemini"><input id="gemini-remember" type="checkbox" checked> Ghi nhớ khóa trên trình duyệt này</label>
+          <p id="gemini-key-help" class="help">Khóa chỉ được ghi nhớ sau khi kết nối thành công. Bỏ chọn để xóa khóa đã lưu. Lượt kiểm tra không gửi ảnh.</p>
           <button id="gemini-check" type="button" disabled>Kiểm tra kết nối</button>
           <p id="gemini-connection" class="help" role="status" aria-live="polite"></p>
         </div>

@@ -365,10 +365,43 @@ async function runGlyphReview() {
 }
 
 const geminiKey = $('gemini-key');
+const rememberGemini = $('gemini-remember');
+const geminiStorageKey = 'xuong-font-gemini-v1';
 const connectionButton = $('gemini-check');
 const connectionStatus = $('gemini-connection');
 let connectionRequest;
 let connectedGeminiModel;
+
+function saveGeminiPreference({ clearKey = false } = {}) {
+  try {
+    const key = geminiKey.value.trim();
+    const previous = JSON.parse(localStorage.getItem(geminiStorageKey) ?? 'null');
+    // Keep an already saved key through a temporary connection failure, with verification reset.
+    const canStore = rememberGemini.checked && !clearKey && key
+      && (connectedGeminiModel || previous?.key === key);
+    localStorage.setItem(geminiStorageKey, JSON.stringify({
+      remember: rememberGemini.checked,
+      ...(canStore ? { key, model: connectedGeminiModel ?? null } : {})
+    }));
+    return true;
+  } catch { return false; }
+}
+
+function restoreGeminiPreference() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(geminiStorageKey) ?? 'null');
+    if (!saved) return;
+    rememberGemini.checked = saved.remember === true;
+    if (!rememberGemini.checked || typeof saved.key !== 'string' || !saved.key.trim()) return;
+    geminiKey.value = saved.key;
+    connectedGeminiModel = typeof saved.model === 'string' && saved.model ? saved.model : undefined;
+    connectionStatus.textContent = connectedGeminiModel
+      ? 'Đã khôi phục khóa đã xác nhận. Bạn có thể dùng AI đọc ảnh và dựng chữ.'
+      : 'Đã điền khóa đã lưu. Bấm Kiểm tra kết nối để bật AI.';
+  } catch {
+    connectionStatus.textContent = 'Không đọc được khóa đã lưu trên trình duyệt này.';
+  }
+}
 
 function resetConnection() {
   connectionRequest?.abort();
@@ -376,6 +409,7 @@ function resetConnection() {
   connectedGeminiModel = undefined;
   connectionButton.disabled = !geminiKey.value.trim();
   connectionStatus.textContent = '';
+  saveGeminiPreference({ clearKey: true });
   renderReferences();
 }
 
@@ -383,6 +417,7 @@ async function checkGeminiConnection() {
   const key = geminiKey.value.trim();
   if (!key || connectionRequest || busy) return;
   connectedGeminiModel = undefined;
+  saveGeminiPreference();
   const request = new AbortController();
   connectionRequest = request;
   connectionButton.disabled = true;
@@ -399,7 +434,9 @@ async function checkGeminiConnection() {
     if (!response.ok || data.connected !== true) throw new Error(data.error ?? 'Gemini chưa xác nhận kết nối.');
     if (connectionRequest === request) {
       connectedGeminiModel = data.model;
-      connectionStatus.textContent = 'Đã kết nối Gemini (' + data.model + '). Bạn có thể dùng AI đọc ảnh và dựng chữ.';
+      const saved = saveGeminiPreference();
+      connectionStatus.textContent = 'Đã kết nối Gemini (' + data.model + ').'
+        + (rememberGemini.checked ? saved ? ' Đã lưu khóa trên trình duyệt này.' : ' Trình duyệt không lưu được khóa.' : ' Khóa dùng trong tab này.');
     }
   } catch (error) {
     if (connectionRequest === request) connectionStatus.textContent = error.message || 'Chưa kết nối được với Gemini.';
@@ -420,7 +457,16 @@ geminiKey.addEventListener('keydown', event => {
   }
 });
 connectionButton.addEventListener('click', checkGeminiConnection);
-resetConnection();
+rememberGemini.addEventListener('change', () => {
+  const saved = saveGeminiPreference();
+  if (!saved) connectionStatus.textContent = 'Trình duyệt không lưu được thay đổi này.';
+  else if (!rememberGemini.checked) connectionStatus.textContent = 'Đã xóa khóa lưu trên trình duyệt. Khóa vẫn dùng được trong tab này.';
+  else if (connectedGeminiModel) connectionStatus.textContent = 'Đã lưu khóa trên trình duyệt này.';
+  else connectionStatus.textContent = 'Kiểm tra kết nối để ghi nhớ khóa.';
+});
+restoreGeminiPreference();
+connectionButton.disabled = !geminiKey.value.trim();
+renderReferences();
 
 $('ai-review-open').addEventListener('click', openGlyphReview);
 $('ai-review-run').addEventListener('click', runGlyphReview);
@@ -851,7 +897,7 @@ async function scanReferences(useAI = false) {
     }
     if (useAI && geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
     if (!prepared.length) throw new Error('Không mở hoặc đọc được ảnh nào.');
-    if (useAI) connectedGeminiModel = model;
+    if (useAI) { connectedGeminiModel = model; saveGeminiPreference(); }
     reviewedWords = [];
     reviewGroups = [];
     $('ocr-results').replaceChildren();
@@ -872,6 +918,7 @@ async function scanReferences(useAI = false) {
   } catch (error) {
     if (useAI) {
       connectedGeminiModel = undefined;
+      saveGeminiPreference();
       connectionStatus.textContent = 'Cần kiểm tra lại kết nối trước khi chạy AI.';
       showScanReport('Đã dừng Gemini. ' + error.message);
     }
@@ -1107,6 +1154,11 @@ async function restoreReferenceProject() {
     refreshReviewVisibility();
     const index = state.activeReference >= 0 && state.activeReference < references.length ? state.activeReference : 0;
     await showReference(index);
+    if (reviewedWords.some(entry => entry.ai)) {
+      const existing = [...new Set(reviewedWords.filter(entry => entry.done)
+        .flatMap(entry => [...entry.input.value.normalize('NFC')]).filter(char => glyphs.has(char)))];
+      summarizeGeminiScan({ existing });
+    }
     $('reference-storage').textContent = `Đã khôi phục ${images.length} ảnh và phần duyệt đã lưu.`;
   } catch {
     $('reference-storage').textContent = 'Không đọc được ảnh đã lưu trên trình duyệt này.';

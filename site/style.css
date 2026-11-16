@@ -112,3 +112,5 @@ dialog::backdrop{background:#221a17bd}
 
 .scan-report{margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#f9f1e6;font-size:13px}
 .scan-report .quiet{padding:4px 0;margin-top:2px}
+
+#gemini-key-field .remember-gemini{margin:6px 0 0}
