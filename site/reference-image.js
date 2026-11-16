@@ -3,7 +3,7 @@ import { MAX_SIDE, makeGlyph } from './engine.js';
 
 const { unifyReferenceA } = require('../src/refine-outline');
 const { connectedComponents } = require('../src/blob-core');
-const { band } = require('../src/metrics');
+const { band, LOWERCASE, XH } = require('../src/metrics');
 
 export async function referenceCanvas(file, crop) {
   const image = await createImageBitmap(file);
@@ -273,6 +273,39 @@ export function completeTildeO(glyph) {
   return !/^[õÕ]$/u.test(glyph.char) || (glyph.d.match(/M/gi)?.length ?? 0) >= 3;
 }
 
+function lowercaseBodyTop(ink, width, bounds, char) {
+  const [base] = char.normalize('NFD');
+  const withShoulder = LOWERCASE.ascenders.includes(base) && !/[flđ]/u.test(base);
+  const tracked = LOWERCASE.body + LOWERCASE.descenders + LOWERCASE.dotted;
+  if (!withShoulder && !tracked.includes(base)) return undefined;
+  const rows = [];
+  for (let y = bounds.y0; y <= bounds.y1; y++) {
+    let left = width, right = -1;
+    for (let x = bounds.x0; x <= bounds.x1; x++) {
+      if (!ink[y * width + x]) continue;
+      left = Math.min(left, x);
+      right = x;
+    }
+    rows.push(right < left ? 0 : right - left + 1);
+  }
+  let bestStart = 0, bestLength = 0, start = 0;
+  for (let i = 0; i <= rows.length; i++) {
+    if (rows[i]) continue;
+    if (i - start > bestLength) { bestStart = start; bestLength = i - start; }
+    start = i + 1;
+  }
+  if (bestLength < rows.length * .5) return undefined;
+  if (withShoulder) {
+    // The upper stem is narrow until the shoulder starts on the right.
+    const stem = median(rows.slice(bestStart + Math.floor(bestLength * .08), bestStart + Math.ceil(bestLength * .15)));
+    const shoulder = rows.findIndex((span, i) => i >= bestStart + bestLength * .09
+      && i < bestStart + bestLength * .46 && span >= stem * 1.45
+      && rows[i + 1] >= stem * 1.45 && rows[i + 2] >= stem * 1.45);
+    return shoulder < 0 ? undefined : bounds.y0 + shoulder;
+  }
+  return bounds.y0 + bestStart;
+}
+
 export async function traceSymbol(mask, bbox, char, wordBox) {
   const { frame: { x, y, w, h }, ink, detailInk = ink } = mask;
   const x0 = Math.max(0, bbox.x0 - x), y0 = Math.max(0, bbox.y0 - y);
@@ -307,7 +340,9 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   }
   const glyph = await makeGlyph(symbolInk, w, bounds, char, coverage, mask.preserveOutline);
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
-  return { ...glyph, preserveOutline: mask.preserveOutline, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
+  const bodyTop = mask.preserveOutline ? lowercaseBodyTop(symbolInk, w, bounds, char) : undefined;
+  return { ...glyph, preserveOutline: mask.preserveOutline,
+    referenceBodyTop: Number.isFinite(bodyTop) ? y + bodyTop : undefined, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
 }
 
@@ -377,10 +412,23 @@ export function alignReferenceGlyphs(words) {
       const measured = bearings.get(glyph.char);
       const left = measured?.left.length ? median(measured.left) : side;
       const right = measured?.right.length ? median(measured.right) : side;
+      const outline = svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(left, alignedTop).abs().unshort();
+      const bodyHeight = alignedTop - (glyph.referenceBodyTop - crop.y) * scale;
+      const targetHeight = XH;
+      if (clean && bodyHeight >= .80 * targetHeight && bodyHeight <= 1.20 * targetHeight) {
+        outline.iterate(segment => {
+          if (!'MLCQ'.includes(segment[0])) return;
+          for (let i = 2; i < segment.length; i += 2) {
+            const point = segment[i];
+            if (point > 0) segment[i] = point < bodyHeight
+              ? point * targetHeight / bodyHeight : point + targetHeight - bodyHeight;
+          }
+        });
+      }
       return {
         ...glyph,
         referenceWordSpace,
-        d: svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(left, alignedTop).round(1).toString(),
+        d: outline.round(1).toString(),
         advance: Math.max(1, Math.round(crop.w * scale + left + right))
       };
     });

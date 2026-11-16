@@ -11,22 +11,30 @@ const UPM = 1000;
 const ASCENT = 1000;
 const DESCENT = -240;
 const CAP = 700; // cap height
-const XH = 480; // x-height
+const XH = 550; // x-height
 const DESC = -220; // descender depth
 const ASC = 720; // ascender top (b, d, f, h, k, l)
+
+const LOWERCASE = Object.freeze({
+  body: 'acemnorsuvwxz',
+  ascenders: 'bdfhklđ',
+  descenders: 'gpqy',
+  dotted: 'ij',
+  crossbar: 't'
+});
 
 const BANDS = new Map();
 const set = (chars, band) => [...chars].forEach((c) => BANDS.set(c, band));
 
 set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789Đ', [0, CAP]);
 set('ÑÁÉÍÓÚÜ', [0, ASCENT]); // caps with accents reach above cap height
-set('bdfhklđ', [0, ASC]);
-set('t', [0, 640]);
-set('acemnorsuvwxz', [0, XH]);
+set(LOWERCASE.ascenders, [0, ASC]);
+set(LOWERCASE.crossbar, [0, 640]);
+set(LOWERCASE.body, [0, XH]);
 set('ñáéíóúü', [0, ASC]); // lowercase with marks above x-height
 set('i', [0, 660]);
 set('j', [DESC, 660]);
-set('gpqy', [DESC, XH]);
+set(LOWERCASE.descenders, [DESC, XH]);
 set('.', [0, 110]);
 set(',', [-140, 110]);
 set(':', [0, XH]);
@@ -84,4 +92,4 @@ function placeGlyph(d, cropSize, pad, char, { lsb = 50, rsb = 50 } = {}) {
   return { d: fixWinding(placed), advance: Math.round(lsb + inkW * s + rsb) };
 }
 
-module.exports = { UPM, ASCENT, DESCENT, XH, CAP, band, placeGlyph };
+module.exports = { UPM, ASCENT, DESCENT, XH, CAP, LOWERCASE, band, placeGlyph };
