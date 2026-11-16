@@ -1,5 +1,6 @@
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { core, charset, composeVietnamese } from './vietnamese.js';
+import { core, lowercase, charset, composeVietnamese } from './vietnamese.js';
+import { createOcrWorker, referenceCanvas, detectWords, wordThumbnail, wordInk, traceSymbol } from './ocr.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('image');
@@ -110,6 +111,7 @@ function renderReferences() {
   $('reference-count').textContent = activeReference >= 0
     ? `${activeReference + 1}/${references.length}` : `${references.length} ảnh`;
   select.disabled = busy || loading;
+  $('scan').disabled = busy || loading || !references.length;
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
 }
@@ -218,7 +220,7 @@ async function trace(single) {
   if (busy || loading) return;
   const chars = [...$('chars').value.normalize('NFC').replace(/\s/g, '')];
   if (!source || !chars.length) return status('Hãy chọn ảnh và nhập chữ trong vùng đã khoanh.');
-  if (chars.some(char => !charset.includes(char))) return status('Bản này hỗ trợ chữ in hoa tiếng Việt, số và dấu câu trong bảng.');
+  if (chars.some(char => !charset.includes(char))) return status('Bản này hỗ trợ chữ hoa, chữ thường tiếng Việt, số và dấu câu trong bảng.');
   if (single && chars.length !== 1) return status('Hãy khoanh một chữ và nhập đúng một ký tự.');
   busy = true;
   $('trace').disabled = $('single').disabled = true;
@@ -263,7 +265,8 @@ for (const char of charset) {
     $('chars').value = char;
     renderGlyphs();
   });
-  (core.includes(char) || char === 'Đ' ? $('glyphs') : $('more-glyphs')).append(button);
+  const grid = lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
+  $(grid).append(button);
   tiles.set(char, button);
 }
 
@@ -356,6 +359,162 @@ function refresh() {
   renderPreview();
   scheduleFont();
 }
+
+let reviewedWords = [];
+
+function setScanBusy(value) {
+  busy = value;
+  $('trace').disabled = $('single').disabled = value;
+  $('apply-scan').disabled = value || !reviewedWords.length;
+  renderReferences();
+}
+
+function addReviewGroup(index, entry, image, words) {
+  const group = document.createElement('fieldset');
+  const title = document.createElement('legend');
+  title.textContent = `Ảnh ${index + 1} · ${entry.file.name}`;
+  group.append(title);
+  if (!words.length) {
+    const empty = document.createElement('p');
+    empty.className = 'help';
+    empty.textContent = 'Chưa đọc được chữ. Bạn có thể khoanh sát chữ hơn hoặc lấy nét thủ công.';
+    group.append(empty);
+  }
+  for (const word of words) {
+    const row = document.createElement('div');
+    row.className = 'ocr-word';
+    const include = document.createElement('input');
+    include.type = 'checkbox';
+    include.checked = word.confidence >= 70 && [...word.text.normalize('NFC')].length === word.symbols.length;
+    include.setAttribute('aria-label', 'Dùng từ ' + word.text);
+    const input = document.createElement('input');
+    input.value = word.text.normalize('NFC');
+    input.setAttribute('aria-label', 'Sửa từ ' + word.text);
+    input.spellcheck = false;
+    const score = document.createElement('small');
+    score.textContent = 'Độ tin cậy ' + Math.round(word.confidence) + '%';
+    row.append(include, wordThumbnail(image, word.bbox), input, score);
+    group.append(row);
+    reviewedWords.push({ index, word, input, include, settings: entry.settings });
+  }
+  $('ocr-results').append(group);
+}
+
+async function scanReferences() {
+  if (busy || loading || !references.length) return;
+  rememberReference();
+  reviewedWords = [];
+  $('ocr-results').replaceChildren();
+  $('ocr-status').textContent = '';
+  $('ocr-review').hidden = true;
+  setScanBusy(true);
+  status('Đang tải bộ nhận diện tiếng Việt…');
+  let worker;
+  let failures = 0;
+  try {
+    worker = await createOcrWorker();
+    for (const [index, entry] of references.entries()) {
+      status(`Đang quét ảnh ${index + 1}/${references.length}…`);
+      try {
+        const image = await referenceCanvas(entry.file, entry.settings?.crop);
+        const words = await detectWords(worker, image);
+        addReviewGroup(index, entry, image, words);
+      } catch {
+        failures++;
+        const note = document.createElement('p');
+        note.className = 'help';
+        note.textContent = `Không quét được ảnh ${index + 1} · ${entry.file.name}`;
+        $('ocr-results').append(note);
+      }
+    }
+    $('ocr-review').hidden = false;
+    status(`Tìm được ${reviewedWords.length} từ trong ${references.length - failures}/${references.length} ảnh đã quét. Hãy duyệt kết quả bên dưới.`);
+  } catch (error) {
+    status('Quét ảnh chưa hoàn tất. ' + error.message);
+  } finally {
+    try { await worker?.terminate(); } finally { setScanBusy(false); }
+  }
+}
+
+async function applyReviewedWords() {
+  if (busy || loading) return;
+  const chosen = reviewedWords.filter(entry => entry.include.checked);
+  const message = $('ocr-status');
+  if (!chosen.length) {
+    message.textContent = 'Chọn ít nhất một từ để lấy nét.';
+    return;
+  }
+  const corrected = new Map();
+  for (const entry of chosen) {
+    const chars = [...entry.input.value.normalize('NFC').replace(/\s/g, '')];
+    if (chars.length !== entry.word.symbols.length || chars.some(char => !charset.includes(char))) {
+      message.textContent = `Ảnh ${entry.index + 1}: “${entry.input.value}” cần đúng ${entry.word.symbols.length} ký tự trong bảng. Bạn có thể bỏ chọn và khoanh thủ công.`;
+      entry.input.focus();
+      return;
+    }
+    corrected.set(entry, chars);
+  }
+  setScanBusy(true);
+  const added = new Map();
+  const failed = new Set();
+  const imported = new Set();
+  // Rank references by OCR confidence per character without replacing approved artwork.
+  const candidates = new Map();
+  for (const [entry, chars] of corrected) {
+    chars.forEach((char, i) => {
+      if (glyphs.get(char)?.source === 'Ảnh mẫu') return;
+      const symbol = entry.word.symbols[i];
+      const options = candidates.get(char) ?? [];
+      options.push({ entry, symbol });
+      candidates.set(char, options);
+    });
+  }
+  try {
+    const byReference = new Map();
+    for (const [char, options] of candidates) {
+      const best = options.reduce((a, b) =>
+        (a.symbol.confidence ?? a.entry.word.confidence) >= (b.symbol.confidence ?? b.entry.word.confidence) ? a : b);
+      const group = byReference.get(best.entry.index) ?? [];
+      group.push({ char, ...best });
+      byReference.set(best.entry.index, group);
+    }
+    for (const [index, group] of byReference) {
+      let image;
+      try {
+        image = await referenceCanvas(references[index].file, group[0].entry.settings?.crop);
+      } catch {
+        group.forEach(({ char }) => failed.add(char));
+        continue;
+      }
+      const masks = new Map();
+      for (const { char, entry, symbol } of group) {
+        try {
+          message.textContent = `Đang lấy nét chữ ${char}…`;
+          if (!masks.has(entry)) masks.set(entry, wordInk(image, entry.word.bbox, entry.settings));
+          added.set(char, await traceSymbol(masks.get(entry), symbol.bbox, char));
+          imported.add(index);
+        } catch {
+          failed.add(char);
+        }
+      }
+    }
+    for (const [char, glyph] of added) glyphs.set(char, glyph);
+    for (const index of imported) {
+      const entry = references[index];
+      entry.settings = { ...entry.settings, used: true };
+    }
+    updateComposed();
+    refresh();
+    const missing = [...failed].filter(char => !added.has(char));
+    message.textContent = added.size ? `Đã thêm ${added.size} ký tự từ ảnh gốc. Xem bộ ký tự và tải .TTF bên dưới.` : 'Chưa có ký tự mới để thêm.';
+    if (missing.length) message.textContent += ' Cần khoanh lại: ' + missing.join(' ');
+  } finally {
+    setScanBusy(false);
+  }
+}
+
+$('scan').addEventListener('click', scanReferences);
+$('apply-scan').addEventListener('click', applyReviewedWords);
 
 document.addEventListener('paste', event => {
   const clipboard = event.clipboardData;

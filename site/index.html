@@ -30,6 +30,7 @@
           <select id="reference"></select>
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
+        <button id="scan" class="scan-button" type="button">Quét tất cả ảnh</button>
       </div>
       <div id="stage" hidden>
         <canvas id="image" aria-label="Ảnh mẫu. Kéo trên ảnh để khoanh vùng chữ."></canvas>
@@ -46,12 +47,20 @@
         <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm chữ</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
       </form>
       <p id="status" class="status" role="status" aria-live="polite"></p>
+      <section id="ocr-review" class="ocr-review" hidden aria-labelledby="ocr-title">
+        <h3 id="ocr-title">Duyệt chữ nhận diện</h3>
+        <p class="help">Đối chiếu mỗi từ với ảnh, sửa chữ hoặc bỏ chọn. Giữ nguyên số ký tự trong từ để các vùng nét khớp nhau.</p>
+        <div id="ocr-results"></div>
+        <button id="apply-scan" class="primary" type="button">Lấy nét từ các từ đã chọn</button>
+        <p id="ocr-status" class="status" role="status" aria-live="polite"></p>
+      </section>
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
       <div class="tool-row"><button id="accents">Tạo dấu tiếng Việt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
       <div class="glyph-legend"><span><i class="dot filled"></i> Ảnh mẫu</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
       <div id="glyphs" class="glyph-grid" aria-label="Ký tự chính"></div>
+      <details><summary>Chữ thường</summary><div id="lower-glyphs" class="glyph-grid"></div></details>
       <details><summary id="more-label">Chữ có dấu và dấu câu</summary><div id="more-glyphs" class="glyph-grid"></div></details>
       <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
       <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>

@@ -1,6 +1,6 @@
 # Xưởng Font
 
-Xưởng Font là công cụ tạo font tiêu đề in hoa tiếng Việt từ ảnh. Công cụ chạy trong Chrome hoặc Edge và xử lý ảnh trên thiết bị.
+Xưởng Font là công cụ tạo font tiêu đề chữ hoa và chữ thường tiếng Việt từ ảnh. Công cụ chạy trong Chrome hoặc Edge và xử lý ảnh trên thiết bị.
 
 ## Chạy trên Windows
 
@@ -13,6 +13,15 @@ Start-Process .\dist\xuong-font.html
 ```
 
 `dist/xuong-font.html` là bản mở trực tiếp. Để đưa lên hosting tĩnh, dùng thư mục `dist` với trang chính `index.html`.
+
+## Quét nhiều ảnh trên web
+
+1. Mở [Xưởng Font](https://xuong-font.vercel.app/) và đưa các ảnh vào danh sách, rồi bấm **Quét tất cả ảnh**. Nếu một ảnh có nhiều chi tiết, hãy khoanh vùng chữ trước khi quét.
+2. So sánh từ OCR với hình cắt bên cạnh. Sửa ký tự đọc sai, giữ nguyên số ký tự của từ, hoặc bỏ chọn vùng bị tách sai.
+3. Bấm **Lấy nét từ các từ đã chọn**. Web dùng nét từ pixel ảnh gốc và giữ các nét đã thêm trước đó. Với nhiều nguồn cho cùng một chữ, công cụ ưu tiên vùng OCR có độ tin cậy cao nhất trong các từ được chọn.
+4. Kiểm tra ô **Còn thiếu**, lấy thêm nét hoặc dùng **Tạo dấu tiếng Việt**, rồi tải `.ttf`.
+
+Tesseract.js nhận diện tiếng Việt trong trình duyệt. Tệp chương trình, WebAssembly và dữ liệu ngôn ngữ đi kèm bản web, nên ảnh không phải gửi lên dịch vụ OCR. Tính năng quét cần mở trang qua HTTP hoặc HTTPS. Bản HTML mở trực tiếp vẫn dùng được quy trình thủ công.
 
 ## Từ ảnh đến font
 

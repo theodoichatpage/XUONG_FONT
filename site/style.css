@@ -70,3 +70,12 @@ details .glyph-grid{margin-top:10px}
 .reference-controls{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;margin-top:5px}
 .reference-controls select{min-width:0;margin-top:0}
 #reference-count{margin-left:6px;color:var(--muted);font-weight:400}
+.scan-button{margin-top:8px;color:var(--red)}
+.ocr-review{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.ocr-review h3{margin:0 0 4px;font:500 22px var(--display)}
+#ocr-results{max-height:440px;overflow:auto;margin:10px 0;padding:0 4px}
+#ocr-results fieldset{min-width:0;border:1px solid var(--line);border-radius:7px;margin:8px 0;padding:8px}
+#ocr-results legend{max-width:100%;font-weight:600;font-size:12px;overflow-wrap:anywhere}
+.ocr-word{display:grid;grid-template-columns:auto minmax(50px,1fr) minmax(65px,1fr);align-items:center;gap:5px 8px;padding:4px 0}
+.ocr-word canvas{max-width:100%;max-height:58px;object-fit:contain;border:1px solid var(--line)}
+.ocr-word small{grid-column:3}

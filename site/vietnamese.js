@@ -1,12 +1,13 @@
 import svgpath from 'svgpath';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
+export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
 export const punctuation = [...'.,:;!?-–—()“”‘’/'];
-const vowels = [...'AĂÂEÊIOÔƠUƯY'];
+const vowels = [...'AĂÂEÊIOÔƠUƯYaăâeêioôơuưy'];
 const tones = ['', '\u0300', '\u0301', '\u0309', '\u0303', '\u0323'];
 export const accented = [...new Set(vowels.flatMap(vowel => tones.map(tone => (vowel + tone).normalize('NFC'))))]
-  .filter(char => !core.includes(char));
-export const charset = [...core, 'Đ', ...accented, ...punctuation];
+  .filter(char => !core.includes(char) && !lowercase.includes(char));
+export const charset = [...core, 'Đ', ...lowercase, ...accented, ...punctuation];
 
 const templates = {
   '\u0300': 'M-73 94 L-20 94 L62 0 L18 0 Z',
@@ -25,8 +26,10 @@ export function composeVietnamese(glyphs) {
     if (glyphs.get(char)?.source === 'Ảnh mẫu') continue;
     const [base, ...marks] = char.normalize('NFD');
     const original = glyphs.get(base);
-    if (!original) continue;
-    let top = 728;
+    if (!original || (base === 'i' && !marks.includes('\u0323'))) continue;
+    const lower = base === base.toLowerCase();
+    const bodyTop = lower ? (base === 'i' ? 660 : 480) : 700;
+    let top = bodyTop + 28;
     let advance = original.advance;
     const paths = [original.d];
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
@@ -35,7 +38,7 @@ export function composeVietnamese(glyphs) {
       if (mark === '\u0323') y = -84;
       else if (mark === '\u031b') {
         x = original.advance - 47;
-        y = 628;
+        y = bodyTop - 72;
         advance += 60;
       } else top += 123;
       paths.push(svgpath(templates[mark]).unarc().translate(x, y).round(1).toString());

@@ -18,9 +18,9 @@ const ASC = 720; // ascender top (b, d, f, h, k, l)
 const BANDS = new Map();
 const set = (chars, band) => [...chars].forEach((c) => BANDS.set(c, band));
 
-set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', [0, CAP]);
+set('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789Đ', [0, CAP]);
 set('ÑÁÉÍÓÚÜ', [0, ASCENT]); // caps with accents reach above cap height
-set('bdfhkl', [0, ASC]);
+set('bdfhklđ', [0, ASC]);
 set('t', [0, 640]);
 set('acemnorsuvwxz', [0, XH]);
 set('ñáéíóúü', [0, ASC]); // lowercase with marks above x-height
@@ -51,10 +51,12 @@ set('¿¡', [DESC, XH]);
 
 function band(char) {
   const [base, ...marks] = char.normalize('NFD');
-  if (/^[A-Z]$/.test(base) && marks.length) {
+  if (/^[A-Za-z]$/.test(base) && marks.length) {
     const above = marks.filter(mark => mark !== '\u0323' && mark !== '\u031b').length;
     const horn = marks.includes('\u031b');
-    return [marks.includes('\u0323') ? -130 : 0, CAP + above * 135 + (horn ? 65 : 0)];
+    const [bottom, top] = BANDS.get(base) || [0, CAP];
+    const bodyTop = base === 'i' && above ? XH : top;
+    return [marks.includes('\u0323') ? Math.min(bottom, -130) : bottom, bodyTop + above * 135 + (horn ? 65 : 0)];
   }
   return BANDS.get(char) || [0, CAP];
 }
