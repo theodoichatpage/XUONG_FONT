@@ -198,7 +198,10 @@ export async function makeGlyph(ink, width, box, char, coverage, preserveOutline
 }
 
 export function exportFont(name, glyphs, spacing, metrics) {
-  return buildTTF(name, glyphs.map(g => ({ ...g, advance: Math.max(1, g.advance + spacing) })), metrics);
+  const spaces = glyphs.map(glyph => glyph.referenceWordSpace).filter(Number.isFinite).sort((a, b) => a - b);
+  const wordSpace = spaces[Math.floor(spaces.length / 2)];
+  return buildTTF(name, glyphs.map(g => ({ ...g, advance: Math.max(1, g.advance + spacing) })),
+    { ...metrics, wordSpace });
 }
 
 export { MAX_SIDE };

@@ -337,15 +337,31 @@ export function alignReferenceGlyphs(words) {
     return clean && Number.isFinite(commonBaseline) && /^[A-ZĐ0-9]$/u.test(glyph.char)
       ? top / (commonBaseline - glyph.pixelCrop.y) : (top - bottom) / glyph.pixelCrop.h;
   }));
-  const gaps = [];
-  for (const word of words) {
+  const gaps = [], wordGaps = [];
+  const bearings = new Map();
+  const measuredGap = (left, right) => (right.x - left.x - left.w) * scale;
+  function addBearing(char, edge, gap) {
+    if (!bearings.has(char)) bearings.set(char, { left: [], right: [] });
+    bearings.get(char)[edge].push(Math.max(-36, Math.min(52, gap / 2)));
+  }
+  for (const [index, word] of words.entries()) {
     for (let i = 1; i < word.length; i++) {
-      const left = word[i - 1].pixelCrop, right = word[i].pixelCrop;
-      const gap = (right.x - left.x - left.w) * scale;
+      const left = word[i - 1], right = word[i];
+      const gap = measuredGap(left.pixelCrop, right.pixelCrop);
       if (gap > 0) gaps.push(gap);
+      if (clean) {
+        addBearing(left.char, 'right', gap);
+        addBearing(right.char, 'left', gap);
+      }
+    }
+    const last = word.at(-1)?.pixelCrop, next = words[index + 1]?.[0]?.pixelCrop;
+    if (clean && last && next && Number.isFinite(commonBaseline)) {
+      const gap = measuredGap(last, next);
+      if (gap >= 35 && gap <= 195) wordGaps.push(gap);
     }
   }
-  const side = Math.round(Math.max(18, Math.min(55, (median(gaps) || 80) / 2)));
+  const side = Math.round(Math.max(clean ? 5 : 18, Math.min(55, (median(gaps) || 70) / 2)));
+  const referenceWordSpace = clean ? Math.round(Math.max(55, median(wordGaps) - 2 * side || 115)) : undefined;
   return unifyReferenceA(words.map(word => {
     const upright = word.filter(({ char }) => /^[A-ZĐ0-9bdfhkltđ]$/u.test(char));
     const stable = upright.length ? upright : word.filter(({ char }) => {
@@ -358,10 +374,14 @@ export function alignReferenceGlyphs(words) {
       const [bottom, top] = band(glyph.char);
       const ratio = scale * crop.h / (top - bottom);
       const alignedTop = Number.isFinite(baseline) ? (baseline - crop.y) * scale : bottom + scale * crop.h;
+      const measured = bearings.get(glyph.char);
+      const left = measured?.left.length ? median(measured.left) : side;
+      const right = measured?.right.length ? median(measured.right) : side;
       return {
         ...glyph,
-        d: svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(side, alignedTop).round(1).toString(),
-        advance: Math.round(crop.w * scale + 2 * side)
+        referenceWordSpace,
+        d: svgpath(glyph.d).translate(-50, -top).scale(ratio).translate(left, alignedTop).round(1).toString(),
+        advance: Math.max(1, Math.round(crop.w * scale + left + right))
       };
     });
   }).flat());
