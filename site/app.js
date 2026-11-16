@@ -4,6 +4,7 @@ import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol,
 import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
+import { balanceGlyphSpacing, fitLowercaseT } from './font-layout.js';
 
 const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
@@ -816,8 +817,8 @@ function scheduleFont() {
   download.removeAttribute('href');
   download.setAttribute('aria-disabled', 'true');
   debounce = setTimeout(async () => {
-    const active = charset.map(usableGlyph).filter(Boolean);
-    if (!active.length) {
+    const savedGlyphs = charset.map(usableGlyph).filter(Boolean);
+    if (!savedGlyphs.length) {
       if (fontFace) document.fonts.delete(fontFace);
       fontFace = undefined;
       $('preview').style.removeProperty('font-family');
@@ -825,6 +826,7 @@ function scheduleFont() {
       return;
     }
     try {
+      const active = savedGlyphs.map(fitLowercaseT);
       const name = $('name').value.trim() || 'Xuong Font';
       let ascent = ASCENT, descent = DESCENT;
       for (const glyph of active) {
@@ -832,7 +834,8 @@ function scheduleFont() {
         ascent = Math.max(ascent, Math.ceil(y + height + 24));
         descent = Math.min(descent, Math.floor(y - 24));
       }
-      const ttf = exportFont(name, active, Number($('spacing').value), { ascent, descent });
+      const balanced = balanceGlyphSpacing(active, Number($('spacing').value));
+      const ttf = exportFont(name, balanced, 0, { ascent, descent });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;
