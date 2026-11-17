@@ -105,10 +105,11 @@ export function fontKerning(glyphs) {
       return edge === undefined ? [] : [o.advance + edge - row.right];
     }).sort((a, b) => a - b);
     const clearance = gaps[Math.floor(gaps.length * .05)];
-    const tighten = Math.floor(Math.min(28, clearance - 15));
+    const tighten = Math.floor(Math.min(42, clearance - 9));
     if (tighten > 0) pairs.push(['o', 'w', -tighten]);
   }
   if (byChar.has('T') && byChar.has('h')) pairs.push(['T', 'h', 24]);
+  if (byChar.has('2') && byChar.has('3')) pairs.push(['2', '3', 30]);
   return pairs;
 }
 
