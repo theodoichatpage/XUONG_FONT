@@ -59,6 +59,7 @@ details .glyph-grid{margin-top:10px}
 .selection-row button{padding:4px 6px;font-size:13px}
 .tone-tools,.manual-trace,.stroke-tools{border-top:1px solid var(--line);padding-top:8px}
 .tone-tools .help,.tone-tools .tool-row,.stroke-tools label,.stroke-tools .tool-row{margin-top:8px}
+.manual-trace h3,.stroke-tools h3{margin:0;color:var(--red);font-size:13px;font-weight:600}
 #missing:not(:empty){margin-top:8px}
 .workspace-side{min-width:0}
 #preview,.preview-copy{margin-top:12px;padding:24px 18px;min-height:135px;border:1px solid var(--line);border-radius:9px;background:#f2e9da;color:#75302b;text-align:center;font:68px/1.3 var(--display);overflow-wrap:anywhere;white-space:pre-wrap}
@@ -99,7 +100,13 @@ details .glyph-grid{margin-top:10px}
   #preview { flex:1; min-height:0; overflow:hidden; padding:12px 8px }
   #expand-preview { display:block; align-self:flex-end; flex:none; padding:2px 5px; font-size:13px }
   .proof-fields { flex:none; margin-block:8px 4px }
-  .manual-trace,.stroke-tools { margin-block:6px 0; position:relative }
+  .manual-trace,.stroke-tools { flex:none; margin-block:6px 0 }
+  .manual-trace .field-row { margin-block:5px 3px }
+  .manual-trace .check { margin-block:3px }
+  .manual-trace .buttons,.stroke-tools label,.stroke-tools .tool-row { margin-top:4px }
+  .manual-trace button,.stroke-tools button { padding:4px 8px; font-size:13px }
+  .manual-trace input:not([type=range]):not([type=checkbox]),.manual-trace select,.stroke-tools input { padding-block:4px }
+  .stroke-tools .tool-row { gap:5px }
   .tool-popover {
     position:absolute; z-index:1; inset:auto 0 calc(100% + 5px);
     border:1px solid var(--line); border-radius:9px; padding:10px;

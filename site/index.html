@@ -61,21 +61,19 @@
         </div>
         <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
       </div>
-      <details class="manual-trace">
-        <summary>Tách chữ thủ công</summary>
-        <div class="tool-popover">
-          <div class="field-row">
-            <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
-            <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
-          </div>
-          <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
-          <form id="trace-form">
-            <label for="chars">Chữ trong vùng chọn · tách thủ công</label>
-            <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
-            <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
-          </form>
+      <section class="manual-trace" aria-labelledby="manual-trace-title">
+        <h3 id="manual-trace-title">Tách chữ thủ công</h3>
+        <div class="field-row">
+          <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
+          <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
         </div>
-      </details>
+        <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
+        <form id="trace-form">
+          <label for="chars">Chữ trong vùng chọn · tách thủ công</label>
+          <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
+          <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
+        </form>
+      </section>
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
@@ -121,19 +119,17 @@
           <label>Khoảng cách chữ trong TTF <output id="spacing-value">10</output><input type="range" id="spacing" min="-30" max="140" value="10"></label>
         </div>
         <p id="missing" class="help" aria-live="polite"></p>
-        <details class="stroke-tools">
-          <summary>Đo và cân nét dọc</summary>
-          <div class="tool-popover">
-            <label for="stroke-letters">Chữ cần chỉnh, rồi chữ làm chuẩn</label>
-            <input id="stroke-letters" value="E F" maxlength="20" autocomplete="off" spellcheck="false">
-            <div class="tool-row">
-              <button id="measure-strokes" type="button">Đo nét</button>
-              <button id="match-strokes" type="button">Cân nét chữ đầu</button>
-              <button id="balance-font-strokes" class="primary" type="button">Cân nét cả bộ</button>
-            </div>
-            <p id="stroke-result" class="help" aria-live="polite"></p>
+        <section class="stroke-tools" aria-labelledby="stroke-tools-title">
+          <h3 id="stroke-tools-title">Đo và cân nét dọc</h3>
+          <label for="stroke-letters">Chữ cần chỉnh, rồi chữ làm chuẩn</label>
+          <input id="stroke-letters" value="E F" maxlength="20" autocomplete="off" spellcheck="false">
+          <div class="tool-row">
+            <button id="measure-strokes" type="button">Đo nét</button>
+            <button id="match-strokes" type="button">Cân nét chữ đầu</button>
+            <button id="balance-font-strokes" class="primary" type="button">Cân nét cả bộ</button>
           </div>
-        </details>
+          <p id="stroke-result" class="help" aria-live="polite"></p>
+        </section>
       </section>
     </div>
   </div>
