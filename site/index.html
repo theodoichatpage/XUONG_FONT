@@ -12,6 +12,7 @@
 <header class="masthead">
   <a class="brand" href="./"><span class="monogram" aria-hidden="true">Aa</span> XƯỞNG FONT</a>
   <div class="masthead-actions">
+    <label class="font-name" for="name">Tên bộ font<input id="name" value="Xuong Font" maxlength="40"></label>
     <details id="gemini-settings" class="connection-settings">
       <summary id="gemini-badge" data-state="idle"><i aria-hidden="true"></i><span id="gemini-badge-label">Gemini: Chưa kết nối</span></summary>
       <div id="gemini-key-home">
@@ -29,14 +30,6 @@
   </div>
 </header>
 <main>
-  <section class="intro">
-    <div><h1>Xưởng Font</h1><p>Tạo font tiêu đề tiếng Việt từ ảnh mẫu.</p></div>
-    <div class="intro-actions">
-      <label for="name">Tên bộ font</label>
-      <input id="name" value="Xuong Font" maxlength="40">
-
-    </div>
-  </section>
   <div class="workspace">
     <section class="panel source" aria-labelledby="source-title">
       <div class="panel-title"><h2 id="source-title">Ảnh mẫu và dựng chữ</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
@@ -51,9 +44,10 @@
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
         <div class="tool-row scan-actions">
-          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>Dựng chữ có mẫu</button>
+          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>Tạo bộ font</button>
           <button id="stop-design" type="button" hidden>Dừng</button>
         </div>
+        <label class="check auto-draw"><input id="auto-draw" type="checkbox" checked> Làm sạch và vẽ bổ sung bằng Gemini</label>
         <p id="ai-scan-help" class="help">Thêm đủ ảnh rồi dựng chữ có mẫu trước.</p>
         <div id="ai-scan-report" class="scan-report" hidden>
           <p id="ai-scan-result" role="status" aria-live="polite"></p>
@@ -118,7 +112,7 @@
         <div id="preview" tabindex="0" role="region" aria-label="Tiêu đề mẫu">HÀO KHÍ LAM SƠN</div>
         <div class="field-row proof-fields">
           <label>Cỡ chữ <output id="size-value">68</output> px<input type="range" id="size" min="24" max="110" value="68"></label>
-          <label>Khoảng cách chữ <output id="spacing-value">0</output><input type="range" id="spacing" min="-30" max="140" value="0"></label>
+          <label>Khoảng cách chữ trong TTF <output id="spacing-value">10</output><input type="range" id="spacing" min="-30" max="140" value="10"></label>
         </div>
         <p id="missing" class="help" aria-live="polite"></p>
         <details class="stroke-tools">

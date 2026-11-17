@@ -3,7 +3,7 @@ import { glyphBounds } from './glyph-review.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
-export const punctuation = [...'.,:;!?-–—()“”‘’/+'];
+export const punctuation = [...'.,:;!?-–—()“”‘’/+<>'];
 export const toneSamples = new Map([
   ['\u0301', 'Sắc'], ['\u0300', 'Huyền'], ['\u0323', 'Nặng'],
   ['\u0303', 'Ngã'], ['\u0309', 'Hỏi'], ['\u0306', 'Trăng'], ['\u0302', 'Mũ'], ['\u031b', 'Râu']
@@ -48,7 +48,7 @@ function undotI(glyph) {
 export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false } = {}) {
   const result = [];
   for (const char of accented) {
-    if (glyphs.get(char)?.source === 'Ảnh mẫu' && !replace(char)) continue;
+    if (['Ảnh mẫu', 'Ảnh làm sạch'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
     const [root, ...marks] = char.normalize('NFD');
     const horn = '\u031b';
     const horned = (root + horn).normalize('NFC');
