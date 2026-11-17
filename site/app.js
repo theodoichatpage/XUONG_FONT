@@ -4,7 +4,7 @@ import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol,
 import { inventoryImage, redrawFontImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
-import { balanceGlyphSpacing, fitLowercaseT, measureLeftStem, matchLeftStem, balanceFontStrokes } from './font-layout.js';
+import { balanceGlyphSpacing, fitLowercaseT, fitLowercaseQ, fontKerning, measureLeftStem, matchLeftStem, balanceFontStrokes } from './font-layout.js';
 
 const { UPM, ASCENT, DESCENT } = require('../src/metrics');
 
@@ -827,7 +827,7 @@ function scheduleFont() {
       return;
     }
     try {
-      const active = savedGlyphs.map(fitLowercaseT);
+      const active = savedGlyphs.map(glyph => fitLowercaseQ(fitLowercaseT(glyph)));
       const name = $('name').value.trim() || 'Xuong Font';
       let ascent = ASCENT, descent = DESCENT;
       for (const glyph of active) {
@@ -836,7 +836,7 @@ function scheduleFont() {
         descent = Math.min(descent, Math.floor(y - 24));
       }
       const balanced = balanceGlyphSpacing(active, Number($('spacing').value));
-      const ttf = exportFont(name, balanced, 0, { ascent, descent });
+      const ttf = exportFont(name, balanced, 0, { ascent, descent, kerning: fontKerning(balanced) });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;

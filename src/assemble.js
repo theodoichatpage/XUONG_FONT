@@ -4,6 +4,7 @@
 // no icon-font "normalize" scaling anywhere in the chain.
 const svg2ttf = require('svg2ttf');
 const ttf2woff = require('ttf2woff');
+const { addKerning } = require('./kern-table');
 const { UPM, ASCENT, DESCENT, XH, CAP } = require('./metrics');
 
 const esc = (ch) => '&#x' + ch.codePointAt(0).toString(16).toUpperCase() + ';';
@@ -15,7 +16,7 @@ const escAttr = (s) => s.replace(/[&<>"']/g, (c) => `&#x${c.codePointAt(0).toStr
  * @param {{wordSpace?:number}} opts
  * @returns {Buffer} TTF
  */
-function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT } = {}) {
+function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT, kerning = [] } = {}) {
   const id = name.replace(/[^A-Za-z0-9_-]+/g, '') || 'DrawYourFont';
   const parts = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -32,7 +33,7 @@ function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DE
   }
   parts.push(`</font></defs></svg>`);
   const ttf = svg2ttf(parts.join('\n'), { description: 'Made with draw-your-font', url: 'https://github.com/danilo-znamerovszkij/draw-your-font' });
-  return Buffer.from(ttf.buffer);
+  return Buffer.from(kerning.length ? addKerning(ttf.buffer, kerning) : ttf.buffer);
 }
 
 function toWoff(ttf) {

@@ -77,6 +77,41 @@ export function fitLowercaseT(glyph) {
   return result;
 }
 
+export function fitLowercaseQ(glyph) {
+  if (glyph.char !== 'q') return glyph;
+  const { y, height } = glyphBounds(glyph);
+  const top = y + height;
+  if (top <= 0 || Math.abs(top - XH) < 4) return glyph;
+  const scale = XH / top;
+  const d = svgpath(glyph.d).abs().unshort().unarc().iterate(segment => {
+    if (segment[0] === 'V' && segment[1] > 0) segment[1] *= scale;
+    if (!'MLCQ'.includes(segment[0])) return;
+    for (let i = 2; i < segment.length; i += 2) {
+      if (segment[i] > 0) segment[i] *= scale;
+    }
+  }).round(1).toString();
+  return { ...glyph, d };
+}
+
+export function fontKerning(glyphs) {
+  const byChar = new Map(glyphs.map(glyph => [glyph.char, glyph]));
+  const pairs = [];
+  const o = byChar.get('o'), w = byChar.get('w');
+  if (o && w) {
+    const left = profile(o), right = profile(w);
+    const bins = new Map(right.rows.map(row => [Math.round(row.y * resolution), row.left]));
+    const gaps = left.rows.flatMap(row => {
+      const edge = bins.get(Math.round(row.y * resolution));
+      return edge === undefined ? [] : [o.advance + edge - row.right];
+    }).sort((a, b) => a - b);
+    const clearance = gaps[Math.floor(gaps.length * .05)];
+    const tighten = Math.floor(Math.min(28, clearance - 15));
+    if (tighten > 0) pairs.push(['o', 'w', -tighten]);
+  }
+  if (byChar.has('T') && byChar.has('h')) pairs.push(['T', 'h', 24]);
+  return pairs;
+}
+
 export function balanceGlyphSpacing(glyphs, adjustment) {
   const gap = Math.max(22, 46 + adjustment);
   return glyphs.map(glyph => {
@@ -86,8 +121,11 @@ export function balanceGlyphSpacing(glyphs, adjustment) {
     if (middle.length < 5) return { ...glyph, advance: Math.max(1, glyph.advance + adjustment) };
     const left = median(middle.map(row => row.left));
     const right = median(middle.map(row => row.right));
-    const leftBearing = Math.max(-24, gap / 2 - (left - box.x));
-    const rightBearing = Math.max(-24, gap / 2 - (box.x + box.width - right));
+    const digit = /^[0-9]$/.test(glyph.char);
+    const halfGap = (gap + (digit ? 26 : 0)) / 2;
+    const minimum = digit ? 8 : -24;
+    const leftBearing = Math.max(minimum, halfGap - (left - box.x));
+    const rightBearing = Math.max(minimum, halfGap - (box.x + box.width - right));
     return { ...glyph, d: svgpath(glyph.d).translate(leftBearing - box.x, 0).round(1).toString(),
       advance: Math.max(1, Math.round(box.width + leftBearing + rightBearing)) };
   });
