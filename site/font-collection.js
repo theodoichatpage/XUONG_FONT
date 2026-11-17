@@ -20,6 +20,58 @@ function accessFonts(mode, action) {
   }));
 }
 
+async function fontDigest(blob) {
+  const bytes = await blob.arrayBuffer();
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+    byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function cleanDuplicates() {
+  const records = await accessFonts('readonly', store => store.getAll());
+  const legacy = records.filter(record => !record.digest);
+  if (!legacy.length) return 0;
+  const digests = new Map(await Promise.all(legacy.map(async record => [record.id, await fontDigest(record.blob)])));
+  let removed = 0;
+  await accessFonts('readwrite', store => {
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const existing = new Set(request.result.map(record => record.digest).filter(Boolean));
+      for (const record of request.result) {
+        const digest = digests.get(record.id);
+        if (record.digest || !digest) continue;
+        if (existing.has(digest)) {
+          store.delete(record.id);
+          removed++;
+        } else {
+          store.put({ ...record, digest });
+          existing.add(digest);
+        }
+      }
+    };
+    return request;
+  });
+  return removed;
+}
+
+async function addFont(record) {
+  const digest = await fontDigest(record.blob);
+  let result;
+  await accessFonts('readwrite', store => {
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const existing = request.result.find(item => item.digest === digest);
+      if (existing) {
+        result = { id: existing.id, duplicate: true };
+      } else {
+        const add = store.add({ ...record, digest });
+        add.onsuccess = () => { result = { id: add.result, duplicate: false }; };
+      }
+    };
+    return request;
+  });
+  return result;
+}
+
 export function setupFontCollection(getCurrentFont) {
   const $ = id => document.getElementById(id);
   const dialog = $('font-collection');
@@ -99,8 +151,10 @@ export function setupFontCollection(getCurrentFont) {
   $('open-font-collection').addEventListener('click', () => {
     dialog.showModal();
     run(async () => {
+      const removed = await cleanDuplicates();
       await refresh();
-      if (!records.length) status.textContent = 'Bạn chưa lưu font nào.';
+      if (removed) status.textContent = 'Đã xóa ' + removed + ' bản trùng font. Mỗi file chỉ giữ một bản.';
+      else if (!records.length) status.textContent = 'Bạn chưa lưu font nào.';
     });
   });
   dialog.addEventListener('close', clearPreview);
@@ -113,7 +167,7 @@ export function setupFontCollection(getCurrentFont) {
     if (!batch.length) return;
     run(async () => {
       let saved = 0, last;
-      const invalid = [];
+      const invalid = [], duplicates = [];
       for (const file of batch) {
         try {
           if (!/\.(ttf|otf)$/i.test(file.name)) throw new Error();
@@ -124,20 +178,23 @@ export function setupFontCollection(getCurrentFont) {
           continue;
         }
         const record = { name: file.name.replace(/\.(ttf|otf)$/i, '').slice(0, 100), filename: file.name, blob: file };
-        last = await accessFonts('readwrite', store => store.add(record));
-        saved++;
+        const result = await addFont(record);
+        last = result.id;
+        if (result.duplicate) duplicates.push(file.name);
+        else saved++;
       }
       await refresh(last);
-      status.textContent = `Đã lưu ${saved} font.` + (invalid.length ? '\nKhông đọc được: ' + invalid.join(', ') : '');
+      status.textContent = `Đã lưu ${saved} font.` + (duplicates.length ? '\nTrùng font, đã bỏ qua: ' + duplicates.join(', ') : '')
+        + (invalid.length ? '\nKhông đọc được: ' + invalid.join(', ') : '');
     });
   });
 
   saveCurrent.addEventListener('click', () => run(async () => {
     const record = getCurrentFont();
     if (!record) return;
-    const id = await accessFonts('readwrite', store => store.add(record));
+    const { id, duplicate } = await addFont(record);
     await refresh(id);
-    status.textContent = 'Đã lưu ' + record.name + '.';
+    status.textContent = duplicate ? 'Trùng font: ' + record.name + ' đã có trong bộ sưu tập.' : 'Đã lưu ' + record.name + '.';
   }));
 
   $('collection-rename').addEventListener('submit', event => {
