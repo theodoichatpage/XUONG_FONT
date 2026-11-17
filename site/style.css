@@ -206,9 +206,27 @@ dialog::backdrop{background:#221a17bd}
 @media(max-width:760px){.masthead,.masthead-actions{flex-wrap:wrap}}
 
 #collection-list-title{font-size:13px;margin:12px 0 5px}
-#collection-families{max-height:220px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:7px}
-#collection-families details{margin:0;padding:6px 10px}
-#collection-families details+details{border-top:1px solid var(--line)}
-#collection-families summary{padding:3px 0}
-#collection-families button{display:block;text-align:left;margin:3px 0 0 12px;width:calc(100% - 12px);padding:4px 8px;overflow-wrap:anywhere;font-size:13px}
-#collection-families button[aria-pressed=true]{background:var(--accent);border-color:var(--red);color:var(--red)}
+#collection-families{min-height:88px;border:1px solid var(--line);border-radius:7px}
+#collection-families button{display:block;text-align:left;width:100%;padding:4px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;border-color:transparent}
+#collection-families .collection-family{color:var(--red)}
+#collection-families .collection-variant{padding-left:22px}
+#collection-families button[aria-pressed=true]{background:var(--accent);color:var(--red)}
+.collection-pages{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px;font-size:12px}
+.collection-pages button{padding:2px 8px}
+
+.collection-body{display:flex;flex-direction:column;overflow:hidden;gap:4px;padding-block:8px}
+.collection-body>.help{margin:0}
+#collection-status{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#collection-editor{display:flex;flex-direction:column;flex:1;min-height:0;margin:2px 0 0}
+#collection-rename{margin:0}
+#collection-rename .tool-row{margin:4px 0}
+#collection-rename button,#collection-rename .download{padding:4px 8px}
+#collection-sample{resize:none;padding-block:4px;min-height:0}
+#collection-preview{flex:1;min-height:0;overflow:hidden;margin-top:5px;padding:5px 10px}
+@media(max-height:660px){
+  #font-collection .viewer-toolbar{padding-block:5px}
+  #collection-list-title{margin-top:2px}
+  #collection-families button{padding-block:2px}
+  #collection-name{padding-block:3px}
+  #collection-preview{font-size:28px}
+}

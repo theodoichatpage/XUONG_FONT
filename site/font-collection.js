@@ -53,6 +53,28 @@ async function cleanDuplicates() {
   return removed;
 }
 
+function isHungFont(record) {
+  const normalize = value => value.normalize('NFD').replace(/\p{M}/gu, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ['suvietkieuhung', 'vietsukieuhung'].includes(normalize(record.name))
+    && ['suvietkieuhung', 'vietsukieuhung'].includes(normalize(record.filename.replace(/\.(ttf|otf)$/i, '')));
+}
+
+function cleanHungCopies() {
+  let removed = 0;
+  return accessFonts('readwrite', store => {
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const copies = request.result.filter(isHungFont);
+      for (const copy of copies.slice(0, -1)) {
+        store.delete(copy.id);
+        removed++;
+      }
+    };
+    return request;
+  }).then(() => removed);
+}
+
 async function addFont(record) {
   const digest = await fontDigest(record.blob);
   let result;
@@ -63,7 +85,8 @@ async function addFont(record) {
       if (existing) {
         result = { id: existing.id, duplicate: true };
       } else {
-        const add = store.add({ ...record, digest });
+        const previous = isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
+        const add = previous ? store.put({ ...record, digest, id: previous.id }) : store.add({ ...record, digest });
         add.onsuccess = () => { result = { id: add.result, duplicate: false }; };
       }
     };
@@ -129,6 +152,11 @@ export function setupFontCollection(getCurrentFont) {
   const status = $('collection-status');
   let records = [];
   let selectedId;
+  let page = 0;
+  let groups = [];
+  const expandedFamilies = new Set();
+  const previousPage = $('collection-previous');
+  const nextPage = $('collection-next');
   const familiesByDigest = new Map();
   let objectURL;
   let previewFace;
@@ -171,8 +199,7 @@ export function setupFontCollection(getCurrentFont) {
   async function refresh(preferred = selectedId) {
     records = await accessFonts('readonly', store => store.getAll());
     selectedId = records.some(record => record.id === preferred) ? preferred : undefined;
-    const openFamilies = new Set([...fonts.querySelectorAll('details[open]')].map(group => group.dataset.family));
-    const groups = new Map();
+    const grouped = new Map();
     for (const record of records) {
       let family = familiesByDigest.get(record.digest);
       if (!family) {
@@ -181,22 +208,34 @@ export function setupFontCollection(getCurrentFont) {
         familiesByDigest.set(record.digest, family);
       }
       const key = family.normalize('NFC').toLocaleLowerCase('vi');
-      if (!groups.has(key)) groups.set(key, { family, members: [] });
-      groups.get(key).members.push(record);
+      if (!grouped.has(key)) grouped.set(key, { key, family, members: [] });
+      grouped.get(key).members.push(record);
     }
-    fonts.replaceChildren();
+    groups = [...grouped.values()].sort((a, b) => nameOrder.compare(a.family, b.family));
+    for (const group of groups) {
+      group.members.sort((a, b) => nameOrder.compare(a.name, b.name));
+      if (group.members.some(record => record.id === selectedId)) expandedFamilies.add(group.key);
+    }
     $('collection-fonts').hidden = !records.length;
     $('collection-count').textContent = '(' + records.length + ')';
-    for (const [key, { family, members }] of [...groups].sort((a, b) => nameOrder.compare(a[1].family, b[1].family))) {
-      const group = document.createElement('details');
-      group.dataset.family = key;
-      group.open = openFamilies.has(key) || members.some(record => record.id === selectedId);
-      const summary = document.createElement('summary');
-      summary.textContent = family + ' (' + members.length + ')';
-      group.append(summary);
-      for (const record of members.sort((a, b) => nameOrder.compare(a.name, b.name))) {
-        const button = document.createElement('button');
-        button.type = 'button';
+    renderFamilies(true);
+    if (dialog.open) await showSelection();
+  }
+
+  function renderFamilies(revealSelected = false, focusKey) {
+    const rows = groups.flatMap(group => expandedFamilies.has(group.key)
+      ? [{ group }, ...group.members.map(record => ({ group, record }))] : [{ group }]);
+    const pageSize = 3;
+    const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+    const selectedRow = rows.findIndex(row => row.record?.id === selectedId && row.record);
+    if (revealSelected && selectedRow >= 0) page = Math.floor(selectedRow / pageSize);
+    page = Math.min(page, pages - 1);
+    fonts.replaceChildren();
+    for (const { group, record } of rows.slice(page * pageSize, (page + 1) * pageSize)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      if (record) {
+        button.className = 'collection-variant';
         button.textContent = record.name;
         button.setAttribute('aria-pressed', String(record.id === selectedId));
         button.addEventListener('click', () => {
@@ -206,12 +245,27 @@ export function setupFontCollection(getCurrentFont) {
           selectedId = record.id;
           showSelection();
         });
-        group.append(button);
+      } else {
+        const expanded = expandedFamilies.has(group.key);
+        button.className = 'collection-family';
+        button.textContent = (expanded ? '▾ ' : '▸ ') + group.family + ' (' + group.members.length + ')';
+        button.setAttribute('aria-expanded', String(expanded));
+        button.addEventListener('click', () => {
+          if (expanded) expandedFamilies.delete(group.key);
+          else expandedFamilies.add(group.key);
+          renderFamilies(false, group.key);
+        });
       }
-      fonts.append(group);
+      fonts.append(button);
+      if (!record && focusKey === group.key) button.focus();
     }
-    if (dialog.open) await showSelection();
+    $('collection-page').textContent = (page + 1) + ' / ' + pages;
+    previousPage.disabled = page === 0;
+    nextPage.disabled = page + 1 >= pages;
   }
+
+  previousPage.addEventListener('click', () => { page--; renderFamilies(); });
+  nextPage.addEventListener('click', () => { page++; renderFamilies(); });
 
   async function run(action) {
     if (working) return;
@@ -234,7 +288,7 @@ export function setupFontCollection(getCurrentFont) {
   $('open-font-collection').addEventListener('click', () => {
     dialog.showModal();
     run(async () => {
-      const removed = await cleanDuplicates();
+      const removed = await cleanHungCopies() + await cleanDuplicates();
       await refresh();
       if (removed) status.textContent = 'Đã xóa ' + removed + ' bản trùng font. Mỗi file chỉ giữ một bản.';
       else if (!records.length) status.textContent = 'Bạn chưa lưu font nào.';
