@@ -25,12 +25,13 @@ function profile(glyph) {
   const pixels = context.getImageData(0, 0, width, height).data;
   const rows = [];
   for (let y = 0; y < height; y++) {
-    let left = width, right = -1, firstEnd = -1;
+    let left = width, right = -1, firstEnd = -1, lastStart = -1;
     for (let x = 0; x < width; x++) {
       if (pixels[(y * width + x) * 4 + 3] < 128) {
         if (right >= 0 && firstEnd < 0) firstEnd = right + 1;
         continue;
       }
+      if (right < 0 || x > right + 1) lastStart = x;
       left = Math.min(left, x);
       right = x;
     }
@@ -39,7 +40,9 @@ function profile(glyph) {
       left: (left - .5) / resolution + box.x,
       right: (right - .5) / resolution + box.x,
       width: (right - left + 1) / resolution,
-      stem: ((firstEnd < 0 ? right + 1 : firstEnd) - left) / resolution
+      stem: ((firstEnd < 0 ? right + 1 : firstEnd) - left) / resolution,
+      rightStem: (right + 1 - lastStart) / resolution,
+      separated: lastStart > left
     });
   }
   const result = { box, rows };
@@ -93,25 +96,63 @@ export function fitLowercaseQ(glyph) {
   return { ...glyph, d };
 }
 
+const fixedUs = new WeakMap();
+
+export function fitLowercaseUStems(glyph) {
+  if (glyph.char.normalize('NFD')[0] !== 'u') return glyph;
+  if (fixedUs.has(glyph)) return fixedUs.get(glyph);
+  const { rows } = profile(glyph);
+  const stems = rows.filter(row => row.separated && row.y >= XH * .32 && row.y <= XH * .73);
+  let result = glyph;
+  if (stems.length >= 8) {
+    const target = median(stems.map(row => row.stem));
+    const current = median(stems.map(row => row.rightStem));
+    const outer = median(stems.map(row => row.right + .5 / resolution));
+    const leftInner = median(stems.map(row => row.left + row.stem - .5 / resolution));
+    const inner = outer - current;
+    const counter = inner - leftInner;
+    const delta = Math.min(target - current, counter * .7, counter - 10);
+    if (delta >= 4 && current >= 8) {
+      const d = svgpath(glyph.d).abs().unshort().unarc().iterate(segment => {
+        if (segment[0] === 'H') segment[1] = adjustedX(segment[1]);
+        else if ('MLCQ'.includes(segment[0])) {
+          for (let i = 1; i < segment.length; i += 2) segment[i] = adjustedX(segment[i]);
+        }
+      }).round(1).toString();
+      result = { ...glyph, d };
+    }
+
+    function adjustedX(x) {
+      if (x <= leftInner || x >= outer - 1 / resolution) return x;
+      const weight = x < inner ? (x - leftInner) / counter : (outer - x) / current;
+      return x - delta * weight;
+    }
+  }
+  fixedUs.set(glyph, result);
+  return result;
+}
+
 export function fontKerning(glyphs) {
   const byChar = new Map(glyphs.map(glyph => [glyph.char, glyph]));
   const pairs = [];
-  const o = byChar.get('o'), w = byChar.get('w');
-  if (o && w) {
-    const left = profile(o), right = profile(w);
+  for (const [first, second, limit, minimum] of [['o', 'w', 42, 9], ['K', 'i', 30, 12], ['K', 'h', 28, 12]]) {
+    const leftGlyph = byChar.get(first), rightGlyph = byChar.get(second);
+    if (!leftGlyph || !rightGlyph) continue;
+    const left = profile(leftGlyph), right = profile(rightGlyph);
     const bins = new Map(right.rows.map(row => [Math.round(row.y * resolution), row.left]));
     const gaps = left.rows.flatMap(row => {
       const edge = bins.get(Math.round(row.y * resolution));
-      return edge === undefined ? [] : [o.advance + edge - row.right];
+      return edge === undefined ? [] : [leftGlyph.advance + edge - row.right];
     }).sort((a, b) => a - b);
     const clearance = gaps[Math.floor(gaps.length * .05)];
-    const tighten = Math.floor(Math.min(42, clearance - 9));
-    if (tighten > 0) pairs.push(['o', 'w', -tighten]);
+    const tighten = Math.floor(Math.min(limit, clearance - minimum));
+    if (tighten > 0) pairs.push([first, second, -tighten]);
   }
   if (byChar.has('T') && byChar.has('h')) pairs.push(['T', 'h', 24]);
   if (byChar.has('2') && byChar.has('3')) pairs.push(['2', '3', 30]);
   if (byChar.has('P') && byChar.has('H')) pairs.push(['P', 'H', 24]);
   if (byChar.has('P') && byChar.has('h')) pairs.push(['P', 'h', 28]);
+  if (byChar.has('k') && byChar.has('h')) pairs.push(['k', 'h', 26]);
   return pairs;
 }
 
