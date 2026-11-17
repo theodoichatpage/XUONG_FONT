@@ -110,6 +110,8 @@ export function fontKerning(glyphs) {
   }
   if (byChar.has('T') && byChar.has('h')) pairs.push(['T', 'h', 24]);
   if (byChar.has('2') && byChar.has('3')) pairs.push(['2', '3', 30]);
+  if (byChar.has('P') && byChar.has('H')) pairs.push(['P', 'H', 24]);
+  if (byChar.has('P') && byChar.has('h')) pairs.push(['P', 'h', 28]);
   return pairs;
 }
 
