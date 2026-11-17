@@ -73,7 +73,10 @@ export function setupFontCollection(getCurrentFont) {
   async function refresh(preferred = fonts.value) {
     records = (await accessFonts('readonly', store => store.getAll())).reverse();
     fonts.replaceChildren(...records.map(record => new Option(record.name, record.id)));
-    if (records.some(record => String(record.id) === String(preferred))) fonts.value = preferred;
+    fonts.size = Math.max(2, Math.min(5, records.length));
+    $('collection-count').textContent = '(' + records.length + ')';
+    // A listbox does not automatically select its first option.
+    fonts.selectedIndex = Math.max(0, records.findIndex(record => String(record.id) === String(preferred)));
     if (dialog.open) await showSelection();
   }
 
