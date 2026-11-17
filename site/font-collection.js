@@ -72,11 +72,55 @@ async function addFont(record) {
   return result;
 }
 
+// Prefer the typographic family, which groups weights across legacy Windows families.
+function fontFamilyFromBytes(bytes) {
+  const data = new DataView(bytes);
+  if (data.byteLength < 12) return '';
+  const tables = data.getUint16(4);
+  for (let i = 0; i < tables; i++) {
+    const entry = 12 + i * 16;
+    if (entry + 16 > data.byteLength) break;
+    if (data.getUint32(entry) !== 0x6e616d65) continue;
+    const start = data.getUint32(entry + 8);
+    const end = start + data.getUint32(entry + 12);
+    if (end > data.byteLength || end - start < 6) return '';
+    const count = data.getUint16(start + 2);
+    const strings = start + data.getUint16(start + 4);
+    let best = '', priority = -1;
+    for (let j = 0; j < count; j++) {
+      const row = start + 6 + j * 12;
+      if (row + 12 > Math.min(end, strings)) break;
+      const platform = data.getUint16(row);
+      const language = data.getUint16(row + 4);
+      const nameId = data.getUint16(row + 6);
+      if (![16, 1].includes(nameId) || ![0, 3].includes(platform)) continue;
+      const length = data.getUint16(row + 8);
+      const offset = strings + data.getUint16(row + 10);
+      if (length % 2 || offset + length > end) continue;
+      const value = new TextDecoder('utf-16be').decode(new Uint8Array(bytes, offset, length)).trim();
+      const rank = (nameId === 16 ? 10 : 0) + (language === 0x409 ? 2 : 0) + (platform === 3 ? 1 : 0);
+      if (value && rank > priority) {
+        best = value;
+        priority = rank;
+      }
+    }
+    return best;
+  }
+  return '';
+}
+
+function familyName(value) {
+  // Some legacy fonts include the weight in the family field itself.
+  return value.replace(/(?:[\s_-]+(?:extra[\s_-]*light|xlight|ultra[\s_-]*light|thin|light|book|regular|medium|semi[\s_-]*bold|demi[\s_-]*bold|extra[\s_-]*bold|x[\s_-]*bold|ultra[\s_-]*bold|bold|black|heavy|italic|oblique|roman))+$/iu, '').trim() || value;
+}
+
+const nameOrder = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
+
 export function setupFontCollection(getCurrentFont) {
   const $ = id => document.getElementById(id);
   const dialog = $('font-collection');
   const files = $('collection-files');
-  const fonts = $('collection-fonts');
+  const fonts = $('collection-families');
   const name = $('collection-name');
   const sample = $('collection-sample');
   const preview = $('collection-preview');
@@ -84,6 +128,8 @@ export function setupFontCollection(getCurrentFont) {
   const saveCurrent = $('collection-save-current');
   const status = $('collection-status');
   let records = [];
+  let selectedId;
+  const familiesByDigest = new Map();
   let objectURL;
   let previewFace;
   let previewRevision = 0;
@@ -102,7 +148,7 @@ export function setupFontCollection(getCurrentFont) {
   async function showSelection() {
     clearPreview();
     const revision = previewRevision;
-    const record = records.find(item => String(item.id) === fonts.value);
+    const record = records.find(item => item.id === selectedId);
     $('collection-editor').hidden = !record;
     if (!record) return;
     name.value = record.name;
@@ -122,20 +168,56 @@ export function setupFontCollection(getCurrentFont) {
     }
   }
 
-  async function refresh(preferred = fonts.value) {
-    records = (await accessFonts('readonly', store => store.getAll())).reverse();
-    fonts.replaceChildren(...records.map(record => new Option(record.name, record.id)));
-    fonts.size = Math.max(2, Math.min(5, records.length));
+  async function refresh(preferred = selectedId) {
+    records = await accessFonts('readonly', store => store.getAll());
+    selectedId = records.some(record => record.id === preferred) ? preferred : undefined;
+    const openFamilies = new Set([...fonts.querySelectorAll('details[open]')].map(group => group.dataset.family));
+    const groups = new Map();
+    for (const record of records) {
+      let family = familiesByDigest.get(record.digest);
+      if (!family) {
+        const raw = fontFamilyFromBytes(await record.blob.arrayBuffer());
+        family = familyName(raw || record.filename.replace(/\.(ttf|otf)$/i, '') || record.name);
+        familiesByDigest.set(record.digest, family);
+      }
+      const key = family.normalize('NFC').toLocaleLowerCase('vi');
+      if (!groups.has(key)) groups.set(key, { family, members: [] });
+      groups.get(key).members.push(record);
+    }
+    fonts.replaceChildren();
+    $('collection-fonts').hidden = !records.length;
     $('collection-count').textContent = '(' + records.length + ')';
-    // A listbox does not automatically select its first option.
-    fonts.selectedIndex = Math.max(0, records.findIndex(record => String(record.id) === String(preferred)));
+    for (const [key, { family, members }] of [...groups].sort((a, b) => nameOrder.compare(a[1].family, b[1].family))) {
+      const group = document.createElement('details');
+      group.dataset.family = key;
+      group.open = openFamilies.has(key) || members.some(record => record.id === selectedId);
+      const summary = document.createElement('summary');
+      summary.textContent = family + ' (' + members.length + ')';
+      group.append(summary);
+      for (const record of members.sort((a, b) => nameOrder.compare(a.name, b.name))) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = record.name;
+        button.setAttribute('aria-pressed', String(record.id === selectedId));
+        button.addEventListener('click', () => {
+          if (working) return;
+          fonts.querySelector('[aria-pressed="true"]')?.setAttribute('aria-pressed', 'false');
+          button.setAttribute('aria-pressed', 'true');
+          selectedId = record.id;
+          showSelection();
+        });
+        group.append(button);
+      }
+      fonts.append(group);
+    }
     if (dialog.open) await showSelection();
   }
 
   async function run(action) {
     if (working) return;
     working = true;
-    files.disabled = fonts.disabled = saveCurrent.disabled = true;
+    files.disabled = saveCurrent.disabled = true;
+    fonts.setAttribute('aria-busy', 'true');
     status.textContent = '';
     try {
       await action();
@@ -143,7 +225,8 @@ export function setupFontCollection(getCurrentFont) {
       status.textContent = 'Không thể cập nhật bộ sưu tập. ' + error.message;
     } finally {
       working = false;
-      files.disabled = fonts.disabled = false;
+      files.disabled = false;
+      fonts.removeAttribute('aria-busy');
       saveCurrent.disabled = !getCurrentFont();
     }
   }
@@ -158,7 +241,6 @@ export function setupFontCollection(getCurrentFont) {
     });
   });
   dialog.addEventListener('close', clearPreview);
-  fonts.addEventListener('change', showSelection);
   sample.addEventListener('input', () => { preview.textContent = sample.value; });
 
   files.addEventListener('change', () => {
@@ -199,7 +281,7 @@ export function setupFontCollection(getCurrentFont) {
 
   $('collection-rename').addEventListener('submit', event => {
     event.preventDefault();
-    const record = records.find(item => String(item.id) === fonts.value);
+    const record = records.find(item => item.id === selectedId);
     const next = name.value.trim();
     if (!record || !next) return;
     run(async () => {
@@ -210,7 +292,7 @@ export function setupFontCollection(getCurrentFont) {
   });
 
   $('collection-remove').addEventListener('click', () => {
-    const record = records.find(item => String(item.id) === fonts.value);
+    const record = records.find(item => item.id === selectedId);
     if (working || !record || !window.confirm('Xóa “' + record.name + '” khỏi bộ sưu tập?')) return;
     run(async () => {
       await accessFonts('readwrite', store => store.delete(record.id));

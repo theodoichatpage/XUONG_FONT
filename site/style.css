@@ -203,3 +203,11 @@ dialog::backdrop{background:#221a17bd}
 #collection-preview{margin-top:10px;padding:14px;border-radius:9px;background:#f2e9da;color:#75302b;font-size:clamp(28px,5vw,52px);line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere}
 
 @media(max-width:760px){.masthead,.masthead-actions{flex-wrap:wrap}}
+
+#collection-list-title{font-size:13px;margin:12px 0 5px}
+#collection-families{max-height:220px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:7px}
+#collection-families details{margin:0;padding:6px 10px}
+#collection-families details+details{border-top:1px solid var(--line)}
+#collection-families summary{padding:3px 0}
+#collection-families button{display:block;text-align:left;margin:3px 0 0 12px;width:calc(100% - 12px);padding:4px 8px;overflow-wrap:anywhere;font-size:13px}
+#collection-families button[aria-pressed=true]{background:var(--accent);border-color:var(--red);color:var(--red)}
