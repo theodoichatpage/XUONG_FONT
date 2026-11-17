@@ -1,3 +1,4 @@
+import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
@@ -19,6 +20,7 @@ let dragStart;
 let selected;
 let fontFace;
 let downloadURL;
+let currentFontExport;
 let revision = 0;
 let loadingRevision = 0;
 const references = [];
@@ -815,6 +817,7 @@ function scheduleFont() {
   const download = $('download');
   if (downloadURL) URL.revokeObjectURL(downloadURL);
   downloadURL = undefined;
+  currentFontExport = undefined;
   download.removeAttribute('href');
   download.setAttribute('aria-disabled', 'true');
   debounce = setTimeout(async () => {
@@ -845,9 +848,11 @@ function scheduleFont() {
       document.fonts.add(face);
       $('preview').style.fontFamily = face.family + ', Georgia, serif';
       $('preview').style.lineHeight = String((ascent - descent) / UPM);
-      downloadURL = URL.createObjectURL(new Blob([ttf], { type: 'font/ttf' }));
+      const blob = new Blob([ttf], { type: 'font/ttf' });
+      downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
       download.download = (name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
+      currentFontExport = { name, filename: download.download, blob };
       download.setAttribute('aria-disabled', 'false');
     } catch (error) {
       if (turn === revision) $('missing').textContent = 'Không xuất được font · ' + error.message;
@@ -1363,3 +1368,5 @@ const fixedWorkspace = matchMedia('(min-width:1024px) and (min-height:520px)');
 $('sample').addEventListener('wheel', event => {
   if (fixedWorkspace.matches) event.preventDefault();
 }, { passive: false });
+
+setupFontCollection(() => currentFontExport);

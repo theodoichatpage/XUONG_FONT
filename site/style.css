@@ -187,3 +187,19 @@ dialog::backdrop{background:#221a17bd}
   .masthead-actions{flex-wrap:wrap}
   .font-name #name{width:min(175px,50vw)}
 }
+
+#open-font-collection{color:inherit;border-color:#705e53;font-size:13px;padding:5px 8px;white-space:nowrap}
+#open-font-collection:hover{background:#493933;color:#fff}
+#font-collection{width:min(720px,94vw)}
+.collection-body{padding:14px 16px;max-height:calc(94dvh - 68px);overflow:auto}
+.collection-upload{display:inline-block;cursor:pointer;border-radius:7px;padding:8px 12px}
+.collection-upload:has(+ input:focus-visible){outline:2px solid var(--red);outline-offset:3px}
+#collection-files:disabled{pointer-events:none}
+.collection-upload:has(+ input:disabled){opacity:.48;cursor:default}
+.collection-body .help{margin-top:6px;white-space:pre-line;overflow-wrap:anywhere}
+#collection-status:empty{display:none}
+#collection-editor,#collection-rename{margin-top:12px}
+#collection-rename .tool-row{margin:8px 0 12px}
+#collection-preview{margin-top:10px;padding:14px;border-radius:9px;background:#f2e9da;color:#75302b;font-size:clamp(28px,5vw,52px);line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere}
+
+@media(max-width:760px){.masthead,.masthead-actions{flex-wrap:wrap}}

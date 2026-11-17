@@ -13,6 +13,7 @@
   <a class="brand" href="./"><span class="monogram" aria-hidden="true">Aa</span> XƯỞNG FONT</a>
   <div class="masthead-actions">
     <label class="font-name" for="name">Tên bộ font<input id="name" value="Xuong Font" maxlength="40"></label>
+    <button id="open-font-collection" type="button" aria-haspopup="dialog">Bộ sưu tập font</button>
     <details id="gemini-settings" class="connection-settings">
       <summary id="gemini-badge" data-state="idle"><i aria-hidden="true"></i><span id="gemini-badge-label">Gemini: Chưa kết nối</span></summary>
       <div id="gemini-key-home">
@@ -134,6 +135,37 @@
     </div>
   </div>
 </main>
+<dialog id="font-collection" aria-labelledby="font-collection-title">
+  <div class="viewer-toolbar">
+    <h2 id="font-collection-title">Bộ sưu tập font</h2>
+    <form method="dialog"><button type="submit" autofocus>Đóng</button></form>
+  </div>
+  <div class="collection-body">
+    <div class="tool-row">
+      <label class="collection-upload primary" for="collection-files">Nhập TTF / OTF</label>
+      <input class="visually-hidden" id="collection-files" type="file" accept=".ttf,.otf" multiple>
+      <button id="collection-save-current" type="button">Lưu font đang làm</button>
+    </div>
+    <p class="help">Font được lưu trong trình duyệt này. Xóa dữ liệu trang sẽ xóa bộ sưu tập.</p>
+    <p id="collection-status" class="help" role="status"></p>
+    <div id="collection-editor" hidden>
+      <label for="collection-fonts">Font đã lưu</label>
+      <select id="collection-fonts"></select>
+      <form id="collection-rename">
+        <label for="collection-name">Tên trong bộ sưu tập</label>
+        <input id="collection-name" maxlength="100" required>
+        <div class="tool-row">
+          <button type="submit">Lưu tên</button>
+          <a id="collection-download" class="download">Tải font</a>
+          <button id="collection-remove" type="button" class="quiet">Xóa font</button>
+        </div>
+      </form>
+      <label for="collection-sample">Gõ thử</label>
+      <textarea id="collection-sample" rows="2" maxlength="240">Sử Việt Kiêu Hùng · Tiếng Việt 123</textarea>
+      <div id="collection-preview" aria-hidden="true"></div>
+    </div>
+  </div>
+</dialog>
 <dialog id="full-preview" aria-labelledby="full-preview-title">
   <div class="viewer-toolbar">
     <h2 id="full-preview-title">Thử tiêu đề</h2>
