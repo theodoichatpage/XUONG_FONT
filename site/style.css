@@ -190,8 +190,9 @@ dialog::backdrop{background:#221a17bd}
 
 #open-font-collection{color:inherit;border-color:#705e53;font-size:13px;padding:5px 8px;white-space:nowrap}
 #open-font-collection:hover{background:#493933;color:#fff}
-#font-collection{width:min(720px,94vw)}
-.collection-body{padding:14px 16px;max-height:calc(94dvh - 68px);overflow:auto}
+#font-collection{width:min(720px,94vw);height:min(740px,94dvh);overflow:hidden}
+#font-collection[open]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+.collection-body{padding:14px 16px;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .collection-upload{display:inline-block;cursor:pointer;border-radius:7px;padding:8px 12px}
 .collection-upload:has(+ input:focus-visible){outline:2px solid var(--red);outline-offset:3px}
 #collection-files:disabled{pointer-events:none}
