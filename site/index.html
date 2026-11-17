@@ -49,9 +49,10 @@
         </div>
         <label class="check auto-draw"><input id="auto-draw" type="checkbox" checked> Làm sạch và vẽ bổ sung bằng Gemini</label>
         <p id="ai-scan-help" class="help">Thêm đủ ảnh rồi dựng chữ có mẫu trước.</p>
-        <div id="ai-scan-report" class="scan-report" hidden>
-          <p id="ai-scan-result" role="status" aria-live="polite"></p>
-        </div>
+        <details id="ai-scan-report" class="scan-report" hidden>
+          <summary id="ai-scan-summary" aria-live="polite">Kết quả dựng chữ</summary>
+          <p id="ai-scan-result" class="tool-popover"></p>
+        </details>
       </div>
       <div id="stage" hidden>
         <div class="source-image-wrap">
@@ -60,18 +61,20 @@
         </div>
         <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
       </div>
-      <details class="manual-trace" open>
+      <details class="manual-trace">
         <summary>Tách chữ thủ công</summary>
-        <div class="field-row">
-          <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
-          <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
+        <div class="tool-popover">
+          <div class="field-row">
+            <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
+            <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
+          </div>
+          <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
+          <form id="trace-form">
+            <label for="chars">Chữ trong vùng chọn · tách thủ công</label>
+            <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
+            <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
+          </form>
         </div>
-        <label class="check"><input id="mask" type="checkbox"> Xem nét đã tách</label>
-        <form id="trace-form">
-          <label for="chars">Chữ trong vùng chọn · tách thủ công</label>
-          <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
-          <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
-        </form>
       </details>
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
@@ -85,31 +88,34 @@
         </div>
       </div>
 
-      <div class="glyph-legend"><span><i class="dot filled"></i> Theo ảnh</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
-      <details class="tone-tools">
-        <summary>Dấu mẫu</summary>
-        <p class="help">Mở ảnh bảng dấu rồi bấm Nhập cả bảng dấu. Xưởng tự ghép các dấu vào bộ chữ. Để thêm râu cho ơ và ư, chọn ô Râu và dùng ảnh mẫu riêng.</p>
-        <div id="tone-samples" class="glyph-grid" aria-label="Dấu mẫu"></div>
-        <div class="tool-row">
-          <button id="import-tone-sheet" class="primary" type="button">Nhập cả bảng dấu</button>
-          <button id="apply-tone-samples" type="button">Áp dụng dấu mẫu</button>
-          <button id="apply-lowercase-horns" type="button">Ghép râu cho ơ, ư</button>
-        </div>
-        <p class="help">Chọn chữ gốc để ghép lại các biến thể, hoặc chọn dấu để áp dụng cho các chữ mang dấu đó.</p>
-      </details>
-      <h3 class="glyph-group">Chữ hoa và số</h3>
-      <div id="glyphs" class="glyph-grid" aria-label="Chữ hoa và số"></div>
-      <h3 class="glyph-group">Chữ thường</h3>
-      <div id="lower-glyphs" class="glyph-grid" aria-label="Chữ thường"></div>
-      <h3 class="glyph-group">Chữ có dấu và dấu câu</h3>
-      <div id="more-glyphs" class="glyph-grid" aria-label="Chữ có dấu và dấu câu"></div>
+      <div class="glyph-scroll" tabindex="0" role="region" aria-label="Danh sách ký tự">
+        <div class="glyph-legend"><span><i class="dot filled"></i> Theo ảnh</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
+        <details class="tone-tools">
+          <summary>Dấu mẫu</summary>
+          <p class="help">Mở ảnh bảng dấu rồi bấm Nhập cả bảng dấu. Xưởng tự ghép các dấu vào bộ chữ. Để thêm râu cho ơ và ư, chọn ô Râu và dùng ảnh mẫu riêng.</p>
+          <div id="tone-samples" class="glyph-grid" aria-label="Dấu mẫu"></div>
+          <div class="tool-row">
+            <button id="import-tone-sheet" class="primary" type="button">Nhập cả bảng dấu</button>
+            <button id="apply-tone-samples" type="button">Áp dụng dấu mẫu</button>
+            <button id="apply-lowercase-horns" type="button">Ghép râu cho ơ, ư</button>
+          </div>
+          <p class="help">Chọn chữ gốc để ghép lại các biến thể, hoặc chọn dấu để áp dụng cho các chữ mang dấu đó.</p>
+        </details>
+        <h3 class="glyph-group">Chữ hoa và số</h3>
+        <div id="glyphs" class="glyph-grid" aria-label="Chữ hoa và số"></div>
+        <h3 class="glyph-group">Chữ thường</h3>
+        <div id="lower-glyphs" class="glyph-grid" aria-label="Chữ thường"></div>
+        <h3 class="glyph-group">Chữ có dấu và dấu câu</h3>
+        <div id="more-glyphs" class="glyph-grid" aria-label="Chữ có dấu và dấu câu"></div>
+      </div>
     </section>
     <div class="workspace-side">
       <section class="panel proof" aria-labelledby="proof-title">
         <div class="panel-title"><h2 id="proof-title">Thử tiêu đề</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
         <label for="sample">Nội dung xem trước</label>
         <textarea id="sample" rows="2" maxlength="240">HÀO KHÍ LAM SƠN</textarea>
-        <div id="preview" tabindex="0" role="region" aria-label="Tiêu đề mẫu">HÀO KHÍ LAM SƠN</div>
+        <div id="preview" role="region" aria-label="Tiêu đề mẫu">HÀO KHÍ LAM SƠN</div>
+        <button id="expand-preview" class="quiet" type="button" aria-haspopup="dialog">Xem đầy đủ</button>
         <div class="field-row proof-fields">
           <label>Cỡ chữ <output id="size-value">68</output> px<input type="range" id="size" min="24" max="110" value="68"></label>
           <label>Khoảng cách chữ trong TTF <output id="spacing-value">10</output><input type="range" id="spacing" min="-30" max="140" value="10"></label>
@@ -117,19 +123,28 @@
         <p id="missing" class="help" aria-live="polite"></p>
         <details class="stroke-tools">
           <summary>Đo và cân nét dọc</summary>
-          <label for="stroke-letters">Chữ cần chỉnh, rồi chữ làm chuẩn</label>
-          <input id="stroke-letters" value="E F" maxlength="20" autocomplete="off" spellcheck="false">
-          <div class="tool-row">
-            <button id="measure-strokes" type="button">Đo nét</button>
-            <button id="match-strokes" type="button">Cân nét chữ đầu</button>
-            <button id="balance-font-strokes" class="primary" type="button">Cân nét cả bộ</button>
+          <div class="tool-popover">
+            <label for="stroke-letters">Chữ cần chỉnh, rồi chữ làm chuẩn</label>
+            <input id="stroke-letters" value="E F" maxlength="20" autocomplete="off" spellcheck="false">
+            <div class="tool-row">
+              <button id="measure-strokes" type="button">Đo nét</button>
+              <button id="match-strokes" type="button">Cân nét chữ đầu</button>
+              <button id="balance-font-strokes" class="primary" type="button">Cân nét cả bộ</button>
+            </div>
+            <p id="stroke-result" class="help" aria-live="polite"></p>
           </div>
-          <p id="stroke-result" class="help" aria-live="polite"></p>
         </details>
       </section>
     </div>
   </div>
 </main>
+<dialog id="full-preview" aria-labelledby="full-preview-title">
+  <div class="viewer-toolbar">
+    <h2 id="full-preview-title">Thử tiêu đề</h2>
+    <form method="dialog"><button type="submit" autofocus>Đóng</button></form>
+  </div>
+  <div class="preview-copy"></div>
+</dialog>
 <dialog id="image-viewer" aria-labelledby="viewer-title">
   <div class="viewer-toolbar">
     <h2 id="viewer-title">Ảnh mẫu</h2>

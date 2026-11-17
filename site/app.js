@@ -865,6 +865,7 @@ function refresh() {
 
 function reportDesign(message) {
   $('ai-scan-report').hidden = false;
+  $('ai-scan-summary').textContent = message.split('\n')[0];
   $('ai-scan-result').textContent = message;
 }
 
@@ -1347,3 +1348,18 @@ async function restoreReferenceProject() {
 }
 
 restoreReferenceProject();
+
+$('expand-preview').addEventListener('click', () => {
+  const preview = $('preview');
+  const dialog = $('full-preview');
+  const copy = dialog.querySelector('.preview-copy');
+  copy.style.cssText = preview.style.cssText;
+  copy.replaceChildren(...Array.from(preview.childNodes, node => node.cloneNode(true)));
+  dialog.showModal();
+  copy.scrollTop = 0;
+});
+
+const fixedWorkspace = matchMedia('(min-width:1024px) and (min-height:520px)');
+$('sample').addEventListener('wheel', event => {
+  if (fixedWorkspace.matches) event.preventDefault();
+}, { passive: false });

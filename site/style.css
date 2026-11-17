@@ -61,17 +61,50 @@ details .glyph-grid{margin-top:10px}
 .tone-tools .help,.tone-tools .tool-row,.stroke-tools label,.stroke-tools .tool-row{margin-top:8px}
 #missing:not(:empty){margin-top:8px}
 .workspace-side{min-width:0}
-#preview{margin-top:12px;padding:24px 18px;min-height:135px;border:1px solid var(--line);border-radius:9px;background:#f2e9da;color:#75302b;text-align:center;font:68px/1.3 var(--display);overflow-wrap:anywhere;white-space:pre-wrap}
-#preview:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+#preview,.preview-copy{margin-top:12px;padding:24px 18px;min-height:135px;border:1px solid var(--line);border-radius:9px;background:#f2e9da;color:#75302b;text-align:center;font:68px/1.3 var(--display);overflow-wrap:anywhere;white-space:pre-wrap}
+.preview-copy { margin:12px; max-height:calc(94dvh - 88px); overflow:auto }
+#expand-preview { display:none }
 .proof-fields{max-width:440px}
 .missing-glyph{color:#9b8175;text-decoration:underline dotted;text-underline-offset:6px}
 
-@media(min-width:1024px) and (min-height:520px){
-  .glyph-toolbar,.workspace-side{position:sticky;top:68px}
-  .glyph-toolbar{z-index:1;padding-top:8px;margin-top:-8px}
-  .workspace-side{max-height:calc(100dvh - 82px);overflow:auto;overscroll-behavior-y:contain}
-  #preview{max-height:40dvh;overflow:auto}
-  .glyph-panel button,.glyph-panel summary{scroll-margin-top:210px}
+@media (min-width:1024px) and (min-height:520px) {
+  body { display:grid; grid-template-rows:auto minmax(0,1fr); height:100dvh; overflow:hidden }
+  main { min-height:0; padding-block:12px }
+  .workspace { height:100%; align-items:stretch; grid-template-rows:minmax(0,1fr) }
+  .panel { min-height:0; padding:12px }
+  .panel-title { margin-bottom:8px }
+  .panel-title h2 { font-size:clamp(20px,1.65vw,28px) }
+  .source,.glyph-panel,.proof { display:flex; flex-direction:column }
+  .glyph-toolbar { flex:none }
+  .glyph-scroll { min-height:0; flex:1; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:0 5px 4px 4px }
+  .glyph-scroll:focus-visible { outline:2px solid var(--red); outline-offset:-2px }
+
+  .source .upload { min-height:56px; padding:4px; gap:0 }
+  .source .upload-icon { display:none }
+  .source .help { font-size:12px }
+  .source .reference-list { margin-top:6px }
+  .source .scan-actions { margin-top:4px }
+  .source .scan-report { position:relative; margin:4px 0 0; padding:3px 6px }
+  #ai-scan-summary { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  #ai-scan-result.tool-popover { inset:calc(100% + 5px) 0 auto; max-height:33dvh; overflow:auto }
+  .source #stage { min-height:0; flex:1; margin-top:6px; display:flex; flex-direction:column }
+  .source .source-image-wrap { display:flex; align-items:center; justify-content:center; flex:1; min-height:0; width:100%; container-type:size }
+  #image { max-height:100cqh }
+  #stage .inline { flex:none; gap:4px }
+  #status { min-height:0; margin-top:4px }
+  #status:empty { display:none }
+
+  .workspace-side,.proof { height:100%; min-height:0 }
+  .proof #sample { resize:none }
+  #preview { flex:1; min-height:0; overflow:hidden; padding:12px 8px }
+  #expand-preview { display:block; align-self:flex-end; flex:none; padding:2px 5px; font-size:13px }
+  .proof-fields { flex:none; margin-block:8px 4px }
+  .manual-trace,.stroke-tools { margin-block:6px 0; position:relative }
+  .tool-popover {
+    position:absolute; z-index:1; inset:auto 0 calc(100% + 5px);
+    border:1px solid var(--line); border-radius:9px; padding:10px;
+    background:var(--panel); box-shadow:0 8px 24px #33201035;
+  }
 }
 @media(max-width:1023px){
   .workspace{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
