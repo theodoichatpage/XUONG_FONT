@@ -77,7 +77,8 @@ export function components(ink, W, H) {
   }));
 }
 
-const PUNCTUATION = /[.,;:!?…"'“”‘’()\[\]\-–—\/]/u;
+// Ký tự nhỏ hoặc mảnh (dấu câu, ^ * ~ = …): không tính là một khối chữ lớn khi so với ảnh.
+const PUNCTUATION = /[.,;:!?…"'“”‘’()\[\]\-–—\/^*~_=+`|]/u;
 const median = values => { const s = [...values].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : 0; };
 const overlapX = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
 const union = items => ({
@@ -172,7 +173,10 @@ export function layoutFromText(canvas, text) {
     // Vùng nhỏ lạc: chỉ nhận dấu câu sát ngay mép một từ, tối đa bằng số dấu câu đã gõ.
     const punctuation = [...textLine].filter(ch => PUNCTUATION.test(ch)).length;
     const edgeGap = m => Math.min(...spans.map(s => m.cx < s.x0 ? s.x0 - m.x1 : m.cx > s.x1 ? m.x0 - s.x1 : 0));
-    const kept = line.loose.filter(m => edgeGap(m) <= 0.6 * ref && m.h < 0.9 * ref).sort((a, b) => edgeGap(a) - edgeGap(b)).slice(0, punctuation);
+    // Vùng nhỏ nằm giữa một từ (vòng của %, dấu ^ * ") luôn thuộc từ đó.
+    const inside = line.loose.filter(m => edgeGap(m) <= 0);
+    const kept = [...inside, ...line.loose.filter(m => edgeGap(m) > 0 && edgeGap(m) <= 0.6 * ref && m.h < 0.9 * ref)
+      .sort((a, b) => edgeGap(a) - edgeGap(b)).slice(0, Math.max(0, punctuation - inside.length))];
     for (const m of kept) nearestSpan(m).items.push(m);
     const ignored = line.loose.length - kept.length;
     if (ignored) warn(index, textLine, `Dòng ${index + 1}: bỏ qua ${ignored} vùng nhỏ không có trong nội dung (chữ ghi chú, vạch trang trí…).`);

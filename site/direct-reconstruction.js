@@ -9,7 +9,9 @@ export function splitReferenceWord(mask, area, chars) {
     const byBody = splitWordByGaps(mask, area, chars.length, true);
     if (byBody.length) return byBody;
   }
-  return splitWordByGaps(mask, area, chars.length);
+  const byGaps = splitWordByGaps(mask, area, chars.length);
+  if (byGaps.length || chars.every(char => /[\p{L}\p{N}]/u.test(char))) return byGaps;
+  return splitWordByGaps(mask, area, chars.length, false, true);
 }
 
 

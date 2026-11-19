@@ -134,7 +134,7 @@ export function wordInk(canvas, box, settings) {
 
 // A clean blank column is a visible boundary between two letters. Only
 // recover a word when the resulting boundaries agree with its corrected text.
-export function splitWordByGaps(mask, box, count, bodyOnly = false) {
+export function splitWordByGaps(mask, box, count, bodyOnly = false, mergeParts = false) {
   const { frame: { x, y, w, h }, ink } = mask;
   const left = Math.max(0, box.x0 - x), right = Math.min(w, box.x1 - x);
   const top = Math.max(0, box.y0 - y), bottom = Math.min(h, box.y1 - y);
@@ -157,6 +157,12 @@ export function splitWordByGaps(mask, box, count, bodyOnly = false) {
       boxes.push({ x0: x + start, x1: x + column, y0: y + top, y1: y + bottom });
       start = -1;
     }
+  }
+  // Ký hiệu như " hoặc % có nhiều mảnh rời: gộp các mảnh có khe hở nhỏ nhất cho đủ số ký tự.
+  while (mergeParts && boxes.length > count) {
+    let best = 1;
+    for (let i = 2; i < boxes.length; i++) if (boxes[i].x0 - boxes[i - 1].x1 < boxes[best].x0 - boxes[best - 1].x1) best = i;
+    boxes.splice(best - 1, 2, { ...boxes[best - 1], x1: boxes[best].x1 });
   }
   if (boxes.length !== count) return [];
   const cuts = boxes.slice(1).map((next, index) => Math.round((boxes[index].x1 + next.x0) / 2));
