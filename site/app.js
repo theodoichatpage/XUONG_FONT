@@ -1526,23 +1526,60 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   onRepair: async (result, candidates) => {
     if (!isQualityEditorSource(result)) await openQualityFont(result);
     if (!isQualityEditorSource(result)) {
-      status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi đề xuất sửa.');
+      status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi sửa.');
       return;
     }
-    const finding = candidates.find(item => glyphs.has(item.chars));
-    if (!finding) { status('Không tìm thấy glyph gốc để chỉnh. Không thay đổi font.'); return; }
-    selected = finding.chars;
-    $('open-font-workspace').click();
-    $('open-mark-spacing').click();
-    $('mark-spacing-scope').value = 'selected';
-    // Translate only the detached mark; never resize or redraw a distinctive outline.
-    const measured = Number(finding.value);
     const threshold = Number(document.querySelector('#editor-font-check [data-role="gap"]')?.value) || 16;
-    const delta = Number.isFinite(measured) ? Math.max(2,Math.min(140,Math.ceil((threshold-measured+2)/2)*2)) : 20;
-    $('mark-gap').value = String(delta);
-    $('mark-scale').value = '100';
+    const proposals = [];
+    const skipped = [];
+    for (const finding of candidates) {
+      const char = finding.chars;
+      const before = glyphs.get(char);
+      const parts = [...char.normalize('NFD')];
+      const root = parts[0];
+      const baseChar = parts.includes('\u031b') ? (root + '\u031b').normalize('NFC') : root;
+      const base = glyphs.get(baseChar);
+      const measured = Number(finding.value);
+      if (!before || !base || !Number.isFinite(measured) || measured < 0) { skipped.push(char); continue; }
+      const gap = Math.max(2, Math.min(140, Math.ceil((threshold - measured + 2) / 2) * 2));
+      const after = adjustGlyphMarks(before, base, { gap, scale: 1 });
+      if (!after || after.d === before.d) { skipped.push(char); continue; }
+      proposals.push({ char, before, after, gap, measured });
+    }
+    if (!proposals.length) {
+      status('Chưa có dấu rời đủ điều kiện sửa tự động. Dấu liền thân và các nét giao nhau cần duyệt bằng mắt.');
+      return;
+    }
+    $('open-font-workspace').click();
+    $('mark-spacing-tools').hidden = false;
+    $('mark-spacing-scope').value = 'selected';
+    selected = proposals[0].char;
+    // Reuse the established before/after proof and explicit apply/undo workflow.
     previewMarkSpacing();
-    status('Đã tạo đề xuất sửa khoảng cách dấu cho '+finding.chars+'. So sánh trước/sau rồi bấm Áp dụng nếu phù hợp; các cảnh báo giao nét không bị sửa tự động.');
+    markCandidates = proposals;
+    const proof = $('mark-spacing-proof');
+    proof.replaceChildren();
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const {char,before,after} of proposals.slice(0,24)) {
+      const a=glyphBounds(before),b=glyphBounds(after),left=Math.min(a.x,b.x)-30;
+      const bottom=Math.min(a.y,b.y)-30,right=Math.max(a.x+a.width,b.x+b.width)+30;
+      const top=Math.max(a.y+a.height,b.y+b.height)+30;
+      const card=document.createElement('div'),title=document.createElement('strong');
+      title.textContent=char;card.append(title);
+      for(const [label,glyph] of [['Trước',before],['Sau',after]]) {
+        const figure=document.createElement('figure'),caption=document.createElement('figcaption');
+        caption.textContent=label;
+        const svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');
+        svg.setAttribute('viewBox',left+' '+(-top)+' '+(right-left)+' '+(top-bottom));
+        path.setAttribute('d',glyph.d);path.setAttribute('transform','scale(1,-1)');
+        svg.append(path);figure.append(svg,caption);card.append(figure);
+      }
+      proof.append(card);
+    }
+    $('mark-spacing-report').textContent='Đề xuất '+proposals.length+' chữ có dấu rời; bỏ qua '+skipped.length+' chữ không chắc chắn. Không thay hình dạng nét. Xem trước rồi bấm Áp dụng, hoặc đóng để hủy.';
+    $('apply-mark-spacing').disabled=false;
+    $('mark-spacing-tools').scrollIntoView({block:'nearest'});
+    status('Đã chuẩn bị '+proposals.length+' đề xuất sửa dấu. Chưa thay đổi font. Duyệt hình trước/sau rồi bấm Áp dụng.');
   }
 });
 const standaloneFontCheck = createFontCheckPanel($('standalone-font-check'), {
