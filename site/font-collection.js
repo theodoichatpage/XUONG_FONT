@@ -401,7 +401,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         const label = document.createElement('strong');
         label.textContent = result.style;
         const proof = document.createElement('p');
-        proof.style.cssText = 'font-size:32px;overflow-wrap:anywhere;white-space:pre-wrap';
+        proof.style.cssText = 'font-size:32px;line-height:1.6;font-weight:400;font-style:normal;font-synthesis:none;letter-spacing:0;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap';
         if (previewLoaded) proof.style.fontFamily = face.family;
         else proof.title = 'Trình duyệt chưa xem thử được kiểu này. Bạn vẫn có thể tải font để kiểm tra.';
         proof.textContent = result.text;

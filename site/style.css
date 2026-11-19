@@ -230,3 +230,7 @@ dialog::backdrop{background:#221a17bd}
   #collection-name{padding-block:3px}
   #collection-preview{font-size:28px}
 }
+
+/* Keep the family action clear of the textarea border and resize handle. */
+#family-text{margin-bottom:12px;min-height:64px}
+#family-create{display:block;margin-top:0}

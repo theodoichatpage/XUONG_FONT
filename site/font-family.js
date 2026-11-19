@@ -66,10 +66,16 @@ export async function createFontFamily(record, chosen, text, onResult) {
   if (source.tables.fvar) throw new Error('Chọn file Regular tĩnh để tạo family.');
   const family = record.family || source.getEnglishName('preferredFamily') || source.getEnglishName('fontFamily') || record.name.replace(/(?:[ -]+Regular)$/i, '').trim();
   const upm = source.unitsPerEm;
+  // cmap is authoritative: multiple code points can share one outline.
+  const codePointsByGlyph = new Map();
+  for (const [code, index] of Object.entries(source.tables.cmap.glyphIndexMap)) {
+    if (!codePointsByGlyph.has(index)) codePointsByGlyph.set(index, []);
+    codePointsByGlyph.get(index).push(Number(code));
+  }
   const indexChars = new Map();
   for (let i = 0; i < source.glyphs.length; i++) {
-    const glyph = source.glyphs.get(i);
-    if (glyph.unicodes?.length) indexChars.set(i, String.fromCodePoint(glyph.unicodes[0]));
+    const codes = codePointsByGlyph.get(i);
+    if (codes?.length) indexChars.set(i, String.fromCodePoint(codes[0]));
   }
   const kerning = Object.entries(source.kerningPairs ?? {}).flatMap(([key, value]) => {
     const [a,b] = key.split(',').map(Number);
@@ -84,8 +90,9 @@ export async function createFontFamily(record, chosen, text, onResult) {
       const old = source.glyphs.get(i);
       const originalPath = old.path ?? new opentype.Path();
       const path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
-      const glyph = new opentype.Glyph({ name: old.name || (i === 0 ? '.notdef' : 'glyph' + i), unicode: old.unicode,
-        unicodes: [...(old.unicodes ?? [])], advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path });
+      // Avoid Glyph's constructor: opentype.js 1.x drops Unicode aliases there.
+      const glyph = { unicodes: codePointsByGlyph.get(i) || [],
+        advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path };
       glyphs.push(glyph);
       if (path.commands.length) {
         const bounds = path.getBoundingBox();
@@ -112,7 +119,13 @@ export async function createFontFamily(record, chosen, text, onResult) {
     let bytes = new Uint8Array(output.buffer);
     if (kerning.length) bytes = addKerning(bytes, kerning);
     // Verify the exported bytes before handing them to storage or preview.
-    opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    const checked = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    for (const [code, index] of Object.entries(source.tables.cmap.glyphIndexMap)) {
+      const point = Number(code);
+      if (index && point >= 32 && !checked.charToGlyphIndex(String.fromCodePoint(point))) {
+        throw new Error('Bản xuất bị thiếu ký tự ' + String.fromCodePoint(point));
+      }
+    }
     await onResult({ name: family + ' ' + style, family, filename: family + '-' + style.replace(/ /g, '') + '.ttf',
       blob: new Blob([bytes], { type: 'font/ttf' }), style, text });
   }
