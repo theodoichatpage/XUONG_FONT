@@ -1,0 +1,771 @@
+/* /css/build/core-a.css *//* css/vendor/froala_editor_v3.0_beta2.css *//*!
+ * froala_editor v3.0.0-beta.2 (https://www.froala.com/wysiwyg-editor)
+ * License https://froala.com/wysiwyg-editor/terms/
+ * Copyright 2014-2019 Froala Labs
+ */
+@charset "UTF-8";
+
+
+
+:where(.cmt) .clearfix::after{clear:both;display:block;content:"";height:0}
+:where(.cmt) #logo{float:left;outline:none}
+:where(.cmt) #logo>span{display:inline-block;float:left;font-family:sans-serif;padding:11px 5px 10px 15px;font-size:12px;font-weight:500;color:#b1b2b7;-webkit-transition:color 0.3s;-moz-transition:color 0.3s;-ms-transition:color 0.3s;-o-transition:color 0.3s}
+:where(.cmt) #logo>svg{height:20px;width:47px;margin:7px 0;cursor:pointer}
+:where(.cmt) #logo>svg *{-webkit-transition:fill 0.3s;-moz-transition:fill 0.3s;-ms-transition:fill 0.3s;-o-transition:fill 0.3s}
+:where(.cmt) #logo:hover>span,:where(.cmt) #logo:focus>span{color:#0098f7}
+@keyframes loading{from{left:-25%}to{left:100%}}
+@-webkit-keyframes loading{from{left:-25%}to{left:100%}}
+@-moz-keyframes loading{from{left:-25%}to{left:100%}}
+@-o-keyframes loading{from{left:-25%}to{left:100%}}
+@keyframes loading{from{left:-25%}to{left:100%}}
+@-webkit-keyframes loading{from{left:-25%}to{left:100%}}
+@-moz-keyframes loading{from{left:-25%}to{left:100%}}
+@-o-keyframes loading{from{left:-25%}to{left:100%}}
+@keyframes loading{from{left:-25%}to{left:100%}}/*# sourceMappingURL=froala_editor.pkgd.min.css.map *//* css/header.css */
+:where(.cmt) .masonry{
+    column-count: 1;
+    column-gap: 10px;
+}
+:where(.cmt) .masonry .item{
+    break-inside: avoid;
+}
+@media (min-width: 576px){
+:where(.cmt) .masonry{
+        column-count: 1;
+        column-gap: 10px;
+    }
+
+    
+}
+@media (min-width: 768px){
+:where(.cmt) .masonry{
+        column-count: 2;
+        column-gap: 10px;
+    }
+    
+}
+@media (min-width: 992px){
+:where(.cmt) .masonry{
+        column-count: 2;
+        column-gap: 10px;
+    }
+:where(.cmt) .masonry .item{
+        break-inside: avoid;
+    }
+    
+}
+@media (min-width: 1200px){
+:where(.cmt) .masonry{
+        column-count: 3;
+        column-gap: 24px;
+    }
+    
+}/*translate*/
+.cmt{ top: 0 !important;}/* Nhan nha cung cap mo hinh AI (vd "Powered by ByteDance"): vien mong, trung tinh, canh nhan AI *//* Spinner chung cho cac cong cu: vong mong co duoi mo dan, theo mau va co chu cua cha */
+:where(.cmt) .cm-spin{
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    vertical-align: -0.15em;
+    border-radius: 50%;
+    background: conic-gradient(from 90deg, transparent 0 15%, currentColor);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+    animation: cm-spin .75s linear infinite;
+}
+@keyframes cm-spin{
+    to { transform: rotate(1turn); }
+}
+@media (prefers-reduced-motion: reduce){
+:where(.cmt) .cm-spin{ animation-duration: 2s; }
+}/* ===== Menu di dong: tam toan man hinh (#cm-msheet), chi duoi 992px ===== *//* css/toastr.min.css */
+:where(.cmt) .toast{background-color:#030303}/* css/toast.css *//* Fallbacks in var(): toast.css also loads on standalone pages without cm-tokens.css (creative-quiz). *//* Toast toan web: vien trang bo tron, toi gian, truot tu tren xuong, can giua man hinh *//* Icon trang thai: cham tron mau nho ben trai (mau trang thai dam giu nguyen o ca 2 theme: cham dac, chu trang) */
+
+/* Dark: the navy-tinted shadow disappears on a dark page, so use the theme shadow (black + hairline ring) *//* SweetAlert2 (public/js/sweet-alert.js, vendor: not edited) in dark mode. Scoped to dark only, so the light theme keeps
+   SweetAlert's own look (#fff popup, #545454 text) exactly as before. Button colours set per call (green confirm) stay. *//* The success tick draws white masks over its ring: repaint them with the popup colour *//* css/normalize.css *//*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */
+.cmt{
+    line-height: 1.15;
+    -webkit-text-size-adjust: 100%
+}
+.cmt{
+    margin: 0
+}
+:where(.cmt) a{
+    background-color: transparent
+}
+.cmt{
+    font-family: var(--font, "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif);
+    line-height: 1.5
+}
+:where(.cmt) *,:where(.cmt),:where(.cmt) :after,:where(.cmt):after,:where(.cmt) :before,:where(.cmt):before{
+    box-sizing: border-box;
+    border: 0 solid #e2e8f0
+}
+:where(.cmt) a{
+    color: inherit;
+    text-decoration: inherit
+}
+:where(.cmt) .bg-white{
+    --bg-opacity: 1;
+    background-color: #fff;
+    background-color: rgba(255, 255, 255, var(--bg-opacity))
+}
+:where(.cmt) .mx-auto{
+    margin-left: auto;
+    margin-right: auto
+}
+:where(.cmt) .mt-2{
+    margin-top: .5rem
+}
+:where(.cmt) .mt-4{
+    margin-top: 1rem
+}
+:where(.cmt) .mt-8{
+    margin-top: 2rem
+}
+:where(.cmt) .-mt-px{
+    margin-top: -1px
+}
+:where(.cmt) .p-6{
+    padding: 1.5rem
+}
+:where(.cmt) .py-4{
+    padding-top: 1rem;
+    padding-bottom: 1rem
+}
+:where(.cmt) .px-6{
+    padding-left: 1.5rem;
+    padding-right: 1.5rem
+}
+:where(.cmt) .pt-8{
+    padding-top: 2rem
+}
+:where(.cmt) .fixed{
+    position: fixed
+}
+:where(.cmt) .relative{
+    position: relative
+}
+:where(.cmt) .top-0{
+    top: 0
+}
+:where(.cmt) .right-0{
+    right: 0
+}
+:where(.cmt) .shadow{
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06)
+}
+:where(.cmt) .text-center{
+    text-align: center
+}
+:where(.cmt) .antialiased{
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale
+}
+:where(.cmt) .w-auto{
+    width: auto
+}/* css/lightbox.css *//* LIGHTBOX STYLES
+–––––––––––––––––––––––––––––––––––––––––––––––––– *//* FOOTER STYLES
+–––––––––––––––––––––––––––––––––––––––––––––––––– *//* css/job-suggestion.css */
+/* Dark theme (this file loads on every page, including forced-light landing pages: light values above stay literal). *//* /css/build/core-b.css *//* css/custom-hover.css */
+@charset "UTF-8";
+
+:where(.cmt) .custom-hover .hover-show{
+    opacity: 0;
+    -webkit-transition: all ease-in-out .2s;
+    -o-transition: all ease-in-out .2s;
+    transition: all ease-in-out .2s;
+}/* css/app.css */
+:where(.cmt) *,:where(.cmt){
+    scroll-behavior: smooth;
+}
+.cmt{
+    /* Chi dung font du dau tieng Viet; khong de "Helvetica Neue" (nhieu may Windows cai ban thieu dau) */
+    font-family: var(--font, "Geist", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif);
+    line-height: 1.6;
+    font-size: 1rem;
+}
+:where(.cmt) button:focus{
+    outline: none!important;
+    box-shadow: none!important;
+}
+:where(.cmt) ul li{
+    list-style: none;
+}
+:where(.cmt) a{
+    color: unset;
+}
+:where(.cmt) a img{
+    border: none
+}
+:where(.cmt) img{
+    object-fit: cover;
+}
+:where(.cmt) a:hover{
+    text-decoration: none
+}
+:where(.cmt) button:focus{
+    outline: none;
+}
+:where(.cmt) .logo{
+    width: 20px !important;
+    height: 20px !important;
+    object-fit: cover;
+}
+:where(.cmt) .text-lightgray{
+    color: #555555;
+}
+:where(.cmt) .text-lightgray:hover{
+    color: black !important;
+}
+:where(.cmt) .text-sm{
+    font-size: 14px;
+}
+:where(.cmt) .text-xl{
+    font-size: 25px !important;
+}
+:where(.cmt) .error{
+    color: red;
+    padding-top: 0.25rem;
+    display: block;
+}/*home page*/
+:where(.cmt) .cursor-pointer{
+    cursor: pointer;
+}
+:where(.cmt) a img{
+    border: none;
+}/* Dropdown trong navbar dung cung co chu voi muc cap 1 (.navbar-nav > .nav-link) *//* Icon trong dropdown-item lay dung co chu cua item (1em), anh theo 14px *//* Menu + item: padding gon lai cho can voi co chu 14px
+   (truoc day menu 10px + item 15px -> chu cach vien 25px) *//* Vuong mien day ra cuoi dong (item da la flex) */
+:where(.cmt) .zoom{
+    cursor: pointer;
+    box-shadow: 0px 0px 7px 0px rgba(0, 0, 0, 0.02);
+    transition: transform .2s !important;
+}
+:where(.cmt) .zoom:hover{
+    transform: scale(1.025);
+    transition: transform .2s !important;
+}
+:where(.cmt) .zoom.btn:active{
+    transform: scale(0.95);
+    transition: transform .2s !important;
+}
+:where(.cmt) .bg-black{
+    background: black !important;
+    color: white;
+}
+:where(.cmt) .progress{
+    height: 5px;
+    max-width: 200px
+}
+:where(.cmt) .flex-1{
+    flex: 1;
+}
+:where(.cmt) .border-dashed{
+    border: 1px dashed lightgray;
+    min-height: 200px;
+    border: 1px dashed #C7C7C7;
+    background: #F5F5F5;
+}
+:where(.cmt) .text-shadow{
+    text-shadow: 0 0 2px #000;
+}
+:where(.cmt) .outline-0,:where(.cmt) outline-0:focus{
+    outline: none !important;
+    box-shadow: none !important;
+}
+:where(.cmt) .pointer-events-none{
+    pointer-events: none;
+}
+:where(.cmt) .pointer-events-none *{
+    pointer-events: all;
+}
+
+
+/* switch */
+:where(.cmt) .fade:not(.show){
+    display: none;
+}
+:where(.cmt) .list-disc{
+    list-style-type: disc !important;
+    margin: 0;
+    padding-left: 20px;
+}
+:where(.cmt) .list-disc li{
+    margin: 0;
+    list-style: disc !important;
+}
+:where(.cmt) .star.active{
+    color: #FF8A00 !important;
+}/*===================================*/
+@-webkit-keyframes twinkly{
+    from {
+        opacity: 0.8;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+@-moz-keyframes twinkly{
+    from {
+        opacity: 0.8;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+@-ms-keyframes twinkly{
+    from {
+        opacity: 0.8;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+@keyframes twinkly{
+    from {
+        opacity: 0.8;
+    }
+    to {
+        opacity: 0.4;
+    }
+}
+:where(.cmt) .backdrop-filter{
+    backdrop-filter: blur(16px);
+}/*select2*/
+:where(.cmt) input::-webkit-outer-spin-button,:where(.cmt) input::-webkit-inner-spin-button{
+    /* display: none; <- Crashes Chrome on hover */
+    -webkit-appearance: none;
+    margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
+}
+:where(.cmt) input[type=number]{
+    -moz-appearance:textfield; /* Firefox */
+}
+:where(.cmt) textarea{
+    resize: none;
+}
+:where(.cmt) .popover{
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075)!important;
+    border: none;
+}
+:where(.cmt) .grain{
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    pointer-event: none;
+    z-index: 5;
+    transform: translateZ(0);
+}
+:where(.cmt) .grain:before{
+    content: "";
+    top: -10rem;
+    left: -10rem;
+    width: calc(100% + 20rem);
+    height: calc(100% + 20rem);
+    z-index: 9999;
+    position: fixed;
+    background-image: url(https://upload.wikimedia.org/wikipedia/commons/5/5c/Image_gaussian_noise_example.png);
+    opacity: 0.15;
+    pointer-events: none;
+    -webkit-animation: noise 1s steps(2) infinite;
+    animation: noise 1s steps(2) infinite;
+}
+@-webkit-keyframes noise{
+    to {
+        transform: translate3d(-7rem, 0, 0);
+    }
+}
+:where(.cmt) .bg-cover{
+    background-size: cover;
+    background-repeat: no-repeat;
+}/* Hide scrollbar for Chrome, Safari and Opera *//* Hide scrollbar for IE, Edge and Firefox *//* Mobile: o nhap >= 16px de iPhone (Safari) khong tu phong to trang khi bam vao */
+@media (max-width: 767.98px){
+:where(.cmt) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=button]):not([type=submit]),:where(.cmt) select,:where(.cmt) textarea{
+        font-size: 16px !important;
+    }
+}/* ---------- Dark theme overrides ----------
+   app.css loads on every page, including the forced-light landing pages and two standalone pages without cm-tokens
+   (creative-quiz, web-tv), so the light rules above keep their exact literal values. Dark values live here only.
+   :where() keeps each selector's specificity identical to the light rule it overrides (this block comes later, so it wins).
+   Dark mode is opt-in only (data-theme="dark" set by the layout head script); there is no prefers-color-scheme twin. */
+:where(.cmt) :where(:root[data-theme="dark"]) .text-black,:where(.cmt) :where(:root[data-theme="dark"]) .text-lightgray:hover{ color: var(--cm-text) !important; }
+:where(.cmt) :where(:root[data-theme="dark"]) .text-lightgray{ color: var(--cm-text-2); }/* keeps the blue link hue, AA on dark */
+:where(.cmt) :where(:root[data-theme="dark"]) .border-dashed{ border-color: var(--cm-line-2); background: var(--cm-surface-2); }/* The select2 rules above and .btn-light below override vendor CSS with higher specificity, so they use the plain :root[data-theme] prefix. */
+:root[data-theme="dark"] :where(.cmt) .btn:is(.bg-transparent, .bg-white, .bg-light),:root[data-theme="dark"] :where(.cmt) .btn:is(.bg-transparent, .bg-white, .bg-light):hover{ color: var(--cm-text); }/* The (hashtag) dang vien: popup du an, trang du an, blog, o nhap the. Tao boi generateTag() (app.js). *//* Ngat dong dep (toan site, ca landing): tieu de + doan ngan can deu cac dong, khong de dong cuoi qua ngan.
+   Bai viet dai (noi dung blog) dung "pretty" de tranh chu mo coi ma khong can deu. */
+:where(.cmt) h1,:where(.cmt) h2,:where(.cmt) h3,:where(.cmt) h4,:where(.cmt) h5,:where(.cmt) h6,:where(.cmt) .h1,:where(.cmt) .h2,:where(.cmt) .h3,:where(.cmt) .h4,:where(.cmt) .lead,:where(.cmt) .cm-head__sub,:where(.cmt) figcaption,:where(.cmt) p,:where(.cmt) li{ text-wrap: balance; }
+:where(.cmt) article p,:where(.cmt) article li,:where(.cmt) .cm-prose-body p,:where(.cmt) .cm-prose-body li,:where(.cmt) .blog-content p,:where(.cmt) .post-content p{ text-wrap: pretty; }/* css/colors.css *//* Dark theme: light values above stay literal (also used on forced-light landing pages); same specificity via :where(). *//* css/cm-tokens.css *//* cm-tokens: the ONE design-token foundation of colorme.vn (colour, type, radius, spacing, shadow).
+   Docs: docs/redesign/TOKENS.md (all values, light + dark) and docs/redesign/TYPOGRAPHY.md (the type scale).
+   Loaded on every page by components/colorme/layout. Tokens live on :root, so they never change a page by themselves.
+   Rule: new CSS never hard-codes a colour, a font size or a font family; it uses these variables.
+
+   Theme: light by default. Dark is opt-in only (owner rule: no OS-following). A visitor's pick:
+   (localStorage 'cm-theme' -> <html data-theme="light|dark">, set before paint by the layout; window.cmTheme.set()).
+   Landing pages render <html data-theme="light" data-theme-lock>, so they always stay light.
+   .cm-theme-light forces the light values on a subtree (document previews, exported "paper"). */
+.cmt,:where(.cmt) .cm-theme-light{
+    color-scheme: light;
+
+    /* Surfaces */
+    --cm-bg: #FFFFFF;            /* page */
+    --cm-bg-subtle: #F9FAFB;     /* tinted page areas (tool pages, table stripes) */
+    --cm-surface: #FFFFFF;       /* cards, panels, inputs */
+    --cm-surface-2: #F2F4F7;     /* fills: pills, hovers, segmented controls, image placeholders */
+    --cm-surface-3: #E4E7EC;     /* stronger fill: pressed, tracks */
+    --cm-elevated: #FFFFFF;      /* menus, popovers, modals, toasts */
+    --cm-inverse: #101828;       /* solid dark button / tooltip background */
+    --cm-inverse-hover: #1D2939;
+    --cm-on-inverse: #FFFFFF;    /* text on --cm-inverse */
+
+    /* Text */
+    --cm-text: #101828;          /* primary: headings, body */
+    --cm-text-2: #475467;        /* secondary: lead paragraphs, labels */
+    --cm-muted: #667085;         /* meta, captions, help text (AA on white and --cm-surface-2) */
+    --cm-faint: #98A2B3;         /* placeholders, disabled, decorative only (not AA: never for real text) */
+
+    /* Lines */
+    --cm-line: #EAECF0;          /* hairlines, card borders, dividers */
+    --cm-line-2: #D0D5DD;        /* input borders, stronger dividers */
+
+    /* Brand + links */
+    --cm-accent: #F15A24;        /* brand orange: icons, focus accents, fills; NOT for text (3.4:1 on white) -> --cm-accent-text */
+    --cm-accent-text: #C2410C;   /* brand orange as TEXT on light surfaces (5.2:1 on white) */
+    --cm-on-accent: #FFFFFF;
+    --cm-link: #C4320A;          /* text links inside prose (5.5:1) */
+    --cm-grad: linear-gradient(to right, #F5AF19, #F15A24); /* the single primary CTA background only, never text */
+    --cm-on-grad: #fff;          /* text on --cm-grad: owner decision 2026-10-02 = white text + icons on every gradient button */
+
+    /* Status (text colour + soft background) */
+    --cm-success: #067647;  --cm-success-bg: #ECFDF3;
+    --cm-warning: #B54708;  --cm-warning-bg: #FFFAEB;
+    --cm-danger: #B42318;   --cm-danger-bg: #FEF3F2;
+    --cm-info: #175CD3;     --cm-info-bg: #EFF8FF;
+
+    /* Focus, overlay, shadow, skeleton */
+    --cm-focus-color: #101828;
+    --cm-focus: 0 0 0 3px rgba(16, 24, 40, .12);   /* box-shadow ring (same shape as cm-ui) */
+    --cm-overlay: rgba(16, 24, 40, .6);
+    --cm-shadow-1: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+    --cm-shadow-2: 0 16px 40px -12px rgba(16, 24, 40, .22), 0 0 0 1px rgba(16, 24, 40, .04);
+    --cm-shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 14px -4px rgba(16, 24, 40, .08);         /* cards at rest: soft elevation */
+    --cm-shadow-card-hover: 0 2px 4px rgba(16, 24, 40, .05), 0 14px 32px -10px rgba(16, 24, 40, .18); /* card / image hover lift */
+    --cm-skeleton: #F2F4F7;
+
+    /* Footer: a dark band in BOTH themes (light text on it never changes). In dark mode it lifts to a surface
+       with a hairline on top, so it still separates from the page background. */
+    --cm-footer-bg: #101828;
+    --cm-footer-edge: transparent;          /* top hairline (inset shadow, no layout shift) */
+    --cm-footer-text: #F2F4F7;              /* headings, hotlines */
+    --cm-footer-muted: #98A2B3;             /* links (7.0:1 on #101828) */
+    --cm-footer-dim: #8B95A7;               /* legal text, small labels (5.9:1 on the footer bg; was #667085 = 3.6:1) */
+    --cm-footer-strong: #FFFFFF;            /* link hover, wordmark */
+    --cm-footer-legal: #D0D5DD;             /* company name */
+    --cm-footer-sep: #475467;               /* dot separators */
+    --cm-footer-line: rgba(255, 255, 255, .08);
+    --cm-footer-line-2: rgba(255, 255, 255, .14);
+    --cm-footer-hover: rgba(255, 255, 255, .06);
+    --cm-footer-accent: #FDB022;            /* focus ring + AI badge on the dark band */
+}
+:where(.cmt) .cm-theme-light{ color: var(--cm-text); background-color: var(--cm-bg); }
+.cmt{
+    /* Type (see TYPOGRAPHY.md). Mobile values first, desktop from 768px. */
+    --cm-font: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    --cm-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --cm-fs-display: 26px;       /* 32 desktop: one hero/page title per page */
+    --cm-fs-h1: 22px;            /* 26 desktop */
+    --cm-fs-h2: 18px;            /* 20 desktop */
+    --cm-fs-h3: 16px;            /* 17 desktop */
+    --cm-fs-h4: 15px;
+    --cm-fs-body: 15px;
+    --cm-fs-body-sm: 13px;
+    --cm-fs-caption: 12px;       /* the smallest size on the site */
+    --cm-fw-regular: 400;        /* body */
+    --cm-fw-medium: 500;         /* UI: buttons, labels, tabs */
+    --cm-fw-semibold: 600;       /* emphasis, buttons */
+    --cm-fw-heading: 700;        /* headings: hierarchy from weight + contrast, not size */
+    --cm-lh-heading: 1.2;
+    --cm-lh-body: 1.55;
+    --cm-lh-ui: 1.4;
+    --cm-ls-tight: -0.02em;      /* sizes >= 24px only */
+    /* Aliases kept identical to cm-ui's names, so both systems resolve to one scale */
+    --cm-fs-title: var(--cm-fs-display);
+    --cm-fs-small: var(--cm-fs-body-sm);
+
+    /* Radius */
+    --cm-radius-sm: 8px;
+    --cm-radius: 10px;           /* = cm-ui --cm-r: inputs, buttons */
+    --cm-radius-lg: 16px;        /* = cm-ui --cm-r-img: cards, images, panels */
+    --cm-radius-xl: 24px;
+    --cm-radius-pill: 999px;
+
+    /* Spacing: 8px grid */
+    --cm-space-1: 4px;
+    --cm-space-2: 8px;
+    --cm-space-3: 12px;
+    --cm-space-4: 16px;
+    --cm-space-5: 24px;
+    --cm-space-6: 32px;
+    --cm-space-7: 48px;
+    --cm-space-8: 64px;
+}
+@media (min-width: 768px){
+.cmt{
+        --cm-fs-display: 32px;
+        --cm-fs-h1: 26px;
+        --cm-fs-h2: 20px;
+        --cm-fs-h3: 17px;
+    }
+}/* ---------- Dark theme: neutral greys, not blue-black ---------- */
+:root[data-theme="dark"] .cmt{
+    color-scheme: dark;
+    --cm-bg: #0B0D12;
+    --cm-bg-subtle: #0E1117;
+    --cm-surface: #12151C;
+    --cm-surface-2: #181C25;
+    --cm-surface-3: #212633;
+    --cm-elevated: #1A1E28;
+    --cm-inverse: #F2F4F7;
+    --cm-inverse-hover: #FFFFFF;
+    --cm-on-inverse: #0B0D12;
+    --cm-text: #F2F4F7;          /* 17.6:1 on bg */
+    --cm-text-2: #C3C9D4;        /* 11:1 on surface */
+    --cm-muted: #98A2B3;         /* 7.1:1 on surface, 6.6:1 on surface-2 */
+    --cm-faint: #6B7385;
+    --cm-line: #232836;
+    --cm-line-2: #303747;
+    --cm-accent: #F15A24;        /* 5.4:1 on surface */
+    --cm-accent-text: #FF8A5C;
+    --cm-on-accent: #FFFFFF;
+    --cm-link: #FF8A5C;          /* 7.9:1 on surface */
+    --cm-success: #47CD89;  --cm-success-bg: #0C2A1C;
+    --cm-warning: #FDB022;  --cm-warning-bg: #2B2109;
+    --cm-danger: #F97066;   --cm-danger-bg: #2A1515;
+    --cm-info: #84CAFF;     --cm-info-bg: #0B2140;
+    --cm-focus-color: #F2F4F7;
+    --cm-focus: 0 0 0 3px rgba(242, 244, 247, .22);
+    --cm-overlay: rgba(0, 0, 0, .7);
+    --cm-shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+    --cm-shadow-2: 0 16px 40px -12px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06);
+    --cm-shadow-card: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px -4px rgba(0, 0, 0, .35);
+    --cm-shadow-card-hover: 0 2px 4px rgba(0, 0, 0, .35), 0 14px 32px -10px rgba(0, 0, 0, .6);
+    --cm-skeleton: #1F2430;
+    --cm-footer-bg: #12151C;
+    --cm-footer-edge: #232836;
+}/* No OS-following (owner rule: light by default, dark only when the user picks it): the head script in
+   components/colorme/layout sets data-theme="dark" only for a stored 'dark' choice. Every dark rule is written once,
+   under :root[data-theme="dark"] (docs/redesign/TOKENS.md). *//* css/cm-motion.css */
+.cmt{
+    --cm-ease: cubic-bezier(.2, .8, .2, 1);
+    --cm-ease-io: cubic-bezier(.65, 0, .35, 1);
+    --cm-dur-1: 120ms;
+    --cm-dur-2: 200ms;
+    --cm-dur-3: 320ms;
+}
+@media (prefers-reduced-motion: no-preference){/* Doi mau / nen / vien / bong mem cho moi thu bam duoc (khong dong vao transform: JS keo tha, slider tu dat) */
+:where(.cmt) :where(a, button, summary, label, [role="button"], [role="tab"], [role="menuitem"], [role="option"], .btn, .dropdown-item, .nav-link, .page-link,
+        input, textarea, select, .form-control, .form-select, .form-check-input, .badge, .cm-chip, .cm-tag){
+        transition-property: color, background-color, border-color, outline-color, box-shadow, opacity, text-decoration-color, fill, stroke;
+        transition-duration: var(--cm-dur-2);
+        transition-timing-function: var(--cm-ease);
+    }
+/* Modal: noi len nhe thay vi truot 50px *//* Tooltip / popover / collapse */
+:where(.cmt) .tooltip.fade,:where(.cmt) .popover.fade{ transition: opacity var(--cm-dur-1) var(--cm-ease); }/* Chuyen trang: cross-fade nhanh, thanh dieu huong dung yen */
+@view-transition{ navigation: auto; }
+:where(.cmt) ::view-transition-old(root){ animation: cmVtOut 160ms var(--cm-ease) both; }
+:where(.cmt) ::view-transition-new(root){ animation: cmVtIn 240ms var(--cm-ease) both; }
+@keyframes cmVtOut{ to { opacity: 0; } }
+@keyframes cmVtIn{ from { opacity: 0; translate: 0 6px; } }
+:where(.cmt) ::view-transition-group(cmh){ animation-duration: 0s; }/* Glide: o nen dung chung cho menu (JS dat vi tri). Nam duoi chu (z-index -1 trong khung isolate) *//* Muc trong khung co glide: nen hover do glide ve (giu doi mau chu) */
+}/* Doi sang/toi (cm-motion.js): chi cross-fade, khong truot */
+/* css/cm-modal.css *//* Dau *//* Than *//* Chan: luon thay nut hanh dong *//* Truong nhap *//* Lua chon dang chip (giu .btn-group.form-gradient .btn + .active cua app.js) *//* Vung tai anh / video *//* The tom tat (vd "Nop bai cho chu de ...") *//* Tab nho trong modal (Anh / Video) *//* Khoi anh + form trong modal: xep mot cot *//* ===== Hop thoai nho (xac nhan / thong bao / nhap 1 truong) + toast: public/js/cm-dialog.js (thay SweetAlert2) ===== */
+
+
+/* /css/cm-type.css *//* ---------- 1. Page defaults (inherited) ---------- *//* Form controls do not inherit the font by default */
+:where(.cmt) :where(.cm-type) :where(button, input, select, textarea, optgroup){ font-family: inherit; }/* ---------- 2. Headings ---------- */
+:where(.cmt) :where(.cm-type main) :is(h1, h2, h3, h4, h5, h6):not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *){
+    font-family: var(--cm-font);
+    font-weight: var(--cm-fw-heading);
+    line-height: var(--cm-lh-heading);
+    color: inherit;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-bottom: .5em;
+}
+:where(.cmt) :where(.cm-type main) h1:not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *),:where(.cmt) :where(.cm-type main) .h1:not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-h1); letter-spacing: var(--cm-ls-tight); }
+:where(.cmt) :where(.cm-type main) h2:not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *),:where(.cmt) :where(.cm-type main) .h2:not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-h2); letter-spacing: var(--cm-ls-tight); }
+:where(.cmt) :where(.cm-type main) h3:not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *),:where(.cmt) :where(.cm-type main) .h3:not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-h3); }
+:where(.cmt) :where(.cm-type main) :is(h4, h5, h6):not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *),:where(.cmt) :where(.cm-type main) :is(.h4, .h5, .h6):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-h4); }
+:where(.cmt) :where(.cm-type main) :is(.display-1, .display-2, .display-3, .display-4, .display-5, .display-6):not(:where(.cm-ui, .cm-type-skip) *){
+    font-size: var(--cm-fs-display); font-weight: var(--cm-fw-heading); line-height: var(--cm-lh-heading); letter-spacing: var(--cm-ls-tight);
+}
+:where(.cmt) :where(.cm-type main) .lead:not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body); font-weight: var(--cm-fw-regular); color: var(--cm-text-2); }/* ---------- 3. Text ---------- *//* p inherits size/colour from its container (no size here, so .small / card text keep working) */
+:where(.cmt) :where(.cm-type main) p{ margin-bottom: 1em; }
+:where(.cmt) :where(.cm-type main) :is(small, .small):not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *){
+    font-size: var(--cm-fs-body-sm); line-height: var(--cm-lh-ui);
+}
+:where(.cmt) :where(.cm-type main) :is(b, strong){ font-weight: var(--cm-fw-semibold); }
+:where(.cmt) :where(.cm-type main) :is(code, kbd, pre, samp){ font-family: var(--cm-font-mono); font-size: .9em; }/* Links inherit their colour (app.css); links inside running text are underlined, never coloured by default */
+:where(.cmt) :where(.cm-type main) a{ color: inherit; }/* Weight utilities: the system has 400 / 500 / 600 only */
+:where(.cmt) :where(.cm-type main) :is(.fw-bold, .fw-bolder):not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *){ font-weight: var(--cm-fw-semibold) !important; }/* No uppercase micro-labels on non-landing pages */
+:where(.cmt) :where(.cm-type main) .text-uppercase:not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *){ text-transform: none !important; letter-spacing: 0 !important; }/* Text colour utilities -> tokens (also what makes them work in dark mode) */
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.text-dark, .text-body, .text-black){ color: var(--cm-text) !important; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.text-muted, .text-secondary){ color: var(--cm-muted) !important; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) .text-danger{ color: var(--cm-danger) !important; }/* ---------- 4. UI text: buttons, forms, labels ---------- */
+:where(.cmt) :where(.cm-type main) .btn:not(:where(.cm-ui, .cm-type-skip) *){
+    font-family: var(--cm-font);
+    font-size: var(--cm-fs-body-sm);
+    font-weight: var(--cm-fw-medium);
+    line-height: var(--cm-lh-ui);
+    letter-spacing: 0;
+    text-transform: none;
+}
+:where(.cmt) :where(.cm-type main) :is(.btn-lg):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body); }
+:where(.cmt) :where(.cm-type main) :is(.btn-sm):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-caption); }
+:where(.cmt) :where(.cm-type main) button:not(:where(.cm-ui, .cm-type-skip) *){ font-weight: var(--cm-fw-medium); }
+:where(.cmt) :where(.cm-type main) :is(input, select, textarea, .form-control, .form-select):not(:where(.cm-ui, .cm-type-skip) *){
+    font-family: var(--cm-font);
+    font-weight: var(--cm-fw-regular);
+}/* 16px in fields on phones: iOS zooms into anything smaller */
+:where(.cmt) :where(.cm-type main) :is(.form-control, .form-select):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body); line-height: var(--cm-lh-ui); }
+@media (min-width: 768px){
+:where(.cmt) :where(.cm-type main) :is(.form-control, .form-select):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body-sm); }
+}
+:where(.cmt) :where(.cm-type main) :is(.form-control-lg):not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body); }
+:where(.cmt) :where(.cm-type main) :is(label, .form-label, legend):not(:where(.cm-ui, .cm-type-skip, .tl-landing, .rb-landing, .pc-landing, .pb-landing, .ly-landing, .afl-hero, .lp-hero, .pc-hero, .pb-hero, .sr-hero, .dgl, .sl) *){
+    font-weight: var(--cm-fw-medium);
+    line-height: var(--cm-lh-ui);
+}
+:where(.cmt) :where(.cm-type main) ::placeholder{ color: var(--cm-faint); opacity: 1; }/* ---------- 5. Tables, badges ---------- */
+:where(.cmt) :where(.cm-type main) table:not(:where(.cm-ui, .cm-type-skip) *){ font-size: var(--cm-fs-body-sm); line-height: var(--cm-lh-ui); }
+:where(.cmt) :where(.cm-type main) th:not(:where(.cm-ui, .cm-type-skip) *){ font-weight: var(--cm-fw-semibold); color: var(--cm-text-2); text-transform: none; letter-spacing: 0; }
+:where(.cmt) :where(.cm-type main) .badge:not(:where(.cm-ui, .cm-type-skip) *){
+    font-size: var(--cm-fs-caption);
+    font-weight: var(--cm-fw-medium);
+    line-height: var(--cm-lh-ui);
+    letter-spacing: 0;
+    text-transform: none;
+}
+:where(.cmt) :where(.cm-type main, .cm-type .modal) .bg-white{ background-color: var(--cm-surface) !important; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) .bg-light{ background-color: var(--cm-surface-2) !important; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.border, .border-top, .border-bottom, .border-start, .border-end){ border-color: var(--cm-line) !important; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.card, .list-group-item, .accordion-item, .toast){ background-color: var(--cm-surface); border-color: var(--cm-line); color: inherit; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.modal-content, .dropdown-menu, .popover, .offcanvas){ background-color: var(--cm-elevated); color: var(--cm-text); border-color: var(--cm-line); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.dropdown-item:hover, .dropdown-item:focus){ background-color: var(--cm-surface-2); color: var(--cm-text); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.modal-header, .modal-footer){ border-color: var(--cm-line); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.form-control, .form-select){ background-color: var(--cm-surface); color: var(--cm-text); border-color: var(--cm-line-2); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.form-control, .form-select):focus{ border-color: var(--cm-focus-color); box-shadow: var(--cm-focus); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.form-control:disabled, .form-control[readonly]){ background-color: var(--cm-surface-2); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) .table{ --bs-table-bg: transparent; --bs-table-striped-bg: var(--cm-bg-subtle); --bs-table-hover-bg: var(--cm-surface-2); color: var(--cm-text); border-color: var(--cm-line); }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) hr{ border-color: var(--cm-line); opacity: 1; }
+:where(.cmt) :where(.cm-type main, .cm-type .modal) :is(.placeholder, .skeleton){ background-color: var(--cm-skeleton); }/* Images and video are never inverted or dimmed in dark mode; the logo stays the original red square *//* Dark mode is opt-in only (data-theme="dark"); no OS-following twin *//* ---------- 7. Helpers ---------- *//* One display title per page (hero of a non-landing page) *//* Legacy font override classes: the site has one font */
+:where(.cmt) :where(.cm-type main) :is(.f-roboto, .font-roboto, .f-arial){ font-family: var(--cm-font); }/* ---------- 8. Page height ---------- *//* Owner rule: the first screen of a non-landing page is all page, never the footer.
+   main fills at least the viewport under the sticky header (64px desktop, 56px mobile). *//* /css/cm-shell.css *//* cm-shell.css: style cua cac thanh phan chung moi trang (hop dang nhap, qua tang / Premium, onboarding, "Dang dien ra", cua chan cong cu,
+   footer, xac minh nguoi that). Truoc dot don dep loi (06/10/2026) cac khoi nay nam trong <style> cua tung view va
+   duoc gui lai trong HTML cua MOI trang (~41 KB voi khach, ~70 KB voi nguoi da dang nhap). Thu tu giu dung thu tu xuat hien trong trang. *//* ===== modal-login (resources/views/components/colorme/modal-login.blade.php) ===== *//* Popup dang nhap: 1 co chieu cao (48px) va 1 bo goc (12px) cho moi o nhap va nut *//* chu 12/10/2026: hop cao hon cho can doi (400 x ~490 thay vi gan vuong) */
+:where(.cmt) #modalLogin .btn{ height: 48px; padding: 0 16px !important; border-radius: 12px; font-size: var(--cm-fs-body); font-weight: var(--cm-fw-semibold); display: inline-flex; align-items: center; justify-content: center; margin-left: 0 !important; margin-right: 0 !important; }/* Nut chinh: gradient cam - do giong nut Dang nhap tren thanh menu *//* brand gradient CTA *//* chua nhap du: nut xam ro rang thay vi gradient mo *//* cm-si: than dang nhap chi con Google (resources/views/auth/_signin.blade.php): popup, /login, /password/reset *//* ===== gifts (resources/views/components/colorme/gifts.blade.php) ===== *//* red notification dot: vivid in both themes; ring = header bg *//* Bang qua tang (dropdown) */
+:where(.cmt) .cmg-panel{ position: fixed; z-index: 1060; width: 400px; max-width: calc(100vw - 24px); max-height: min(640px, calc(100vh - 90px)); display: flex; flex-direction: column;
+    --cmg-bg: var(--cm-elevated); background: var(--cm-elevated); border: 1px solid var(--cm-line); border-radius: 20px; box-shadow: 0 24px 60px -20px rgba(16, 24, 40, .35); overflow: hidden; animation: cmgIn .22s ease both; font-size: 14px; color: var(--cm-text); }
+:where(.cmt) .cmg-panel[hidden]{ display: none; }
+@keyframes cmgSheet{ from { transform: translateY(100%); } to { transform: none; } }
+@keyframes cmgIn{ from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }/* So voucher / loi moi con dung duoc tren tab */
+:where(.cmt) .cmg-empty :is(i, .icon){ font-size: 26px; color: var(--cm-line-2); display: block; margin-bottom: 8px; }/* Ve voucher *//* Nut chinh tang ban be: gradient cam - do cua thuong hieu *//* soft orange tint (dark: see overrides below) *//* Form gui *//* Loi moi Premium */
+:where(.cmt) .cmg-invite-top :is(i, .icon){ color: #F5B301; font-size: 22px; }/* Hop voucher hang ngay + hop nang cap */
+:where(.cmt) .cmg-modal{ position: fixed; inset: 0; z-index: 1070; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(16, 24, 40, .45); animation: cmgFade .2s ease both; }
+:where(.cmt) .cmg-modal[hidden]{ display: none; }
+@keyframes cmgFade{ from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 575.98px){/* Mobile: bang qua la bottom sheet co nen mo, tay nam keo, chieu cao co dinh, cuon ben trong */
+:where(.cmt) .cmg-panel{ left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important; width: 100%; max-width: none; height: min(86vh, 720px); max-height: none; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); animation: cmgSheet .28s cubic-bezier(.2, .8, .2, 1); }
+:where(.cmt) .cmg-panel::before{ content: ''; display: block; flex: 0 0 auto; width: 40px; height: 4px; border-radius: 4px; background: var(--cm-line-2); margin: 10px auto 0; }/* Hop tang voucher: bam theo vung nhin thay phia tren ban phim (iOS) */
+:where(.cmt) .cmg-actions .cmg-btn :is(i, .icon){ margin-right: 4px !important; }
+:where(.cmt) .cmg-modal{ align-items: flex-end; padding: 0; }
+}/* Dark: navy shadows/backdrops vanish on a dark page; tints need dark equivalents. Light keeps the values above. */
+:root[data-theme="dark"] :where(.cmt) .cmg-panel,:root[data-theme="dark"] :where(.cmt) .cmg-dialog{ box-shadow: var(--cm-shadow-2); }
+:root[data-theme="dark"] :where(.cmt) .cmg-sheet-bg,:root[data-theme="dark"] :where(.cmt) .cmg-modal{ background: var(--cm-overlay); }/* Vuong mien Premium (gold crown: brand accent, same in both themes) *//* ===== Ban moi (2026-10): dropdown cua thanh dieu huong + the voucher gon + toast nhac nhe ===== */
+:where(.cmt) .cmg-panel{ width: 380px; max-height: min(620px, calc(100vh - 84px)); border-radius: 16px; box-shadow: var(--cm-shadow-2); animation: cmgDrop .18s cubic-bezier(.2, .8, .2, 1) both; font-size: 14px; }
+@keyframes cmgDrop{ from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+:where(.cmt) .cmg-panel:focus{ outline: none; }/* The voucher gon: % lon ben trai, pham vi + han + hanh dong ben phai *//* Voucher tang rieng (300.000d, 20%...): cuong mau dam + nhan de phan biet voi voucher 15% thuong *//* Moi ban be *//* Toast nhac voucher: goc duoi trai, khong chan thao tac, tu an sau 6 giay */
+:where(.cmt) .cmg-toast{ position: fixed; z-index: 1065; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 12px; max-width: min(400px, calc(100vw - 32px)); padding: 10px 8px 10px 12px; border-radius: 14px; background: var(--cm-elevated); border: 1px solid var(--cm-line); box-shadow: var(--cm-shadow-2); color: var(--cm-text); font-size: 13.5px; animation: cmgToastIn .3s cubic-bezier(.2, .8, .2, 1) both; }
+:where(.cmt) .cmg-toast.is-out{ animation: cmgToastOut .2s ease both; }
+@keyframes cmgToastIn{ from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes cmgToastOut{ to { opacity: 0; transform: translateY(8px); } }/* Hai tab: Voucher | Premium Account (segmented control duoi tieu de) *//* count badge: vivid red in both themes *//* Tab Premium Account *//* gold crown: brand accent, same in both themes */
+@media (prefers-reduced-motion: reduce){
+:where(.cmt) .cmg-panel,:where(.cmt) .cmg-toast,:where(.cmt) .cmg-toast.is-out{ animation: none; } }
+@media (max-width: 575.98px){
+:where(.cmt) .cmg-panel{ width: 100%; max-height: none; border-radius: 20px 20px 0 0; }
+:where(.cmt) .cmg-toast{ left: 12px; right: 12px; max-width: none; }
+}/* ===== onboarding (resources/views/components/colorme/onboarding.blade.php) ===== */
+:where(.cmt) .cmo{ position: fixed; inset: 0; z-index: 1070; display: grid; place-items: center; padding: 16px; background: rgba(12, 14, 20, .55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: cmoFade .3s ease both; }
+:where(.cmt) .cmo[hidden]{ display: none; }/* Onboarding: the CO DINH chieu cao cho ca 5 buoc (khong nhay khi chuyen buoc). Moi buoc = cot: hinh (co gian) + noi dung + hang nut o day.
+   Man hinh thap: buoc tu cuon ben trong, hang nut van dinh o day. *//* Buoc app: vung hinh la container -> cum dien thoai va ma QR tu thu nho theo chieu cao con lai (man hinh thap van thay tron ven) *//* Heo va the Premium cung co gian theo vung hinh: khong bao gio bi cat */
+@keyframes cmoFade{ from { opacity: 0; } }
+/* Onboarding hoc vien: khong dong giua chung (chu so huu 04/10): an nut X va nut "Mo qua", phai di het 5 buoc */
+:where(.cmt) .cmo[data-mode="onboard"] .cmo-x,:where(.cmt) .cmo[data-mode="onboard"] [data-cmo-gifts]{ display: none; }
+
+:where(.cmt) .cmo h2{ margin: 0 0 10px; font-size: 24px; line-height: 1.25; font-weight: 800; letter-spacing: -.02em; color: inherit; }
+:where(.cmt) .cmo p{ margin: 0; font-size: 15px; line-height: 1.6; color: var(--cm-text-2, #475467); }/* Hang nut dinh o day the: man hinh thap van luon thay nut (noi dung cuon phia tren) *//* 1. Chao mung */
+
+
+
+/* 2. App: 2 ma QR *//* 3 man hinh app (anh tinh cua trang /app-hoc-vien): giua to, hai ben nghieng ra sau. Vien dien thoai nam ngoai man hinh, bo goc 15.4% nhu iPhone *//* Moi kich thuoc tinh theo --h (chieu cao cum dien thoai): doi --h la ca cum co gian deu, khong bao gio bi cat.
+   Onboarding: --h bam theo chieu cao vung hinh (container query), xem ben duoi. */
+
+
+/* hop QR sau dang nhap (the hep hon): thu nho cum dien thoai *//* 3. Tai khoan Premium (he Labs: den + lime) */
+
+/* 4. Qua tang: ve voucher *//* 5. Cam on */
+
+
+@media (max-width: 520px){
+:where(.cmt) .cmo{ padding: 0; align-items: end; }
+
+:where(.cmt) .cmo h2{ font-size: 21px; }
+}
+@media (prefers-reduced-motion: reduce){
+:where(.cmt) .cmo *,:where(.cmt) .cmo{ animation: none !important; transition: none !important; }
+}/* ===== happening-now (resources/views/components/colorme/happening-now.blade.php) ===== */
+/* ===== tool-gate (resources/views/components/colorme/tool-gate.blade.php) ===== */
+:where(.cmt) .cm-gate-note :is(i, .icon){ color: #F5B301; margin-right: 6px; }
+:where(.cmt) .cm-gate-perks :is(i, .icon){ color: var(--cm-text); margin-top: 3px; font-size: 13px; }/* ===== footer (resources/views/components/colorme/footer.blade.php) ===== *//* Luoi cot: MOT luoi 5 cot bang nhau cho ca footer; moi dai (thuong hieu/khoa hoc/..., cong cu) dung dung 5 cot nay
+   -> mep cot thang hang. Khoa hoc chiem 2 cot (danh sach chia doi theo cot, cung khoang cach cot). *//* Danh sach khoa hoc chiem cac cot con lai; cot con = cot luoi ngoai (cung gap) -> thang mep voi dai Cong cu *//* Nhom link *//* Tieu de cot: cung kieu, cung khoang cach o moi dai *//* 2 cot CSS cung khoang cach voi luoi -> nua sau thang mep cot thu 3; moi nua chay doc doc lap *//* Phap ly *//* Chu ColorME khong lo: SVG text, ngang dung be rong container, cat o mep duoi *//* ===== human (resources/views/components/colorme/human.blade.php) ===== */
+:where(.cmt) .cm-human-wrap{ position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 16px; background: rgba(16, 24, 40, .45); }
+:where(.cmt) .cm-human-wrap[hidden]{ display: none; }
+:where(.cmt) .cm-human-card{ display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 20px 16px; border-radius: 18px; background: var(--cm-elevated, #fff); color: var(--cm-text, #101828); box-shadow: 0 24px 60px -20px rgba(16, 24, 40, .45); max-width: 100%; }
+:where(.cmt) .cm-human-card p{ margin: 0; font-size: 14.5px; font-weight: 600; text-align: center; }/* base-reset.css *//* ColorME tools: element defaults the tool bodies rely on (replaces the old framework reset; owner 16/10: Tailwind only).
+   Scoped under .cmt by the exporter; layout and spacing come from Tailwind classes in tools-tw.css. */
+:where(.cmt) *,:where(.cmt),:where(.cmt) *::before,:where(.cmt)::before,:where(.cmt) *::after,:where(.cmt)::after{ box-sizing: border-box; }
+:where(.cmt) h1,:where(.cmt) h2,:where(.cmt) h3,:where(.cmt) h4,:where(.cmt) h5,:where(.cmt) h6{ margin-top: 0; margin-bottom: .5rem; font-weight: 500; line-height: 1.2; }
+:where(.cmt) h1{ font-size: calc(1.375rem + 1.5vw); }
+:where(.cmt) h2{ font-size: calc(1.325rem + .9vw); }
+:where(.cmt) h3{ font-size: calc(1.3rem + .6vw); }
+:where(.cmt) h4{ font-size: calc(1.275rem + .3vw); }
+:where(.cmt) h5{ font-size: 1.25rem; }
+:where(.cmt) h6{ font-size: 1rem; }
+@media (min-width: 1200px){
+:where(.cmt) h1{ font-size: 2.5rem; }
+:where(.cmt) h2{ font-size: 2rem; }
+:where(.cmt) h3{ font-size: 1.75rem; }
+:where(.cmt) h4{ font-size: 1.5rem; } }
+:where(.cmt) p{ margin-top: 0; margin-bottom: 1rem; }
+:where(.cmt) ol,:where(.cmt) ul{ padding-left: 2rem; margin-top: 0; margin-bottom: 1rem; }
+:where(.cmt) ol ol,:where(.cmt) ol ul,:where(.cmt) ul ol,:where(.cmt) ul ul{ margin-bottom: 0; }
+:where(.cmt) dd{ margin-bottom: .5rem; margin-left: 0; }
+:where(.cmt) blockquote,:where(.cmt) figure{ margin: 0 0 1rem; }
+:where(.cmt) b,:where(.cmt) strong{ font-weight: bolder; }
+:where(.cmt) hr{ margin: 1rem 0; color: inherit; background-color: currentColor; border: 0; opacity: .25; height: 1px; }
+:where(.cmt) img,:where(.cmt) svg{ vertical-align: middle; }
+:where(.cmt) table{ caption-side: bottom; border-collapse: collapse; }
+:where(.cmt) th{ text-align: inherit; }
+:where(.cmt) label{ display: inline-block; }
+:where(.cmt) button{ border-radius: 0; }
+:where(.cmt) input,:where(.cmt) button,:where(.cmt) select,:where(.cmt) optgroup,:where(.cmt) textarea{ margin: 0; font-family: inherit; font-size: inherit; line-height: inherit; }
+:where(.cmt) button,:where(.cmt) select{ text-transform: none; }
+:where(.cmt) button,:where(.cmt) [type=button],:where(.cmt) [type=reset],:where(.cmt) [type=submit]{ -webkit-appearance: button; }
+:where(.cmt) button:not(:disabled),:where(.cmt) [type=button]:not(:disabled),:where(.cmt) [type=reset]:not(:disabled),:where(.cmt) [type=submit]:not(:disabled){ cursor: pointer; }
+:where(.cmt) textarea{ resize: vertical; }
+:where(.cmt) fieldset{ min-width: 0; padding: 0; margin: 0; border: 0; }
+:where(.cmt) pre{ display: block; margin-top: 0; margin-bottom: 1rem; overflow: auto; font-size: .875em; }
+:where(.cmt) code{ font-size: .875em; word-wrap: break-word; }
+:where(.cmt) [hidden]{ display: none !important; }
