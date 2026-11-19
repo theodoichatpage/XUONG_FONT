@@ -1468,3 +1468,19 @@ $('undo-mark-spacing').addEventListener('click', () => {
   for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) glyphs.set(char, before);
   lastMarkChange = []; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });
+
+$('rule-search').addEventListener('input', () => {
+  const normalize = value => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/đ/g, 'd');
+  const query = normalize($('rule-search').value.trim());
+  let visible = 0;
+  for (const card of document.querySelectorAll('.rule-card')) {
+    card.hidden = !normalize(card.textContent).includes(query);
+    if (!card.hidden) visible++;
+  }
+  $('rule-search-status').textContent = query ? visible + ' mục phù hợp.' : '';
+});
+for (const link of document.querySelectorAll('.rules-index a')) link.addEventListener('click', event => {
+  event.preventDefault();
+  $('rule-search').value = ''; $('rule-search').dispatchEvent(new Event('input'));
+  document.querySelector(link.getAttribute('href'))?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+});

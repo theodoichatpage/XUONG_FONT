@@ -169,21 +169,29 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   const workspace = $('font-workspace');
   const createTab = $('open-font-workspace');
   const collectionTab = $('open-font-collection');
+  const rulesTab = $('open-font-rules');
+  const rulesPanel = $('font-rules');
   const collectionVisible = () => !dialog.hidden;
-  function selectTab(collection) {
-    workspace.hidden = collection;
-    dialog.hidden = !collection;
-    createTab.setAttribute('aria-selected', String(!collection));
-    collectionTab.setAttribute('aria-selected', String(collection));
-    createTab.tabIndex = collection ? -1 : 0;
-    collectionTab.tabIndex = collection ? 0 : -1;
-    if (!collection) clearPreview();
+  const tabs = [createTab, collectionTab, rulesTab];
+  function selectTab(value) {
+    const active = value === 'rules' ? rulesTab : value ? collectionTab : createTab;
+    workspace.hidden = active !== createTab;
+    dialog.hidden = active !== collectionTab;
+    rulesPanel.hidden = active !== rulesTab;
+    for (const tab of tabs) {
+      tab.setAttribute('aria-selected', String(tab === active));
+      tab.tabIndex = tab === active ? 0 : -1;
+    }
+    if (active !== collectionTab) clearPreview();
   }
   createTab.addEventListener('click', () => selectTab(false));
-  for (const tab of [createTab, collectionTab]) tab.addEventListener('keydown', event => {
+  rulesTab.addEventListener('click', () => selectTab('rules'));
+  for (const tab of tabs) tab.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const next = event.key === 'Home' ? createTab : event.key === 'End' ? collectionTab : tab === createTab ? collectionTab : createTab;
+    const index = tabs.indexOf(tab);
+    const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1)
+      : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
     next.click(); next.focus();
   });
 
