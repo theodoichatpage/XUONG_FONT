@@ -8,91 +8,112 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
   if(standalone)root.classList.add('checker-showcase');
   root.innerHTML=`<div class="check-toolbar"><h3>${standalone?'Chọn file để kiểm tra':'Tự động sửa font'}</h3><div class="tool-row">${getCurrent?'<button class="primary" type="button" data-action="current">Tự động kiểm tra và đề xuất sửa</button>':''}${standalone?'<label class="check-file-button primary">Chọn file font<input type="file" multiple accept=".ttf,.otf,.woff,.woff2" data-role="files" class="visually-hidden"></label>':''}<a href="https://colorme.vn/tools/vietnamese-font-check" target="_blank" rel="noopener noreferrer">Đối chiếu trên ColorME</a></div><div class="check-thresholds" ${standalone?"":"hidden"}><label>Khoảng hở dưới<input type="number" min="0" max="100" value="16" data-role="gap"> / 1000 em</label><label>Chênh đỉnh râu trên<input type="number" min="0" max="100" value="20" data-role="horn"> / 1000 em</label></div><p class="help">${standalone?'TTF, OTF, WOFF · chọn nhiều file hoặc kéo thả vào đây · tối đa 30 MB/file. WOFF2 chưa được bộ đọc này hỗ trợ; dùng TTF/OTF tương ứng. Không cần cài font. ':''}File được đọc trong trình duyệt. Các ngưỡng là mức rà soát tùy chọn của Xưởng, chưa phải chuẩn số được chuyên gia duyệt.</p><p data-role="status" role="status" aria-live="polite">${standalone?'Chọn file để xem bảng 146 ký tự tiếng Việt và kết quả kỹ thuật.':'Xưởng tự kiểm tra khi bạn bấm nút. Thay đổi nét và chi tiết đặc trưng chỉ thực hiện sau khi bạn duyệt.'}</p></div><div data-role="report" ${standalone?"hidden":"hidden"}><label>Font trong lần kiểm tra<select data-role="font"></select></label><p data-role="summary" class="check-summary"></p><div class="tool-row check-result-actions" ${standalone?"":"hidden"}><button type="button" data-action="open">Mở font này để chỉnh sửa</button>${onMarks?'<button type="button" data-action="marks">Chỉnh dấu</button>':''}</div><section class="coverage-section" ${standalone?"":"hidden"}><h4>Bảng 146 ký tự tiếng Việt</h4><p data-role="coverage-summary"></p><label>Lọc bảng chữ<select data-role="filter"><option value="all">Tất cả ký tự</option><option value="missing">Chỉ chữ thiếu / rỗng</option><option value="components">Chữ có thành phần ghép</option><option value="present">Chữ có glyph</option></select></label><div class="coverage-legend"><span>● Có glyph</span><span>○ Thiếu / rỗng</span><span>△ Có thành phần ghép, chưa xác minh</span></div><div data-role="coverage" class="coverage-grid"></div><p class="help">Có glyph chưa chứng minh hình chữ đúng hoặc đẹp. Chữ có thành phần ghép vẫn cần thử định vị dấu và shaping; không tự tính là đạt.</p></section><label ${standalone?"":"hidden"}>Câu xem thử<textarea data-role="sample" rows="2">Đường về quê hương — Nguyễn Hữu Đạt — ă â ê ô ơ ư đ</textarea></label><div data-role="proof" class="check-vector-sample" ${standalone?"":"hidden"}></div><p data-role="proof-note" class="help"></p><p data-role="measurement" class="help"></p><div class="tool-row" data-role="repair-actions" ${standalone?"":"hidden"}><button type="button" data-action="repair" ${onRepair?"":"disabled"}>Đề xuất sửa an toàn</button><span class="help" data-role="repair-hint">Chỉ tạo bản xem trước; không tự thay nét chữ.</span></div><div class="quality-table-wrap" ${standalone?"":"hidden"}><table class="quality-table"><thead><tr><th>Trạng thái</th><th>Chữ / cặp</th><th>Kết quả</th></tr></thead><tbody data-role="findings"></tbody></table></div><p class="help">Kết quả của file tại thời điểm kiểm tra. Sau khi sửa hoặc xuất lại cần kiểm lại. Duyệt thị giác và thử trong ứng dụng vẫn cần thiết.</p></div>`;
   if(standalone){
-    root.insertAdjacentHTML('afterbegin',`<div class="checker-hero"><h2>Kiểm tra font tiếng Việt</h2><p>Tải file font để kiểm tra 146 ký tự, xem outline thật và phát hiện chữ thiếu. Không cần cài font vào máy.</p><div class="checker-hero-actions"><label class="checker-upload-button">Tải file TTF / OTF / WOFF<input type="file" accept=".ttf,.otf,.woff" multiple data-role="hero-files"></label><a class="checker-google-link" href="https://fonts.google.com/?subset=vietnamese" target="_blank" rel="noopener noreferrer">Tìm font Google</a></div><p class="checker-live-status" data-role="live-status" role="status" aria-live="polite"></p></div><div class="checker-showcase-grid"><div class="checker-paper-zone" data-role="dropzone" tabindex="0" role="button" aria-label="Chọn file font để kiểm tra"><div class="checker-paper-top"><span>146 KÝ TỰ TIẾNG VIỆT</span><span data-role="paper-state">MẪU MINH HỌA · CHƯA TẢI FONT</span></div><div class="checker-paper" data-role="live-paper"><div class="checker-paper-head"><span>BẢN SOÁT CHỮ</span><strong data-role="paper-name">CHƯA CHỌN FONT</strong></div><div class="checker-paper-glyphs" data-role="paper-glyphs"><div><strong>Ặ</strong><small>Ă + NẶNG</small></div><div><strong>ẫ</strong><small>Â + NGÃ</small></div><div><strong>Ỡ</strong><small>Ơ + NGÃ</small></div><div><strong>ự</strong><small>Ư + NẶNG</small></div></div><div class="checker-paper-sentence" data-role="paper-sentence">Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.</div></div><div class="checker-paper-stamp" data-role="paper-stamp">Chưa kiểm tra</div><p class="checker-drop-hint">Nhấn để chọn hoặc kéo thả file .ttf / .otf / .woff</p></div><div class="checker-showcase-right"><div class="checker-search-card"><div class="checker-card-head"><span>FONT GOOGLE</span><span>Chọn font để tải và kiểm tra</span></div><label class="checker-google-input"><span>⌕</span><input type="search" data-role="google-search" placeholder="Tìm font Google"></label><div class="checker-google-options" data-role="google-options"></div><p class="checker-google-note">Tải file font từ Google Fonts để kiểm tra chính xác các ký tự.</p></div><div class="checker-result-card"><div class="checker-card-head"><span>KẾT QUẢ</span><span data-role="showcase-badge">Chưa kiểm định</span></div><div class="checker-result-inner"><strong data-role="showcase-name">Chưa chọn font</strong><p data-role="showcase-description">Chọn TTF / OTF / WOFF để bắt đầu kiểm tra.</p><div class="checker-progress"><span data-role="showcase-progress"></span></div><p data-role="showcase-count">0 / 146 ký tự đã kiểm tra</p><p data-role="missing-characters" class="checker-missing-list" hidden></p></div></div></div></div>`);
-    root.querySelector('[data-role=hero-files]').addEventListener('change',event=>{
-      const files=[...event.target.files];event.target.value='';
-      if(files.length)run(files.map(file=>({name:file.name.replace(/\\.(ttf|otf|woff)$/i,''),filename:file.name,blob:file})));
-    });
+    root.insertAdjacentHTML('afterbegin',`<div class="checker-hero"><h2>Kiểm tra font tiếng Việt</h2><p>Tải file font để kiểm tra 146 ký tự, xem outline thật và phát hiện chữ thiếu. Không cần cài font vào máy.</p><div class="checker-hero-actions"><label class="checker-upload-button">Tải file TTF / OTF / WOFF<input type="file" accept=".ttf,.otf,.woff,.woff2" data-role="hero-files"></label><a class="checker-google-link" href="#font-google-search">Tìm font Google</a></div><p class="checker-live-status" data-role="live-status" role="status" aria-live="polite"></p></div><div class="checker-showcase-grid"><div class="checker-paper-zone" data-role="dropzone" tabindex="0" role="button" aria-label="Chọn file font để kiểm tra"><div class="checker-paper-top"><span>146 KÝ TỰ TIẾNG VIỆT</span><span data-role="paper-state">MẪU MINH HỌA · CHƯA TẢI FONT</span></div><div class="checker-paper" data-role="live-paper"><div class="checker-paper-head"><span>BẢN SOÁT CHỮ</span><strong data-role="paper-name">CHƯA CHỌN FONT</strong></div><div class="checker-paper-glyphs" data-role="paper-glyphs"><div><strong>Ặ</strong><small>Ă + NẶNG</small></div><div><strong>ẫ</strong><small>Â + NGÃ</small></div><div><strong>Ỡ</strong><small>Ơ + NGÃ</small></div><div><strong>ự</strong><small>Ư + NẶNG</small></div></div><div class="checker-paper-sentence" data-role="paper-sentence">Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.</div></div><div class="checker-paper-stamp" data-role="paper-stamp">Chưa kiểm tra</div><p class="checker-drop-hint">Nhấn để chọn hoặc kéo thả file .ttf / .otf / .woff / .woff2</p></div><div class="checker-showcase-right"><div class="checker-search-card"><div class="checker-card-head"><span>FONT GOOGLE</span><span>Chọn font để tải và kiểm tra</span></div><label class="checker-google-input"><span>⌕</span><input type="search" data-role="google-search" placeholder="Tìm font Google"></label><div class="checker-google-options" data-role="google-options"></div><p class="checker-google-note">Chọn một font phổ biến hoặc nhập tên Google Font và nhấn Enter để kiểm tra ngay.</p></div><div class="checker-result-card"><div class="checker-card-head"><span>KẾT QUẢ</span><span data-role="showcase-badge">Chưa kiểm định</span></div><div class="checker-result-inner"><strong data-role="showcase-name">Chưa chọn font</strong><p data-role="showcase-description">Chọn TTF / OTF / WOFF để bắt đầu kiểm tra.</p><div class="checker-progress"><span data-role="showcase-progress"></span></div><p data-role="showcase-count">0 / 146 ký tự đã kiểm tra</p><p data-role="missing-characters" class="checker-missing-list" hidden></p></div></div></div></div>`);
+
+    const picker=root.querySelector('[data-role=hero-files]');
     const zone=root.querySelector('[data-role=dropzone]');
-    zone.addEventListener('click',()=>root.querySelector('[data-role=hero-files]').click());
-    zone.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();root.querySelector('[data-role=hero-files]').click();}});
-    const googleNames=['Be Vietnam Pro','Montserrat','Inter','Playfair Display','Roboto','Lora','Oswald','Bebas Neue','Pacifico','Poppins'];
+    const loadFiles=files=>{const file=files?.[0];if(file)checkUploadedFont(file);};
+    picker.addEventListener('change',event=>{loadFiles(event.target.files);event.target.value='';});
+    zone.addEventListener('click',event=>{if(!event.target.closest('[data-role=live-paper]'))picker.click();});
+    zone.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();picker.click();}});
+    for(const type of ['dragenter','dragover'])zone.addEventListener(type,event=>{event.preventDefault();zone.classList.add('is-dragover');});
+    zone.addEventListener('dragleave',event=>{event.preventDefault();zone.classList.remove('is-dragover');});
+    zone.addEventListener('drop',event=>{event.preventDefault();zone.classList.remove('is-dragover');loadFiles(event.dataTransfer.files);});
+    const popular=['Be Vietnam Pro','Montserrat','Inter','Playfair Display','Roboto','Lora','Oswald','Bebas Neue','Pacifico','Poppins'];
     const search=root.querySelector('[data-role=google-search]');
     const options=root.querySelector('[data-role=google-options]');
     const updateOptions=()=>{
       options.replaceChildren();
-      for(const name of googleNames.filter(name=>name.toLowerCase().includes(search.value.trim().toLowerCase()))){
+      const q=search.value.trim().toLocaleLowerCase();
+      for(const name of popular.filter(name=>name.toLocaleLowerCase().includes(q))){
         const button=document.createElement('button');button.type='button';button.textContent=name;
+        button.classList.toggle('is-selected',name.toLocaleLowerCase()===q);
         button.addEventListener('click',()=>{search.value=name;updateOptions();checkGoogleFont(name);});
         options.append(button);
       }
     };
-    search.addEventListener('input',updateOptions);updateOptions();
+    search.addEventListener('input',updateOptions);
+    search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();checkGoogleFont(search.value.trim());}});
+    root.querySelector('.checker-google-link').addEventListener('click',event=>{event.preventDefault();search.focus();search.scrollIntoView({block:'center',behavior:'smooth'});});
+    updateOptions();
   }
-  let googleRequest=0;
-  async function checkGoogleFont(name){
-    if(!standalone)return;
-    const request=++googleRequest;
-    const status=root.querySelector('[data-role=live-status]');
-    status.textContent='Đang tải và kiểm tra '+name+' từ Google Fonts…';
-    const family='"XuongCheckGoogle'+request+'"';
-    const chars=vietnameseCheckCharacters;
-    try{
-      const cssUrl='https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@400&display=swap&text='+encodeURIComponent(chars.join('')+'Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.');
-      const response=await fetch(cssUrl);
-      if(!response.ok)throw Error('Google Fonts không trả về stylesheet ('+response.status+').');
-      const css=await response.text();
-      const urls=[...css.matchAll(/url\(([^)]+)\)/g)].map(m=>m[1].replace(/^['"]|['"]$/g,''));
-      if(!urls.length)throw Error('Không tìm thấy file font từ Google Fonts.');
-      const fontResponse=await fetch(urls[0]);if(!fontResponse.ok)throw Error('Không tải được file font.');
-      const blob=await fontResponse.blob();
-      const face=new FontFace(family,await blob.arrayBuffer());
-      await face.load();
-      if(request!==googleRequest)return;
-      document.fonts.add(face);
-      const canvas=document.createElement('canvas');canvas.width=180;canvas.height=160;
+  let browserRequest=0;
+  const browserChars=vietnameseCheckCharacters;
+  const browserSample='Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.';
+  function hasBrowserGlyph(char,family){
+    const samples=['monospace','serif'].map(fallback=>{
+      const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;
       const ctx=canvas.getContext('2d',{willReadFrequently:true});
-      if(!ctx)throw Error('Trình duyệt không hỗ trợ Canvas.');
-      const pixels=(char,font)=>{
-        ctx.clearRect(0,0,180,160);ctx.fillStyle='#000';ctx.font='72px '+font;
-        ctx.textBaseline='alphabetic';ctx.fillText(char,12,100);
-        return ctx.getImageData(0,0,180,160).data;
-      };
-      const diff=(a,b)=>{for(let i=3;i<a.length;i+=4)if(a[i]!==b[i])return true;return false;};
-      const missing=[];
-      for(const char of chars){
-        const actual=pixels(char,family+', monospace');
-        const mono=pixels(char,'monospace');
-        const serif=pixels(char,'serif');
-        // A glyph is considered supported only if the chosen font differs from both fallbacks.
-        if(!diff(actual,mono)||!diff(actual,serif))missing.push(char);
+      if(!ctx)throw Error('Canvas không khả dụng.');
+      ctx.clearRect(0,0,128,128);ctx.font='64px "'+family.replace(/"/g,'')+'", '+fallback;
+      ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.fillText(char,12,64);
+      return ctx.getImageData(0,0,128,128).data;
+    });
+    for(let i=3;i<samples[0].length;i+=4)if(samples[0][i]!==samples[1][i])return false;
+    return true;
+  }
+  async function displayBrowserFont(family,label,source,request){
+    await document.fonts.load('64px "'+family+'"',browserChars.join(''));
+    await document.fonts.ready;
+    if(request!==browserRequest)return;
+    if(!hasBrowserGlyph('a',family)&&!hasBrowserGlyph('A',family))throw Error('Không tải được font hoặc font không có chữ Latin.');
+    const missing=browserChars.filter(ch=>!hasBrowserGlyph(ch,family));
+    const count=browserChars.length-missing.length;
+    const $r=role=>root.querySelector('[data-role="'+role+'"]');
+    $r('showcase-name').textContent=label;
+    $r('paper-name').textContent=label.toUpperCase();
+    $r('showcase-description').textContent=source+' · kiểm tra hiển thị 146 ký tự trong trình duyệt.';
+    $r('showcase-badge').textContent=missing.length?'✕ Thiếu '+missing.length+' ký tự':'✓ Đủ dấu tiếng Việt';
+    $r('showcase-count').textContent=count+' / '+browserChars.length+' ký tự tiếng Việt hiển thị được';
+    $r('showcase-progress').style.width=(count/browserChars.length*100).toFixed(1)+'%';
+    $r('paper-stamp').textContent=missing.length?'Thiếu '+missing.length:'Đạt';
+    $r('paper-state').textContent='ĐÃ KIỂM TRA FONT';
+    const missingList=$r('missing-characters');
+    missingList.hidden=!missing.length;missingList.textContent=missing.length?'Chữ thiếu: '+missing.join(' '):'';
+    const glyphs=$r('paper-glyphs');glyphs.replaceChildren();
+    for(const [ch,caption] of [['Ặ','Ă + NẶNG'],['ẫ','Â + NGÃ'],['Ỡ','Ơ + NGÃ'],['ự','Ư + NẶNG']]){
+      const cell=document.createElement('div'),glyph=document.createElement('strong'),desc=document.createElement('small');
+      glyph.textContent=ch;glyph.style.fontFamily='"'+family+'",sans-serif';
+      if(missing.includes(ch))glyph.classList.add('checker-glyph-missing');
+      desc.textContent=missing.includes(ch)?'THIẾU':caption;
+      cell.append(glyph,desc);glyphs.append(cell);
+    }
+    const sentence=$r('paper-sentence');
+    sentence.replaceChildren();sentence.textContent=browserSample;
+    sentence.style.fontFamily='"'+family+'",sans-serif';
+    $r('live-status').textContent='';
+  }
+  async function checkGoogleFont(name){
+    if(!standalone||!name)return;
+    const request=++browserRequest;
+    const status=root.querySelector('[data-role=live-status]');
+    status.textContent='Đang kiểm tra '+name+'…';
+    try{
+      const safeName=name.trim().slice(0,100);
+      const family=safeName;
+      const id='xuong-google-'+safeName.replace(/[^a-z0-9]/gi,'-');
+      if(!document.getElementById(id)){
+        const link=document.createElement('link');link.id=id;link.rel='stylesheet';
+        link.href='https://fonts.googleapis.com/css2?family='+encodeURIComponent(safeName).replace(/%20/g,'+')+'&display=swap';
+        document.head.append(link);
+        await new Promise((resolve,reject)=>{link.onload=resolve;link.onerror=()=>reject(Error('Google Fonts không tải được stylesheet.'));});
       }
-      if(request!==googleRequest)return;
-      const present=chars.length-missing.length;
-      const $r=role=>root.querySelector('[data-role="'+role+'"]');
-      $r('showcase-name').textContent=name;
-      $r('paper-name').textContent=name.toUpperCase();
-      $r('showcase-description').textContent='Google Fonts · kiểm tra khả năng hiển thị bằng Canvas (không phải xác minh cmap).';
-      $r('showcase-badge').textContent=missing.length?'✕ Thiếu '+missing.length+' ký tự':'✓ Đủ 146 ký tự';
-      $r('showcase-count').textContent=present+' / '+chars.length+' ký tự hiển thị · '+missing.length+' thiếu';
-      $r('showcase-progress').style.width=(present/chars.length*100)+'%';
-      $r('paper-stamp').textContent=missing.length?'Thiếu '+missing.length:'✓ Đủ ký tự';
-      $r('paper-state').textContent='GOOGLE FONTS · KIỂM TRA TRỰC TIẾP';
-      $r('missing-characters').hidden=!missing.length;
-      $r('missing-characters').textContent=missing.length?'Chữ thiếu: '+missing.join(' '):'';
-      const glyphs=$r('paper-glyphs');glyphs.replaceChildren();
-      for(const char of ['Ặ','ẫ','Ỡ','ự']){
-        const cell=document.createElement('div'),glyph=document.createElement('strong'),label=document.createElement('small');
-        glyph.textContent=char;glyph.style.fontFamily=family+', sans-serif';
-        if(missing.includes(char))glyph.style.color='#d83c32';
-        label.textContent=missing.includes(char)?'THIẾU':char;
-        cell.append(glyph,label);glyphs.append(cell);
-      }
-      const sentence=$r('paper-sentence');sentence.replaceChildren();
-      sentence.textContent='Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.';
-      sentence.style.fontFamily=family+', sans-serif';
-      status.textContent='Đã kiểm tra '+name+' trực tiếp từ Google Fonts.';
-    }catch(error){if(request===googleRequest)status.textContent='Không kiểm tra được '+name+': '+error.message;}
+      await displayBrowserFont(family,safeName,'Google Fonts',request);
+    }catch(error){if(request===browserRequest)status.textContent='Không kiểm tra được '+name+': '+error.message;}
+  }
+  async function checkUploadedFont(file){
+    if(!standalone)return;
+    const request=++browserRequest,status=root.querySelector('[data-role=live-status]');
+    if(file.size>30*1024*1024){status.textContent='File vượt quá 30 MB.';return;}
+    if(!/\.(ttf|otf|woff|woff2)$/i.test(file.name)){status.textContent='Hãy chọn file TTF, OTF, WOFF hoặc WOFF2.';return;}
+    status.textContent='Đang đọc '+file.name+'…';
+    try{
+      const family='XuongUploadCheck'+request;
+      const face=new FontFace(family,await file.arrayBuffer());
+      await face.load();document.fonts.add(face);
+      if(request!==browserRequest)return;
+      await displayBrowserFont(family,file.name.replace(/\.[^.]+$/,''),'File '+file.name.split('.').pop().toUpperCase(),request);
+    }catch(error){if(request===browserRequest)status.textContent='Không đọc được file font: '+error.message;}
   }
   const $=role=>root.querySelector('[data-role="'+role+'"]');
   const selected=()=>results[Number($('font').value)];
