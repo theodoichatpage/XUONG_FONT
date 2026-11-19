@@ -67,9 +67,9 @@ export async function createFontFamily(record, chosen, text, onResult) {
   const indexChars = new Map();
   for (let i = 0; i < source.glyphs.length; i++) {
     const glyph = source.glyphs.get(i);
-    if (glyph.unicodes.length) indexChars.set(i, String.fromCodePoint(glyph.unicodes[0]));
+    if (glyph.unicodes?.length) indexChars.set(i, String.fromCodePoint(glyph.unicodes[0]));
   }
-  const kerning = Object.entries(source.kerningPairs).flatMap(([key, value]) => {
+  const kerning = Object.entries(source.kerningPairs ?? {}).flatMap(([key, value]) => {
     const [a,b] = key.split(',').map(Number);
     return indexChars.has(a) && indexChars.has(b) ? [[indexChars.get(a),indexChars.get(b),value]] : [];
   });
@@ -80,9 +80,10 @@ export async function createFontFamily(record, chosen, text, onResult) {
     let ascent = source.ascender, descent = source.descender;
     for (let i = 0; i < source.glyphs.length; i++) {
       const old = source.glyphs.get(i);
-      const path = amount && old.path.commands.length ? embolden(old.path, amount) : old.path;
-      const glyph = new opentype.Glyph({ name: old.name, unicode: old.unicode,
-        unicodes: [...old.unicodes], advanceWidth: Math.round(old.advanceWidth + (old.path.commands.length ? amount * 2 : 0)), path });
+      const originalPath = old.path ?? new opentype.Path();
+      const path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
+      const glyph = new opentype.Glyph({ name: old.name || (i === 0 ? '.notdef' : 'glyph' + i), unicode: old.unicode,
+        unicodes: [...(old.unicodes ?? [])], advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path });
       glyphs.push(glyph);
       if (path.commands.length) {
         const bounds = path.getBoundingBox();
