@@ -24,6 +24,6 @@ Bộ quy tắc không thay thế thuật toán kiểm va chạm. Chỉ nói tín
 
 ## Rà soát theo quy tắc
 
-Trong Bộ sưu tập, chọn Đánh giá font hoặc Đánh giá family; trong tab Quy tắc có Đánh giá font đang làm. `site/font-quality.js` đọc file font, rà cmap/metadata, lấy khoảng gần nhất contour dấu rời, giao outline của cặp thử và chỉ báo chênh đỉnh râu. Báo rõ mục cần duyệt bằng mắt, chưa đo được và chưa xác minh shaping NFD.
+Trong Bộ sưu tập, chọn Đánh giá font hoặc Đánh giá family; dưới Thử tiêu đề có Đánh giá font đang làm; tab Kiểm tra font tiếng Việt nhận file độc lập. `site/font-quality.js` đọc file font, rà cmap/metadata, lấy khoảng gần nhất contour dấu rời, giao outline của cặp thử và chỉ báo chênh đỉnh râu. Báo rõ mục cần duyệt bằng mắt, chưa đo được và chưa xác minh shaping NFD.
 
 Mỗi quy tắc có SVG nguyên bản trong `site/references/vector`, cùng thông tin nguồn và hash hình học. Phần SVG của font đang kiểm chỉ sao lại outline font đó. Không dịch, vẽ thêm dấu vào mẫu chuẩn để làm kết quả trông đạt.

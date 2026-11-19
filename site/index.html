@@ -17,6 +17,7 @@
   <button id="open-font-workspace" role="tab" aria-selected="true" aria-controls="font-workspace" type="button">Tạo font mới</button>
   <button id="open-font-collection" role="tab" aria-selected="false" aria-controls="font-collection" tabindex="-1" type="button">Bộ sưu tập Font</button>
   <button id="open-font-rules" role="tab" aria-selected="false" aria-controls="font-rules" tabindex="-1" type="button">Quy tắc font Việt</button>
+  <button id="open-font-checker" role="tab" aria-selected="false" aria-controls="font-checker" tabindex="-1" type="button">Kiểm tra font tiếng Việt</button>
 </nav>
   </div>
   <div class="masthead-actions">
@@ -153,6 +154,7 @@
           <p id="stroke-result" class="help" aria-live="polite"></p>
         </section>
       </section>
+      <section class="panel quality-workbench font-check-panel" id="editor-font-check" aria-label="Đánh giá và xử lý font đang làm"></section>
     </div>
   </div>
 <section id="font-collection" role="tabpanel" aria-labelledby="open-font-collection" hidden>
@@ -220,17 +222,8 @@
 </section>
 <section id="font-rules" class="font-rules" role="tabpanel" aria-labelledby="open-font-rules" hidden>
   <div class="rules-heading"><div><h2>Quy tắc thiết kế font Việt</h2><p>Diễn giải tiếng Việt kèm SVG gốc của tác giả; đối chiếu khi dựng chữ, Việt hóa và tạo family.</p></div><label for="rule-search">Tìm quy tắc<input id="rule-search" type="search" placeholder="Ví dụ: râu, chữ hoa, dấu nặng"></label></div>
-  <section class="quality-controls" aria-label="Đánh giá font theo quy tắc">
-    <div class="tool-row"><button id="quality-current" class="primary" type="button">Đánh giá font đang làm</button><label for="quality-min-gap">Cảnh báo khoảng hở dưới<input id="quality-min-gap" type="number" min="0" max="100" value="16"> / 1000 em</label><label for="quality-horn-tolerance">Cảnh báo chênh đỉnh râu trên<input id="quality-horn-tolerance" type="number" min="0" max="100" value="20"> / 1000 em</label></div>
-    <p class="help">Kiểm tra ngay trên trình duyệt, không gửi file font lên trang tham khảo. Ngưỡng do Xưởng chọn để rà soát, không phải tiêu chuẩn số của trang nguồn. Kiểm trên file xuất thực tế; minh họa SVG dùng outline của font, không dùng ảnh chụp.</p>
-    <p id="quality-status" role="status" aria-live="polite">Chọn font đang làm, hoặc dùng Đánh giá font / Đánh giá family trong Bộ sưu tập Font.</p>
-  </section>
   <div class="rules-layout"><aside class="rules-index"><h3>Tra cứu nhanh</h3><a href="#rule-position">Vị trí dấu</a><a href="#rule-collision">Tránh dấu chạm chữ</a><a href="#rule-kerning">Khoảng cách giữa các chữ có dấu</a><a href="#rule-horn-spacing">Khoảng cách quanh râu ơ, ư</a><a href="#rule-horn-pair">Cặp râu ươ</a><a href="#rule-weight">Kích thước và độ đậm của dấu</a><a href="#rule-harmony">Sự hòa hợp</a><a href="#rule-capitals">Dấu trên chữ hoa</a><a href="#rule-dotted-i">Chấm trên chữ i</a><a href="#rule-acute-grave">Dấu sắc và huyền</a><a href="#rule-circumflex">Dấu mũ</a><a href="#rule-breve">Dấu trăng</a><a href="#rule-horn">Râu của ơ và ư</a><a href="#rule-hook">Dấu hỏi</a><a href="#rule-tilde">Dấu ngã</a><a href="#rule-underdot">Dấu nặng</a><a href="#rule-dyet">Gạch của Đ và đ</a><a href="#rule-dong">Ký hiệu đồng ₫</a><hr><a href="#rules-checklist">Kiểm tra trước khi xuất</a><a href="#rules-glossary">Giải thích thuật ngữ</a><a href="#rules-sources">Nguồn và ảnh gốc</a></aside>
-  <div class="rules-content"><section id="quality-report" class="rules-extra" hidden>
-    <div class="inline"><h3>Kết quả rà soát font</h3><label for="quality-font-select">Font trong lần kiểm tra<select id="quality-font-select"></select></label></div>
-    <p id="quality-summary"></p><p id="quality-measurement-note" class="help"></p>
-    <div class="quality-table-wrap"><table class="quality-table"><thead><tr><th>Trạng thái</th><th>Chữ / cặp</th><th>Kết quả</th></tr></thead><tbody id="quality-findings"></tbody></table></div>
-  </section><p id="rule-search-status" class="help" role="status"></p>
+  <div class="rules-content"><p id="rule-search-status" class="help" role="status"></p>
   <div class="rules-notice"><strong>Mẫu tham khảo nguyên bản</strong><p>Hình SVG bên dưới giữ nguyên đường nét từ trang Vietnamese Typography. Không tự vẽ lại hoặc dùng đường nét tham khảo để sinh font đầu ra. Outline font đang kiểm tra được trình bày riêng, không được coi là mẫu đã được chuyên gia duyệt.</p><strong>Chọn đúng cách sửa</strong><p>Dấu sát thân: chỉnh khoảng hở dấu–thân. Hai tầng dấu sát nhau: chỉnh riêng dấu–dấu. Hai chữ sát nhau: kiểm advance/kerning. Râu và gạch Đ/đ phải nối vào thân.</p></div>
   <div class="rules-grid"><article class="rule-card" id="rule-position"><h3>Vị trí dấu</h3><p class="rule-principle">Chọn cách đặt dấu phù hợp toàn bộ font.</p><p>Dấu thanh đi với mũ có thể nằm bên phải, chia sang hai phía hoặc ở trên. Cách đặt bên phải giúp giữ nhịp nhất quán; cách xếp trên cân đối nhưng cần kiểm chiều cao dòng. Đây là lựa chọn thiết kế, không phải một vị trí bắt buộc cho mọi font.</p><p class="rule-example"><strong>Đối chiếu:</strong> So ấ ầ ẩ ẫ, ế ề ể ễ và ố ồ ổ ỗ ở cả chữ hoa lẫn chữ thường.</p><figure class="rule-illustration"><a href="./references/vector/directions.svg" target="_blank" rel="noopener" aria-label="Mở SVG gốc: Ba cách bố trí dấu thanh quanh dấu mũ."><img src="./references/vector/directions.svg" alt="Ba cách bố trí dấu thanh quanh dấu mũ." loading="lazy"></a><figcaption>Ba cách bố trí dấu thanh quanh dấu mũ. <span>SVG gốc của tác giả · Bấm để mở và phóng to.</span></figcaption></figure></article>
 <article class="rule-card" id="rule-collision"><h3>Tránh dấu chạm chữ</h3><p class="rule-principle">Kiểm cả chữ bên trái và bên phải.</p><p>Dấu có thể đã cách thân nguyên âm nhưng vẫn đụng t, đ hoặc nét cao của chữ kế bên. Không chỉ xem từng glyph đứng một mình. Kiểm cả dấu thanh, mũ/trăng và các phần nhô ngang.</p><p class="rule-example"><strong>Đối chiếu:</strong> Xem Bất, đồng, những, trường ở cỡ nhỏ và cỡ tiêu đề.</p><figure class="rule-illustration"><a href="./references/vector/avoid-collisions.svg" target="_blank" rel="noopener" aria-label="Mở SVG gốc: Đối chiếu dấu thoáng với dấu va vào chữ t và đ."><img src="./references/vector/avoid-collisions.svg" alt="Đối chiếu dấu thoáng với dấu va vào chữ t và đ." loading="lazy"></a><figcaption>Đối chiếu dấu thoáng với dấu va vào chữ t và đ. <span>SVG gốc của tác giả · Bấm để mở và phóng to.</span></figcaption></figure></article>
@@ -256,6 +249,7 @@
   <section class="rules-extra" id="rules-sources"><h3>Nguồn và ảnh gốc</h3><p>Tham khảo <strong>Vietnamese Typography — Donny Trương</strong>, cùng hai ảnh chụp do người dùng cung cấp. Nội dung trên là diễn giải tiếng Việt phục vụ thực hành, không phải bản dịch được tác giả duyệt.</p><div class="tool-row"><a class="download" href="https://vietnamesetypography.com/design-challenges/" target="_blank" rel="noopener noreferrer">Design Challenges — bản gốc</a><a class="download" href="https://vietnamesetypography.com/diacritical-details/" target="_blank" rel="noopener noreferrer">Diacritical Details — bản gốc</a></div><details><summary>Ảnh đối chiếu: Các vấn đề thiết kế</summary><a href="./references/design-challenges.png" target="_blank" rel="noopener"><img src="./references/design-challenges.png" loading="lazy" alt="Ảnh chụp Design Challenges: vị trí, va chạm, kerning, râu, độ đậm, chữ hoa và chấm i"></a></details><details><summary>Ảnh đối chiếu: Chi tiết dấu tiếng Việt</summary><a href="./references/diacritical-details.png" target="_blank" rel="noopener"><img src="./references/diacritical-details.png" loading="lazy" alt="Ảnh chụp Diacritical Details: từng dấu, gạch Đ đ và ký hiệu đồng"></a></details></section>
   </div></div>
 </section>
+<section id="font-checker" class="font-checker-page" role="tabpanel" aria-labelledby="open-font-checker" hidden><div class="checker-heading"><h2>Kiểm tra font tiếng Việt</h2><p>Phân tích file mới hoặc font thành phẩm ngay trên trình duyệt, không cần cài vào máy. Kết quả ở tab này tách riêng với bộ chữ đang chỉnh sửa.</p></div><section id="standalone-font-check" class="panel font-check-panel" aria-label="Kiểm tra file font độc lập"></section></section>
 </main>
 <dialog id="full-preview" aria-labelledby="full-preview-title">
   <div class="viewer-toolbar">

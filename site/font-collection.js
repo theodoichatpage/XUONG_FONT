@@ -172,14 +172,17 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   const createTab = $('open-font-workspace');
   const collectionTab = $('open-font-collection');
   const rulesTab = $('open-font-rules');
+  const checkerTab = $('open-font-checker');
+  const checkerPanel = $('font-checker');
   const rulesPanel = $('font-rules');
   const collectionVisible = () => !dialog.hidden;
-  const tabs = [createTab, collectionTab, rulesTab];
+  const tabs = [createTab, collectionTab, rulesTab, checkerTab];
   function selectTab(value) {
-    const active = value === 'rules' ? rulesTab : value ? collectionTab : createTab;
+    const active = value === 'checker' ? checkerTab : value === 'rules' ? rulesTab : value ? collectionTab : createTab;
     workspace.hidden = active !== createTab;
     dialog.hidden = active !== collectionTab;
     rulesPanel.hidden = active !== rulesTab;
+    checkerPanel.hidden = active !== checkerTab;
     for (const tab of tabs) {
       tab.setAttribute('aria-selected', String(tab === active));
       tab.tabIndex = tab === active ? 0 : -1;
@@ -188,6 +191,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   }
   createTab.addEventListener('click', () => selectTab(false));
   rulesTab.addEventListener('click', () => selectTab('rules'));
+  checkerTab.addEventListener('click', () => selectTab('checker'));
   for (const tab of tabs) tab.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -428,7 +432,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     const record = records.find(item => item.id === selectedId);
     if (!record || working || familyRunning) return;
     const group = groups.find(group => group.members.some(item => item.id === record.id));
-    run(async () => { selectTab('rules'); await assess(wholeFamily ? group.members : [record]); });
+    run(async () => { selectTab(false); await assess(wholeFamily ? group.members : [record]); });
   });
 
   $('collection-edit').addEventListener('click', () => {
@@ -572,4 +576,18 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       status.textContent = 'Đã xóa khỏi bộ sưu tập.';
     });
   });
+  return {
+    async editRecord(record) {
+      if (working || familyRunning) return false;
+      let opened = false;
+      await run(async () => {
+        if (await vietnamize(record, { editOnly: true })) {
+          editingRecord = record.id != null ? record : undefined;
+          selectedId = record.id; selectTab(false); opened = true;
+        }
+      });
+      return opened;
+    }
+  };
+
 }

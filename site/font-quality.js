@@ -1,4 +1,6 @@
 import opentype from 'opentype.js';
+import { analyzeVietnameseCoverage } from './font-coverage.js';
+export { analyzeVietnameseCoverage, vietnameseCheckCharacters } from './font-coverage.js';
 import ClipperLib from 'clipper-lib';
 import { familyStyles } from './family-styles.js';
 const S = 32;
@@ -49,6 +51,9 @@ export async function assessFont(record,{minGap=16,hornTolerance=20}={}){
   const add=(status,rule,chars,message,value)=>findings.push({status,rule,chars,message,...(value==null?{}:{value})});
   const has=char=>!!font.charToGlyphIndex(char);
   const polygons=char=>{if(!cache.has(char))cache.set(char,union(flattenQualityPath(font.charToGlyph(char).path)));return cache.get(char);};
+  const coverage=analyzeVietnameseCoverage(font);
+  const blank=coverage.entries.filter(item=>item.status==='blank');
+  if(blank.length)add('fail','blank-glyph',blank.map(item=>item.char).join(' '),'Có mã trong cmap nhưng glyph không có đường nét.');
   const missing=required.filter(char=>!has(char));
   add(missing.length?'fail':'pass','coverage',missing.join(' '),missing.length?'Thiếu '+missing.length+' ký tự trong bộ chữ Việt và Latin cơ bản.':'Đủ '+required.length+' ký tự trong bộ thử chữ Việt và Latin.');
   const expected=familyStyles.find(item=>item.style===record.style);
@@ -102,7 +107,7 @@ export async function assessFont(record,{minGap=16,hornTolerance=20}={}){
   const combining=[...'\u0300\u0301\u0309\u0303\u0323\u0302\u0306\u031b'].filter(c=>!has(c));
   add('manual','nfd',combining.map(c=>'U+'+c.codePointAt(0).toString(16).toUpperCase()).join(' '),combining.length?'Thiếu '+combining.length+' mã dấu kết hợp trong cmap; chưa xác minh hiển thị NFD.':'Có mã dấu kết hợp; vẫn cần kiểm vị trí dấu và shaping NFD trong ứng dụng thực tế.');
   add('manual','optical','','Cần duyệt bằng mắt: hòa hợp nét, hình râu, hỏi/ngã, chấm i, độ rõ ở cỡ nhỏ, thiết kế Italic và hai dòng.');
-  return {record,font,findings,measured,tested,checkedPairs,threshold:{minGap,hornTolerance},time:new Date().toISOString(),counts:{fail:findings.filter(f=>f.status==='fail').length,warning:findings.filter(f=>f.status==='warning').length,manual:findings.filter(f=>f.status==='manual').length}};
+  return {record,font,coverage,findings,measured,tested,checkedPairs,threshold:{minGap,hornTolerance},time:new Date().toISOString(),counts:{fail:findings.filter(f=>f.status==='fail').length,warning:findings.filter(f=>f.status==='warning').length,manual:findings.filter(f=>f.status==='manual').length}};
 }
 export function makeQualitySVG(font,text){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),group=document.createElementNS(ns,'g');
