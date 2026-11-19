@@ -238,7 +238,13 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
 
   async function refresh(preferred = selectedId) {
     records = await accessFonts('readonly', store => store.getAll());
-    selectedId = records.some(record => record.id === preferred) ? preferred : undefined;
+    // On first opening, automatically show the most recently saved font.
+    // IndexedDB assigns increasing numeric IDs to newly added font records.
+    const newest = records.reduce((latest, record) =>
+      !latest || Number(record.id) > Number(latest.id) ? record : latest, null);
+    selectedId = records.some(record => record.id === preferred)
+      ? preferred
+      : newest?.id;
     const grouped = new Map();
     for (const record of records) {
       let family = record.family || familiesByDigest.get(record.digest);
