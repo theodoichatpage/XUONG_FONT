@@ -1624,16 +1624,16 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
     status('Đã chuẩn bị '+proposals.length+' đề xuất sửa dấu. Chưa thay đổi font. Duyệt hình trước/sau rồi bấm Áp dụng.');
   }
 });
-// The previous standalone checker has been retired; editor quality checks remain intact.
-const retiredChecker = $('standalone-font-check');
-if (retiredChecker) {
-  retiredChecker.replaceChildren();
-  const notice=document.createElement('div');
-  notice.className='checker-rebuild-notice';
-  notice.setAttribute('role','status');
-  const heading=document.createElement('h2');heading.textContent='Kiểm tra font tiếng Việt';
-  const body=document.createElement('p');body.textContent='Phiên bản kiểm tra cũ đã được gỡ bỏ. Công cụ đang chờ thay thế bằng phiên bản ColorME được cấp phép.';
-  notice.append(heading,body);
-  retiredChecker.append(notice);
+// Licensed ColorME checker runs as a same-origin, locally hosted isolated page.
+const standaloneCheckerMount = $('standalone-font-check');
+if (standaloneCheckerMount) {
+  standaloneCheckerMount.replaceChildren();
+  const frame = document.createElement('iframe');
+  frame.src = './colorme-check/index.html';
+  frame.title = 'Kiểm tra font tiếng Việt — ColorME';
+  frame.className = 'colorme-check-frame';
+  frame.loading = 'eager';
+  frame.setAttribute('allow', 'clipboard-read; clipboard-write');
+  standaloneCheckerMount.append(frame);
 }
 async function runFontQuality(records) { await editorFontCheck.run(records); }
