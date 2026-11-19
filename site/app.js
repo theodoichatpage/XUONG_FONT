@@ -1577,6 +1577,29 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
         path.setAttribute('d',glyph.d);path.setAttribute('transform','scale(1,-1)');
         svg.append(path);figure.append(svg,caption);card.append(figure);
       }
+      const actions=document.createElement('div');
+      actions.className='tool-row';
+      const accept=document.createElement('button'),reject=document.createElement('button');
+      accept.type=reject.type='button';
+      accept.textContent='Áp dụng chữ này';reject.textContent='Từ chối';
+      accept.addEventListener('click',()=>{
+        const proposal=markCandidates.find(item=>item.char===char);
+        if(!proposal || glyphs.get(char)!==proposal.before){status('Glyph đã thay đổi; hãy chạy lại sửa tự động.');return;}
+        glyphs.set(char,proposal.after);
+        markCandidates=markCandidates.filter(item=>item.char!==char);
+        auditRepairPending=false;
+        lastMarkChange=[proposal];
+        refresh();
+        $('undo-mark-spacing').disabled=false;
+        status('Đã áp dụng riêng chữ '+char+'. Có thể hoàn tác.');
+      });
+      reject.addEventListener('click',()=>{
+        markCandidates=markCandidates.filter(item=>item.char!==char);
+        card.remove();
+        $('apply-mark-spacing').disabled=!markCandidates.length;
+        status('Đã từ chối thay đổi cho chữ '+char+'. Glyph gốc được giữ nguyên.');
+      });
+      actions.append(accept,reject);card.append(actions);
       proof.append(card);
     }
     $('mark-spacing-report').textContent='Đề xuất '+proposals.length+' chữ có dấu rời; bỏ qua '+skipped.length+' chữ không chắc chắn. Không thay hình dạng nét. Xem trước rồi bấm Áp dụng, hoặc đóng để hủy.';
