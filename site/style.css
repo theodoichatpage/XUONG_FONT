@@ -287,3 +287,9 @@ dialog::backdrop{background:#221a17bd}
 @media(max-width:620px){.masthead-start{flex-wrap:wrap}.masthead .studio-tabs{max-width:100%;overflow-x:auto;flex-shrink:1}}
 
 .rules-glossary dt{font-weight:600;margin-top:12px}.rules-glossary dd{margin:3px 0 0;line-height:1.65}
+
+.rule-illustration{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line)}
+.rule-illustration a{display:block;background:white;border:1px solid var(--line);border-radius:7px;padding:8px;overflow:hidden;cursor:zoom-in}
+.rule-illustration svg{display:block;width:100%;height:auto;overflow:hidden;background:white}
+.rule-illustration figcaption{margin-top:8px;color:var(--muted);font-size:13px;line-height:1.5}
+.rule-illustration figcaption span{display:block;font-size:12px;margin-top:3px}
