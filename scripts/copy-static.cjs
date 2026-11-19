@@ -4,6 +4,10 @@ for (const file of ['index.html', 'style.css']) copyFileSync('site/' + file, 'di
 
 cpSync('site/references', 'dist/references', { recursive: true });
 
+// Ship the licensed checker and its local font catalogue with the production build.
+cpSync('site/colorme-check', 'dist/colorme-check', { recursive: true });
+cpSync('site/js/vendor/google-fonts-list-2026.10', 'dist/js/vendor/google-fonts-list-2026.10', { recursive: true });
+
 const html = readFileSync('site/index.html', 'utf8');
 const css = readFileSync('dist/style.css', 'utf8');
 const js = readFileSync('dist/app.js', 'utf8').replace(/<\/script/gi, '<\\/script');
