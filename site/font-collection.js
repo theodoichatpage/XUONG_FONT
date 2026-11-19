@@ -165,6 +165,27 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   let previewFace;
   let previewRevision = 0;
   let working = false;
+  let editingRecord;
+  const workspace = $('font-workspace');
+  const createTab = $('open-font-workspace');
+  const collectionTab = $('open-font-collection');
+  const collectionVisible = () => !dialog.hidden;
+  function selectTab(collection) {
+    workspace.hidden = collection;
+    dialog.hidden = !collection;
+    createTab.setAttribute('aria-selected', String(!collection));
+    collectionTab.setAttribute('aria-selected', String(collection));
+    createTab.tabIndex = collection ? -1 : 0;
+    collectionTab.tabIndex = collection ? 0 : -1;
+    if (!collection) clearPreview();
+  }
+  createTab.addEventListener('click', () => selectTab(false));
+  for (const tab of [createTab, collectionTab]) tab.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? createTab : event.key === 'End' ? collectionTab : tab === createTab ? collectionTab : createTab;
+    next.click(); next.focus();
+  });
 
   function clearPreview() {
     previewRevision++;
@@ -181,6 +202,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     const revision = previewRevision;
     const record = records.find(item => item.id === selectedId);
     $('collection-editor').hidden = !record;
+    $('collection-empty').hidden = !!record;
     if (!record) return;
     name.value = record.name;
     preview.textContent = sample.value;
@@ -190,12 +212,12 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     try {
       const face = new FontFace('collection-preview-' + revision, await record.blob.arrayBuffer());
       await face.load();
-      if (revision !== previewRevision || !dialog.open) return;
+      if (revision !== previewRevision || !collectionVisible()) return;
       document.fonts.add(face);
       previewFace = face;
       preview.style.fontFamily = face.family + ', serif';
     } catch {
-      if (revision === previewRevision && dialog.open) status.textContent = 'Trình duyệt chưa xem thử được font này.';
+      if (revision === previewRevision && collectionVisible()) status.textContent = 'Trình duyệt chưa xem thử được font này.';
     }
   }
 
@@ -222,13 +244,13 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     $('collection-fonts').hidden = !records.length;
     $('collection-count').textContent = '(' + records.length + ')';
     renderFamilies(true);
-    if (dialog.open) await showSelection();
+    if (collectionVisible()) await showSelection();
   }
 
   function renderFamilies(revealSelected = false, focusKey) {
     const rows = groups.flatMap(group => expandedFamilies.has(group.key)
       ? [{ group }, ...group.members.map(record => ({ group, record }))] : [{ group }]);
-    const pageSize = 3;
+    const pageSize = 12;
     const pages = Math.max(1, Math.ceil(rows.length / pageSize));
     const selectedRow = rows.findIndex(row => row.record?.id === selectedId && row.record);
     if (revealSelected && selectedRow >= 0) page = Math.floor(selectedRow / pageSize);
@@ -242,7 +264,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         button.textContent = record.name;
         button.setAttribute('aria-pressed', String(record.id === selectedId));
         button.addEventListener('click', () => {
-          if (working) return;
+          if (working || familyRunning) return;
           fonts.querySelector('[aria-pressed="true"]')?.setAttribute('aria-pressed', 'false');
           button.setAttribute('aria-pressed', 'true');
           selectedId = record.id;
@@ -289,7 +311,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   }
 
   $('open-font-collection').addEventListener('click', () => {
-    dialog.showModal();
+    selectTab(true);
     run(async () => {
       const removed = await cleanHungCopies() + await cleanDuplicates();
       await refresh();
@@ -297,7 +319,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
       else if (!records.length) status.textContent = 'Bạn chưa lưu font nào.';
     });
   });
-  dialog.addEventListener('close', clearPreview);
+
   sample.addEventListener('input', () => { preview.textContent = sample.value; });
 
   files.addEventListener('change', () => {
@@ -331,7 +353,14 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   saveCurrent.addEventListener('click', () => run(async () => {
     const record = getCurrentFont();
     if (!record) return;
-    const { id, duplicate } = await addFont(record);
+    let result;
+    if (editingRecord && record.name === editingRecord.name.slice(0, 40)) {
+      const updated = { ...editingRecord, ...record, digest: await fontDigest(record.blob) };
+      await accessFonts('readwrite', store => store.put(updated));
+      editingRecord = updated;
+      result = { id: updated.id, duplicate: false };
+    } else result = await addFont(record);
+    const { id, duplicate } = result;
     await refresh(id);
     status.textContent = duplicate ? 'Trùng font: ' + record.name + ' đã có trong bộ sưu tập.' : 'Đã lưu ' + record.name + '.';
   }));
@@ -352,27 +381,42 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     const record = records.find(item => item.id === selectedId);
     if (!record) return;
     run(async () => {
-      if (await vietnamize(record)) dialog.close();
+      if (await vietnamize(record)) { editingRecord = undefined; selectTab(false); }
     });
   });
 
+
+  $('collection-edit').addEventListener('click', () => {
+    const record = records.find(item => item.id === selectedId);
+    if (!record) return;
+    run(async () => {
+      if (await vietnamize(record, { editOnly: true })) {
+        editingRecord = record;
+        selectedId = record.id;
+        selectTab(false);
+      }
+    });
+  });
 
   const familyDialog = $('family-dialog');
   let familyRecord;
   let familyRunning = false;
   const familyAssets = [];
   $('collection-family-open').addEventListener('click', () => {
-    if (working) return;
+    if (working || familyRunning) return;
     familyRecord = records.find(record => record.id === selectedId);
     if (!familyRecord) return;
     const group = groups.find(group => group.members.some(record => record.id === familyRecord.id));
     familyRecord = { ...familyRecord, family: group?.family || familyRecord.name };
     $('family-status').textContent = '';
     $('family-source').textContent = 'Font gốc: ' + familyRecord.name;
-    familyDialog.showModal();
+    familyDialog.hidden = false;
+    $('family-title').focus();
+    familyDialog.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
-  familyDialog.addEventListener('cancel', event => { if (familyRunning) event.preventDefault(); });
-  familyDialog.addEventListener('close', () => {
+  $('family-close').addEventListener('click', () => {
+    if (familyRunning) return;
+    familyDialog.hidden = true;
     for (const asset of familyAssets) { URL.revokeObjectURL(asset.url); document.fonts.delete(asset.face); }
     familyAssets.length = 0;
     $('family-results').replaceChildren();
@@ -414,7 +458,16 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         }
         const savedLabel = document.createElement('span');
         savedLabel.textContent = result.style === 'Regular' ? 'Font gốc trong bộ sưu tập' : 'Đã tự lưu vào ' + result.family;
-        const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,savedLabel);
+        const editButton = document.createElement('button');
+        editButton.disabled = true;
+        editButton.dataset.familyEdit = '';
+        editButton.type = 'button'; editButton.textContent = 'Chỉnh sửa ' + result.style;
+        editButton.addEventListener('click', () => run(async () => {
+          const target = result.style === 'Regular' ? records.find(item => item.id === familyRecord.id)
+            : records.find(item => item.family === result.family && item.style === result.style && item.generatedFrom === (familyRecord.generatedFrom ?? familyRecord.id));
+          if (target && await vietnamize(target, { editOnly: true })) { editingRecord = target; selectedId = target.id; selectTab(false); }
+        }));
+        const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,editButton,savedLabel);
         row.append(label,proof,actions); $('family-results').append(row);
         $('family-status').textContent = 'Đã tạo ' + result.style + '.';
       });
@@ -424,7 +477,9 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
       await refresh(familyRecord.id);
       $('family-status').textContent = 'Tạo family chưa hoàn tất: ' + error.message + '. Các kiểu đã lưu vẫn có trong bộ sưu tập.';
     }
-    finally { familyRunning = false; $('family-create').disabled = $('family-close').disabled = false; }
+    finally { familyRunning = false; $('family-create').disabled = $('family-close').disabled = false;
+      familyDialog.querySelectorAll('[data-family-edit]').forEach(button => { button.disabled = false; });
+    }
   });
 
   $('collection-remove').addEventListener('click', () => {

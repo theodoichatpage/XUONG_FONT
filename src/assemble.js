@@ -16,13 +16,13 @@ const escAttr = (s) => s.replace(/[&<>"']/g, (c) => `&#x${c.codePointAt(0).toStr
  * @param {{wordSpace?:number}} opts
  * @returns {Buffer} TTF
  */
-function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT, kerning = [] } = {}) {
+function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT, kerning = [], familyName = name, styleName = 'Regular', weight = 400 } = {}) {
   const id = name.replace(/[^A-Za-z0-9_-]+/g, '') || 'DrawYourFont';
   const parts = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg"><defs>`,
     `<font id="${id}" horiz-adv-x="${wordSpace}">`,
-    `<font-face font-family="${escAttr(name)}" units-per-em="${UPM}" ascent="${ascent}" descent="${descent}" x-height="${XH}" cap-height="${CAP}"/>`,
+    `<font-face font-family="${escAttr(familyName)}" font-weight="${weight}" units-per-em="${UPM}" ascent="${ascent}" descent="${descent}" x-height="${XH}" cap-height="${CAP}"/>`,
     `<missing-glyph horiz-adv-x="${Math.round(UPM / 2)}"/>`,
     `<glyph glyph-name="space" unicode="${esc(' ')}" horiz-adv-x="${wordSpace}" d=""/>`,
   ];
@@ -32,7 +32,7 @@ function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DE
     parts.push(`<glyph glyph-name="${gname}" unicode="${esc(g.char)}" horiz-adv-x="${g.advance}" d="${g.d}"/>`);
   }
   parts.push(`</font></defs></svg>`);
-  const ttf = svg2ttf(parts.join('\n'), { description: 'Made with draw-your-font', url: 'https://github.com/danilo-znamerovszkij/draw-your-font' });
+  const ttf = svg2ttf(parts.join('\n'), { familyname: familyName, subfamilyname: styleName, fullname: name, description: 'Made with draw-your-font', url: 'https://github.com/danilo-znamerovszkij/draw-your-font' });
   return Buffer.from(kerning.length ? addKerning(ttf.buffer, kerning) : ttf.buffer);
 }
 

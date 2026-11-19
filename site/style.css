@@ -234,3 +234,27 @@ dialog::backdrop{background:#221a17bd}
 /* Keep the family action clear of the textarea border and resize handle. */
 #family-text{margin-bottom:12px;min-height:64px}
 #family-create{display:block;margin-top:0}
+
+.studio-tabs{display:flex;gap:8px;padding:8px clamp(14px,2vw,36px) 0;border-bottom:1px solid var(--line);background:var(--panel)}
+.studio-tabs button{border:0;border-radius:7px 7px 0 0;padding:9px 16px;color:var(--muted)}
+.studio-tabs button[aria-selected=true]{background:var(--red);color:white}
+#font-collection{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+#font-collection>.viewer-toolbar{padding:0 0 12px;border:0}
+#font-collection .collection-body{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:18px;padding:0;flex:1;min-height:0;overflow:hidden}
+.collection-library,.collection-detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-height:0;overflow:auto;overscroll-behavior:contain}
+.collection-library>.tool-row{margin-bottom:10px}
+#collection-editor{display:block;margin:0}
+#collection-preview{min-height:180px;padding:18px;margin-top:12px;overflow:auto}
+#family-dialog{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+#family-dialog .viewer-toolbar{padding:0;border:0;gap:12px}
+.family-body{padding-top:14px}
+#family-results section{min-width:0}
+#collection-families button{padding:8px;font-size:14px}
+@media(min-width:1024px) and (min-height:520px){body{grid-template-rows:auto auto minmax(0,1fr)}}
+@media(max-width:800px){#font-collection .collection-body{grid-template-columns:1fr;overflow:visible}#font-collection{height:auto;overflow:visible}.collection-library,.collection-detail{overflow:visible}.studio-tabs button{font-size:14px;padding-inline:12px}}
+
+.studio-tabs #open-font-collection{color:var(--muted);border:0;padding:9px 16px;font-size:15px}
+.studio-tabs #open-font-collection[aria-selected=true]{color:white;background:var(--red)}
+.studio-tabs #open-font-collection:hover{color:var(--red);background:var(--accent)}
+.studio-tabs #open-font-collection[aria-selected=true]:hover{color:white;background:var(--red-dark)}
+#collection-empty{padding:20px;color:var(--muted)}

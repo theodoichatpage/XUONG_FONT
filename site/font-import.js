@@ -26,7 +26,7 @@ export async function importFontFile(record) {
     return indexChars.has(a) && indexChars.has(b)
       ? [[indexChars.get(a), indexChars.get(b), Math.round(amount * scale)]] : [];
   });
-  return { glyphs, metrics: { ascent: Math.ceil(font.ascender * scale),
+  return { glyphs, styleMetrics: { familyName: record.family || font.getEnglishName('preferredFamily') || font.getEnglishName('fontFamily'), styleName: record.style || font.getEnglishName('fontSubfamily') || 'Regular', weight: font.tables.os2?.usWeightClass || 400 }, metrics: { ascent: Math.ceil(font.ascender * scale),
     descent: Math.floor(font.descender * scale), wordSpace: glyphs.get(' ')?.advance, kerning } };
 }
 
