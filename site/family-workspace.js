@@ -5,6 +5,8 @@ import {createFamilyProject,saveFamilyProject,listFamilyProjects,loadFamilyProje
 import {redrawFontImage} from './ai-design.js';
 import {referenceCanvas,isCleanReference} from './reference-image.js';
 import {layoutFromText} from './local-layout.js';
+// Tăng khi cách tách vùng thay đổi để ảnh đã tách theo cách cũ được tách lại.
+const LAYOUT_VERSION=2;
 import {canApproveProof,proofMetricVersion} from './proof-approval.js';
 import {reuseReferenceComponents} from './reference-components.js';
 import {retraceSettings} from './reference-mask.js';
@@ -129,7 +131,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   for(const type of ['dragover','drop'])$('drop').addEventListener(type,e=>{e.preventDefault();e.stopPropagation();if(type==='drop')void run(()=>addImages(e.dataTransfer.files));});
 
   $('analyze').onclick=()=>run(async()=>{
-    const pendingImages=project.images.filter(i=>(!i.analysis||i.analysisVersion!==2||(i.layoutText&&i.analysisText!==i.layoutText))&&!i.excluded&&inFlow(i));
+    const pendingImages=project.images.filter(i=>(!i.analysis||i.analysisVersion!==2||(i.layoutText&&(i.analysisText!==i.layoutText||i.layoutVersion!==LAYOUT_VERSION)))&&!i.excluded&&inFlow(i));
     const key=getKey();if(!key&&pendingImages.some(i=>!i.layoutText))throw Error('Nhập khóa Gemini ở thanh trên, hoặc gõ nội dung chữ dưới ảnh để dựng không cần Gemini.');
     for(const [index,image]of pendingImages.entries()){
       say('Đang phân tích ảnh '+(index+1)+': '+image.name);
@@ -138,10 +140,10 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
         const layout=layoutFromText(await sourceCanvas(image.blob),image.layoutText);
         if(image.analysis)image.analysisHistory=[...(image.analysisHistory||[]),image.analysis].slice(-3);
         image.analysis={style:image.layoutStyle||'',confidence:1,basis:'label',evidence:'Nội dung do người dùng nhập; vùng chữ tách trên máy, không dùng AI.',quality:'needs-review',profile:{},words:layout.words,lines:[],textLines:layout.lines,source:'local',needsConfirmation:!image.layoutStyle};
-        image.analysisVersion=2;image.analysisText=image.layoutText;
-        image.traceDiagnostics=layout.diagnostics.map(d=>({text:d.text,status:'too-few-words',expected:d.expected,parts:d.found}));
+        image.analysisVersion=2;image.analysisText=image.layoutText;image.layoutVersion=LAYOUT_VERSION;
+        image.layoutWarnings=layout.diagnostics.map(d=>d.message);
         if(image.layoutStyle&&(!image.confirmed||image.styleChosenBy==='user')){image.styleId=image.layoutStyle;image.confirmed=true;image.styleChosenBy='user';}
-        await persist('Đã tách '+layout.words.length+' từ trong '+image.name+' (không dùng Gemini)');render();continue;
+        await persist('Đã tách '+layout.words.length+' từ trong '+image.name+' (không dùng Gemini)'+(image.layoutWarnings.length?'. '+image.layoutWarnings.join(' '):''));render();continue;
       }
       const canvas=await sourceCanvas(image.blob),preview=document.createElement('canvas'),scale=Math.min(1,1200/Math.max(canvas.width,canvas.height));preview.width=Math.round(canvas.width*scale);preview.height=Math.round(canvas.height*scale);preview.getContext('2d').drawImage(canvas,0,0,preview.width,preview.height);
       const response=await fetch('/api/glyph-review',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key},body:JSON.stringify({mode:'family-analysis',image:preview.toDataURL('image/jpeg',.88).split(',')[1],preferredModel:getModel()}),signal:flowSignal?AbortSignal.any([flowSignal,AbortSignal.timeout(88000)]):AbortSignal.timeout(88000)});
@@ -259,7 +261,8 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       const style=activeStyle();if(!style.glyphs.length)throw Error('Ảnh đã lưu nhưng chưa tách được chữ đáng tin cậy. Cần ảnh rõ hơn; Xưởng chưa tạo font.');
       await persist('Đã dựng và kiểm '+total+' chữ trong '+styles.length+' kiểu; giữ bản nháp để bạn xem');
       await onResult?.(project,style);root.open=false;render();
-      say('Bản nháp có '+style.glyphs.length+' chữ chưa duyệt cho '+readableStyle(styleId)+'. Bấm Đối chiếu chữ đã tách để kiểm đúng ký tự và đường nét. Chữ thiếu không được tự bịa.');
+      const layoutWarnings=project.images.filter(i=>inFlow(i)&&i.layoutText).flatMap(i=>i.layoutWarnings||[]);
+      say('Bản nháp có '+style.glyphs.length+' chữ chưa duyệt cho '+readableStyle(styleId)+'. Bấm Đối chiếu chữ đã tách để kiểm đúng ký tự và đường nét. Chữ thiếu không được tự bịa.'+(layoutWarnings.length?' Lưu ý: '+layoutWarnings.join(' '):''));
       return {ok:true,projectId:project.id};
     }catch(error){say(signal?.aborted?'Đã dừng. Ảnh và phần đã dựng vẫn được giữ.':error.message);return {ok:false};}
     finally{flowRunning=false;flowSignal=undefined;flowTarget=undefined;flowImages=undefined;}

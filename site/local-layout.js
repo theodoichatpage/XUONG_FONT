@@ -77,6 +77,7 @@ export function components(ink, W, H) {
   }));
 }
 
+const PUNCTUATION = /[.,;:!?…"'“”‘’()\[\]\-–—\/]/u;
 const median = values => { const s = [...values].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : 0; };
 const overlapX = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
 const union = items => ({
@@ -107,10 +108,11 @@ export function layoutFromText(canvas, text) {
   const bodies = comps.filter(c => c.h >= 0.55 * ref).sort((a, b) => a.cy - b.cy);
   const lineBodies = splitAtLargestGaps(bodies, textLines.length, (a, b) => b.cy - a.cy);
   if (!lineBodies) throw Error(`Nội dung có ${textLines.length} dòng nhưng ảnh chỉ thấy ${bodies.length} khối chữ. Kiểm tra lại nội dung đã gõ.`);
-  const lines = lineBodies.map(items => ({ bodies: items.sort((a, b) => a.x0 - b.x0), marks: [] }));
+  const lines = lineBodies.map(items => ({ bodies: items.sort((a, b) => a.x0 - b.x0), marks: [], loose: [] }));
   const bodySet = new Set(bodies);
 
-  // Dấu/chấm gắn vào thân chữ ngay trên hoặc dưới nó; vùng nhỏ lạc (dấu câu) theo dòng gần nhất.
+  // Dấu/chấm gắn vào thân chữ ngay trên hoặc dưới nó. Vùng nhỏ còn lại (dấu câu, chữ nhỏ ghi chú,
+  // vạch trang trí) để riêng; chỉ giữ đúng số dấu câu có trong nội dung đã gõ.
   for (const c of comps) {
     if (bodySet.has(c)) continue;
     let best = null;
@@ -132,7 +134,7 @@ export function layoutFromText(canvas, text) {
       const d = Math.abs(c.cy - (top + bottom) / 2);
       if (d < distance && c.y0 > top - 0.5 * ref && c.y1 < bottom + 0.8 * ref) { distance = d; nearest = index; }
     });
-    if (distance < Infinity) lines[nearest].marks.push(c);
+    if (distance < Infinity) lines[nearest].loose.push(c);
   }
 
   const words = [], lineBoxes = [], diagnostics = [];
@@ -142,8 +144,10 @@ export function layoutFromText(canvas, text) {
     const bottom = Math.min(1000, Math.ceil((box.y1 + pad) / H * 1000)), right = Math.min(1000, Math.ceil((box.x1 + pad) / W * 1000));
     return [top, left, Math.max(bottom, top + 1), Math.max(right, left + 1)];
   };
+  const warn = (index, textLine, message) => diagnostics.push({ line: index + 1, text: textLine, message });
   lines.forEach((line, index) => {
     const textLine = textLines[index], wordTexts = textLine.split(' ');
+    const letters = [...textLine.replace(/\s/gu, '')].filter(ch => !PUNCTUATION.test(ch)).length;
     // Gộp thân chồng nhau theo chiều ngang thành cột để không cắt giữa một chữ.
     const columns = [];
     for (const b of line.bodies) {
@@ -151,20 +155,37 @@ export function layoutFromText(canvas, text) {
       if (last && b.x0 < last.x1) { last.x1 = Math.max(last.x1, b.x1); last.items.push(b); }
       else columns.push({ x0: b.x0, x1: b.x1, items: [b] });
     }
-    const groups = splitAtLargestGaps(columns, wordTexts.length, (a, b) => b.x0 - a.x1);
-    if (!groups) {
-      diagnostics.push({ line: index + 1, text: textLine, status: 'too-few-words', expected: wordTexts.length, found: columns.length });
+    // Số khối chữ lớn trên ảnh lệch quá xa số chữ đã gõ: nội dung không khớp, bỏ dòng thay vì dựng sai.
+    if (columns.length < 0.5 * letters || columns.length > 1.6 * letters + 1) {
+      warn(index, textLine, `Dòng ${index + 1}: ảnh có ${columns.length} chữ lớn nhưng nội dung gõ "${textLine}" có ${letters} chữ. Chỉ gõ những chữ cùng cỡ có trong dòng đó, bỏ phần chữ nhỏ ghi chú. Dòng này đã bỏ qua.`);
       return;
     }
-    const spans = groups.map(g => ({ x0: g[0].x0, x1: g.at(-1).x1, items: g.flatMap(col => col.items) }));
-    for (const m of line.marks) {
-      const inside = spans.find(s => s.x0 <= m.cx && m.cx <= s.x1);
-      const target = inside || spans.reduce((a, b) => Math.min(Math.abs(m.cx - a.x0), Math.abs(m.cx - a.x1)) <= Math.min(Math.abs(m.cx - b.x0), Math.abs(m.cx - b.x1)) ? a : b);
-      target.items.push(m);
+    const groups = splitAtLargestGaps(columns, wordTexts.length, (a, b) => b.x0 - a.x1);
+    if (!groups) {
+      warn(index, textLine, `Dòng ${index + 1}: nội dung có ${wordTexts.length} từ nhưng ảnh chỉ thấy ${columns.length} khối chữ. Dòng này đã bỏ qua.`);
+      return;
     }
-    spans.forEach((span, i) => words.push({ text: wordTexts[i], box: norm(union(span.items)) }));
+    const spans = groups.map((g, i) => ({ x0: g[0].x0, x1: g.at(-1).x1, items: g.flatMap(col => col.items), text: wordTexts[i], columns: g.length }));
+    const nearestSpan = m => spans.find(s => s.x0 <= m.cx && m.cx <= s.x1)
+      || spans.reduce((a, b) => Math.min(Math.abs(m.cx - a.x0), Math.abs(m.cx - a.x1)) <= Math.min(Math.abs(m.cx - b.x0), Math.abs(m.cx - b.x1)) ? a : b);
+    for (const m of line.marks) nearestSpan(m).items.push(m);
+    // Vùng nhỏ lạc: chỉ nhận dấu câu sát ngay mép một từ, tối đa bằng số dấu câu đã gõ.
+    const punctuation = [...textLine].filter(ch => PUNCTUATION.test(ch)).length;
+    const edgeGap = m => Math.min(...spans.map(s => m.cx < s.x0 ? s.x0 - m.x1 : m.cx > s.x1 ? m.x0 - s.x1 : 0));
+    const kept = line.loose.filter(m => edgeGap(m) <= 0.6 * ref && m.h < 0.9 * ref).sort((a, b) => edgeGap(a) - edgeGap(b)).slice(0, punctuation);
+    for (const m of kept) nearestSpan(m).items.push(m);
+    const ignored = line.loose.length - kept.length;
+    if (ignored) warn(index, textLine, `Dòng ${index + 1}: bỏ qua ${ignored} vùng nhỏ không có trong nội dung (chữ ghi chú, vạch trang trí…).`);
+    for (const span of spans) {
+      const expected = [...span.text].filter(ch => !PUNCTUATION.test(ch)).length;
+      if (span.columns > 2 * expected + 1 || expected > 3 * span.columns + 1) {
+        warn(index, textLine, `Dòng ${index + 1}, từ "${span.text}": vị trí trên ảnh không khớp nội dung, đã bỏ qua từ này.`);
+        continue;
+      }
+      words.push({ text: span.text, box: norm(union(span.items)) });
+    }
     lineBoxes.push({ text: textLine, box: norm(union(spans.flatMap(s => s.items))) });
   });
-  if (!words.length) throw Error('Chưa khớp được dòng nào với nội dung đã gõ. Kiểm tra số dòng và số từ.');
+  if (!words.length) throw Error('Chưa khớp được dòng nào với nội dung đã gõ. ' + diagnostics.map(d => d.message).join(' '));
   return { words, lines: lineBoxes, diagnostics };
 }
