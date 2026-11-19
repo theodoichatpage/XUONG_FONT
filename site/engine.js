@@ -167,10 +167,13 @@ function cropToImageData(ink, imgWidth, blob, coverage, scale, preserveOutline) 
 
 // ---------- trace + build ----------
 
-async function traceCrop(img, scale, photograph, preserveOutline) {
+async function traceCrop(img, scale, photograph, preserveOutline, smooth = false) {
   traceReady ??= initPotrace();
   await traceReady;
-  const svg = await potrace(img, {
+  // smooth: tham số chuẩn của Potrace. Góc thật vẫn giữ là góc, đường cong được gộp cho trơn.
+  const svg = await potrace(img, smooth ? {
+    turdsize: 2, alphamax: 1, opticurve: 1, opttolerance: 0.2 * scale, extractcolors: false,
+  } : {
     turdsize: 0,
     alphamax: preserveOutline ? .35 : photograph ? 0.88 : 0.86,
     opticurve: preserveOutline ? 0 : 1,
@@ -184,12 +187,13 @@ async function traceCrop(img, scale, photograph, preserveOutline) {
 }
 
 
-export async function makeGlyph(ink, width, box, char, coverage, preserveOutline = false) {
+export async function makeGlyph(ink, width, box, char, coverage, preserveOutline = false, smooth = false) {
   const size = Math.max(box.x1 - box.x0 + 1, box.y1 - box.y0 + 1);
-  const scale = Math.max(1, Math.min(coverage ? 2 : 3, Math.floor(900 / size)));
+  // Làm mượt: phóng crop đến 4 lần (nội suy bicubic trên độ phủ) để mép chữ nhỏ không thành bậc.
+  const scale = Math.max(1, Math.min(smooth && coverage ? 4 : coverage ? 2 : 3, Math.floor((smooth ? 1200 : 900) / size)));
   const crop = cropToImageData(ink, width, box, coverage, scale, preserveOutline);
   const fitted = !preserveOutline && char === 'm' ? fitLetterM(crop, PAD * scale) : null;
-  const traced = fitted ?? await traceCrop(crop, scale, Boolean(coverage), preserveOutline);
+  const traced = fitted ?? await traceCrop(crop, scale, Boolean(coverage), preserveOutline, smooth && preserveOutline);
   const d = !preserveOutline && traced && /^u[\u0300\u0301\u0303\u0309]?$/u.test(char.normalize('NFD'))
     ? fitLetterU(crop, PAD * scale, traced) : traced;
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);

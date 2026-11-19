@@ -54,6 +54,23 @@ function otsu(histogram, count) {
   return threshold;
 }
 
+// Độ phủ mực theo độ xám ở mép chữ, để vector đi qua mép thật giữa hai pixel thay vì bám bậc thang.
+// Mức 128 nằm đúng tại ngưỡng đã chọn, nên vùng mực không dày lên hay mỏng đi so với mặt nạ đen trắng.
+export function edgeCoverage(pixels, ink, threshold, light) {
+  const inkLevels = [], paperLevels = [];
+  for (let p = 0; p < pixels.length; p++) (ink[p] ? inkLevels : paperLevels).push(pixels[p]);
+  if (!inkLevels.length || !paperLevels.length) return ink.map(value => value * 255);
+  const middle = values => { values.sort((a, b) => a - b); return values[values.length >> 1]; };
+  const inkLevel = middle(inkLevels), paperLevel = middle(paperLevels);
+  if (Math.abs(inkLevel - paperLevel) < 24) return ink.map(value => value * 255);
+  const toInk = Math.max(1, Math.abs(threshold - inkLevel)), toPaper = Math.max(1, Math.abs(paperLevel - threshold));
+  return Uint8Array.from(pixels, value => {
+    const d = light ? value - threshold : threshold - value;   // dương: phía mực
+    const c = d >= 0 ? 128 + 127 * Math.min(1, d / toInk) : 128 - 128 * Math.min(1, -d / toPaper);
+    return Math.max(0, Math.min(255, Math.round(c)));
+  });
+}
+
 export function wordInk(canvas, box, settings) {
   const frame = region(canvas, box, 5);
   const { x, y, w, h } = frame;
@@ -78,8 +95,9 @@ export function wordInk(canvas, box, settings) {
   // Direct reconstruction: no expansion into gray neighbors, no morphology,
   // no synthetic cleanup. Uncertain backgrounds remain visible for review.
   if (!settings?.legacyCleanup) {
-    return { frame, ink, coverage: ink.map(value=>value*255), preserveOutline:true,
-      processing:{threshold,light,method:'threshold-only',morphology:false} };
+    const smooth = settings?.smooth !== false;
+    return { frame, ink, coverage: smooth ? edgeCoverage(pixels, ink, threshold, light) : ink.map(value=>value*255), preserveOutline:true,
+      processing:{threshold,light,method:smooth?'threshold-antialiased':'threshold-only',morphology:false,smooth} };
   }
   if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink, preserveOutline:true };
   const whiteBorder = border.subarray(235).reduce((sum, n) => sum + n, 0);
@@ -370,7 +388,7 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
       throw new Error('Vùng ảnh chỉ chứa dấu hoặc thiếu thân chữ.');
     }
   }
-  const glyph = await makeGlyph(symbolInk, w, bounds, char, coverage, mask.preserveOutline);
+  const glyph = await makeGlyph(symbolInk, w, bounds, char, coverage, mask.preserveOutline, !!mask.processing?.smooth);
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
   const bodyTop = mask.preserveOutline ? lowercaseBodyTop(symbolInk, w, bounds, char) : undefined;
   return { ...glyph, preserveOutline: mask.preserveOutline, processing:mask.processing,
