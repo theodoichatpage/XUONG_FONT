@@ -105,7 +105,12 @@ export function layoutFromText(canvas, text) {
   if (!comps.length) throw Error('Không thấy nét chữ trong ảnh. Cần ảnh chữ tương phản rõ với nền.');
 
   // Thân chữ: các vùng đủ cao. Dấu, chấm và dấu câu là vùng nhỏ.
-  const ref = median(comps.map(c => c.h).sort((a, b) => a - b).slice(Math.floor(comps.length * 0.3)));
+  // Cỡ chữ chuẩn lấy từ đúng số chữ người dùng đã gõ: N vùng cao nhất. Không lấy theo số đông,
+  // vì chữ ghi chú nhỏ (bảng giá, chú thích) có thể nhiều hơn chữ lớn cần dựng.
+  const typed = textLines.join('').replace(/\s/gu, '');
+  const letterCount = Math.max(1, [...typed].filter(ch => !PUNCTUATION.test(ch)).length);
+  const tallest = comps.map(c => c.h).sort((a, b) => b - a).slice(0, letterCount);
+  const ref = median(tallest);
   const bodies = comps.filter(c => c.h >= 0.55 * ref).sort((a, b) => a.cy - b.cy);
   const lineBodies = splitAtLargestGaps(bodies, textLines.length, (a, b) => b.cy - a.cy);
   if (!lineBodies) throw Error(`Nội dung có ${textLines.length} dòng nhưng ảnh chỉ thấy ${bodies.length} khối chữ. Kiểm tra lại nội dung đã gõ.`);
@@ -125,10 +130,12 @@ export function layoutFromText(canvas, text) {
         if (above && ov < 0.3 * c.w) continue;
         if (below && !above && !(b.x0 <= c.cx && c.cx <= b.x1)) continue;
         const gap = Math.max(b.y0 - c.y1, c.y0 - b.y1, 0);
-        if (!best || gap < best.gap) best = { gap, index };
+        // Dấu dưới (nặng) nằm sát chân chữ; dấu trên có thể xếp hai tầng nên được xa hơn.
+        const limit = below && !above ? 0.4 * ref : 0.7 * ref;
+        if (gap < limit && (!best || gap < best.gap)) best = { gap, index };
       }
     });
-    if (best && best.gap < 0.7 * ref) { lines[best.index].marks.push(c); continue; }
+    if (best) { lines[best.index].marks.push(c); continue; }
     let nearest = 0, distance = Infinity;
     lines.forEach((line, index) => {
       const top = median(line.bodies.map(b => b.y0)), bottom = median(line.bodies.map(b => b.y1));
@@ -173,9 +180,12 @@ export function layoutFromText(canvas, text) {
     // Vùng nhỏ lạc: chỉ nhận dấu câu sát ngay mép một từ, tối đa bằng số dấu câu đã gõ.
     const punctuation = [...textLine].filter(ch => PUNCTUATION.test(ch)).length;
     const edgeGap = m => Math.min(...spans.map(s => m.cx < s.x0 ? s.x0 - m.x1 : m.cx > s.x1 ? m.x0 - s.x1 : 0));
-    // Vùng nhỏ nằm giữa một từ (vòng của %, dấu ^ * ") luôn thuộc từ đó.
-    const inside = line.loose.filter(m => edgeGap(m) <= 0);
-    const kept = [...inside, ...line.loose.filter(m => edgeGap(m) > 0 && edgeGap(m) <= 0.6 * ref && m.h < 0.9 * ref)
+    // Vùng nhỏ nằm giữa một từ (vòng của %, dấu ^ * ") luôn thuộc từ đó: tâm nằm trong bề ngang từ
+    // và cả vùng nằm trong dải chiều cao của dòng. Chữ ghi chú lệch xuống dòng dưới không tính.
+    const lineTop = Math.min(...line.bodies.map(b => b.y0)), lineBottom = Math.max(...line.bodies.map(b => b.y1));
+    const within = m => spans.some(s => s.x0 <= m.cx && m.cx <= s.x1) && m.y0 >= lineTop - 0.35 * ref && m.y1 <= lineBottom + 0.35 * ref;
+    const inside = line.loose.filter(within);
+    const kept = [...inside, ...line.loose.filter(m => !within(m) && edgeGap(m) > 0 && edgeGap(m) <= 0.6 * ref && m.h < 0.9 * ref)
       .sort((a, b) => edgeGap(a) - edgeGap(b)).slice(0, Math.max(0, punctuation - inside.length))];
     for (const m of kept) nearestSpan(m).items.push(m);
     const ignored = line.loose.length - kept.length;

@@ -6,7 +6,7 @@ import {redrawFontImage} from './ai-design.js';
 import {referenceCanvas,isCleanReference} from './reference-image.js';
 import {layoutFromText} from './local-layout.js';
 // Tăng khi cách tách vùng thay đổi để ảnh đã tách theo cách cũ được tách lại.
-const LAYOUT_VERSION=2;
+const LAYOUT_VERSION=3;
 import {canApproveProof,proofMetricVersion} from './proof-approval.js';
 import {reuseReferenceComponents} from './reference-components.js';
 import {retraceSettings} from './reference-mask.js';
