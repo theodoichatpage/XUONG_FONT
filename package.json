@@ -10,6 +10,7 @@
     "check:font": "fontbakery check-typenetwork -n -c outline_alignment_miss -c outline_colinear_vectors -c outline_jaggy_segments -c outline_semi_vertical -c outline_short_segments"
   },
   "dependencies": {
+    "clipper-lib": "^6.4.2",
     "esm-potrace-wasm": "0.5.0",
     "opentype.js": "^1.3.4",
     "svg2ttf": "6.0.3",

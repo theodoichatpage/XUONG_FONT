@@ -1,3 +1,4 @@
+import { createFontFamily } from './font-family.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
 
@@ -351,6 +352,71 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     run(async () => {
       if (await vietnamize(record)) dialog.close();
     });
+  });
+
+
+  const familyDialog = $('family-dialog');
+  let familyRecord;
+  let familyRunning = false;
+  const familyAssets = [];
+  $('collection-family-open').addEventListener('click', () => {
+    if (working) return;
+    familyRecord = records.find(record => record.id === selectedId);
+    if (!familyRecord) return;
+    $('family-source').textContent = 'Font gốc: ' + familyRecord.name;
+    familyDialog.showModal();
+  });
+  familyDialog.addEventListener('cancel', event => { if (familyRunning) event.preventDefault(); });
+  familyDialog.addEventListener('close', () => {
+    for (const asset of familyAssets) { URL.revokeObjectURL(asset.url); document.fonts.delete(asset.face); }
+    familyAssets.length = 0;
+    $('family-results').replaceChildren();
+  });
+  $('family-create').addEventListener('click', async () => {
+    if (familyRunning || !familyRecord) return;
+    const styles = [['family-medium','Medium'],['family-semibold','SemiBold'],['family-bold','Bold']]
+      .filter(([id]) => $(id).checked).map(([,style]) => style);
+    if (!styles.length) { $('family-status').textContent = 'Chọn ít nhất một kiểu chữ.'; return; }
+    familyRunning = true;
+    $('family-create').disabled = $('family-close').disabled = true;
+    for (const asset of familyAssets) { URL.revokeObjectURL(asset.url); document.fonts.delete(asset.face); }
+    familyAssets.length = 0;
+    $('family-results').replaceChildren();
+    $('family-status').textContent = 'Đang tạo family…';
+    try {
+      await createFontFamily(familyRecord, styles, $('family-text').value, async result => {
+        const face = new FontFace('family-proof-' + crypto.randomUUID(), await result.blob.arrayBuffer());
+        await face.load();
+        document.fonts.add(face);
+        const url = URL.createObjectURL(result.blob);
+        familyAssets.push({ face, url });
+        const row = document.createElement('section');
+        row.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--line)';
+        const label = document.createElement('strong');
+        label.textContent = result.style;
+        const proof = document.createElement('p');
+        proof.style.cssText = 'font-size:32px;overflow-wrap:anywhere;white-space:pre-wrap';
+        proof.style.fontFamily = face.family;
+        proof.textContent = result.text;
+        const link = document.createElement('a');
+        link.className = 'download'; link.href = url; link.download = result.filename; link.textContent = 'Tải ' + result.style;
+        const saveButton = document.createElement('button');
+        saveButton.type = 'button'; saveButton.textContent = 'Lưu bộ sưu tập';
+        saveButton.addEventListener('click', async () => {
+          saveButton.disabled = true;
+          try {
+            const added = await addFont(result);
+            saveButton.textContent = added.duplicate ? 'Đã có trong bộ sưu tập' : 'Đã lưu';
+            await refresh(added.id);
+          } catch (error) { saveButton.disabled = false; $('family-status').textContent = error.message; }
+        });
+        const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,saveButton);
+        row.append(label,proof,actions); $('family-results').append(row);
+        $('family-status').textContent = 'Đã tạo ' + result.style + '.';
+      });
+      $('family-status').textContent = 'Đã tạo family. So sánh các kiểu bên dưới rồi tải hoặc lưu.';
+    } catch (error) { $('family-status').textContent = 'Tạo family chưa hoàn tất: ' + error.message; }
+    finally { familyRunning = false; $('family-create').disabled = $('family-close').disabled = false; }
   });
 
   $('collection-remove').addEventListener('click', () => {

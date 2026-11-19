@@ -165,6 +165,7 @@
         <div class="tool-row">
           <button type="submit">Lưu tên</button>
           <a id="collection-download" class="download">Tải font</a>
+          <button id="collection-family-open" type="button">Tạo family</button>
           <button id="collection-vietnamize" type="button">Việt hóa</button>
           <button id="collection-remove" type="button" class="quiet">Xóa font</button>
         </div>
@@ -173,6 +174,23 @@
       <textarea id="collection-sample" rows="2" maxlength="240">Sử Việt Kiêu Hùng · Tiếng Việt 123</textarea>
       <div id="collection-preview" aria-hidden="true"></div>
     </div>
+  </div>
+</dialog>
+<dialog id="family-dialog" aria-labelledby="family-title">
+  <div class="viewer-toolbar"><h2 id="family-title">Tạo family từ Regular</h2><form method="dialog"><button id="family-close">Đóng</button></form></div>
+  <div style="padding:14px;max-height:75dvh;overflow:auto">
+    <p id="family-source"></p>
+    <p class="help">Tạo bản nháp tăng độ đậm từ Regular. Kiểm tra lòng chữ và dấu trước khi sử dụng. Bản xuất giữ đường nét và kerning cơ bản, các tính năng OpenType nâng cao cần đối chiếu.</p>
+    <div class="tool-row" style="margin:10px 0">
+      <label class="check"><input id="family-medium" type="checkbox" checked> Medium</label>
+      <label class="check"><input id="family-semibold" type="checkbox" checked> SemiBold</label>
+      <label class="check"><input id="family-bold" type="checkbox" checked> Bold</label>
+    </div>
+    <label for="family-text">Nội dung so sánh</label>
+    <textarea id="family-text" rows="2" maxlength="240">Tiếng Việt · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ · 123</textarea>
+    <button id="family-create" type="button" class="primary">Tạo family</button>
+    <p id="family-status" class="help" role="status" aria-live="polite"></p>
+    <div id="family-results"></div>
   </div>
 </dialog>
 <dialog id="full-preview" aria-labelledby="full-preview-title">
