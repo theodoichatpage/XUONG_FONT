@@ -439,21 +439,6 @@
             };
         })();
 
-        // Lien ket gop y co dinh o cuoi moi cong cu (Megamind #372): mo the gop y, chi can viet, sao khong bat buoc.
-        // Gop y chi doi ColorME doc (trang thong ke /tools/usage-analytics), may chu loc noi dung va gioi han so lan gui.
-        (function () {
-            const add = () => {
-                const root = document.querySelector('[data-tool-body]');
-                if (!root || root.querySelector('.cm-fb-link') || !ToolsHelpers.feedback) return;
-                const b = document.createElement('button');
-                b.type = 'button'; b.className = 'cm-fb-link'; b.textContent = 'Góp ý cho công cụ này';
-                b.addEventListener('click', () => ToolsHelpers.feedback.note());
-                root.appendChild(b);
-            };
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add); else add();
-            document.addEventListener('cm:tool-ready', add);
-        })();
-
         // Loi moi gop y sau ket qua: the nho "Ban muon cong cu nay lam them gi?" + nut Gop y (mo the danh gia o tren).
         // Giao dien o public/js/tool-feedback-prompt.js, chi nap khi du dieu kien. Tan suat (localStorage cm-fbp):
         // - tu lan dung thanh cong thu 2 (tinh moi cong cu; lan dau tien cua lan ghe dau tien thi khong hoi)
