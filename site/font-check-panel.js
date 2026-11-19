@@ -22,21 +22,30 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     const popular=['Be Vietnam Pro','Montserrat','Inter','Playfair Display','Roboto','Lora','Oswald','Bebas Neue','Pacifico','Poppins'];
     const search=root.querySelector('[data-role=google-search]');
     const options=root.querySelector('[data-role=google-options]');
+    let selectedGoogle='Be Vietnam Pro';
     const updateOptions=()=>{
       options.replaceChildren();
-      const q=search.value.trim().toLocaleLowerCase();
-      for(const name of popular.filter(name=>name.toLocaleLowerCase().includes(q))){
+      // Popular choices always stay visible, including after selecting one.
+      for(const name of popular){
         const button=document.createElement('button');button.type='button';button.textContent=name;
-        button.classList.toggle('is-selected',name.toLocaleLowerCase()===q);
-        button.addEventListener('click',()=>{search.value=name;updateOptions();checkGoogleFont(name);});
+        button.classList.toggle('is-selected',name===selectedGoogle);
+        button.setAttribute('aria-pressed',String(name===selectedGoogle));
+        button.addEventListener('click',()=>{
+          selectedGoogle=name;search.value=name;updateOptions();checkGoogleFont(name);
+        });
         options.append(button);
       }
     };
-    search.addEventListener('input',updateOptions);
-    search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();checkGoogleFont(search.value.trim());}});
+    search.addEventListener('input',()=>{ /* Free-text Google Fonts name; keep popular choices visible. */ });
+    search.addEventListener('keydown',event=>{
+      if(event.key==='Enter'){
+        event.preventDefault();
+        const name=search.value.trim();if(!name)return;
+        selectedGoogle=name;updateOptions();checkGoogleFont(name);
+      }
+    });
     root.querySelector('.checker-google-link').addEventListener('click',event=>{event.preventDefault();search.focus();search.scrollIntoView({block:'center',behavior:'smooth'});});
-    updateOptions();
-    search.value='Be Vietnam Pro';updateOptions();
+    search.value=selectedGoogle;updateOptions();
     queueMicrotask(()=>checkGoogleFont('Be Vietnam Pro'));
   }
   let browserRequest=0;
@@ -62,6 +71,9 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     const missing=browserChars.filter(ch=>!hasBrowserGlyph(ch,family));
     const count=browserChars.length-missing.length;
     const $r=role=>root.querySelector('[data-role="'+role+'"]');
+    const animated=[root.querySelector('.checker-paper'),root.querySelector('.checker-result-card'),$r('showcase-badge'),$r('paper-stamp')].filter(Boolean);
+    animated.forEach(el=>{el.classList.remove('checker-reveal');void el.offsetWidth;el.classList.add('checker-reveal');});
+    $r('showcase-progress').style.width='0%';
     $r('showcase-name').textContent=label;
     $r('paper-name').textContent=label.toUpperCase();
     $r('showcase-description').textContent=source+' · kiểm tra hiển thị 146 ký tự trong trình duyệt.';
