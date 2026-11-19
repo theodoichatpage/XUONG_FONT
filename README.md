@@ -58,3 +58,9 @@ Kiểm thử: `npm run check:quality`, `npm run check:family`, `npm run check:re
 `npm run check:fidelity` kiểm hàm đối chiếu sản phẩm với cutoff 0, hai polarity, contour chéo, mất serif nhỏ và proof cũ. Truyền đường dẫn ảnh “Ba tên Việt trên nền trắng(4).png” để chạy 13 glyph trực tiếp theo các crop chú giải. Bài này cần runtime rasterizer như check:reconstruction. [Báo cáo bổ sung](reports/lowercase-reference-2026-11-19.md) phân biệt rõ ị trực tiếp và i suy luận bằng tái sử dụng hai contour, không vẽ lại thân.
 
 Trong Family, bấm **Đối chiếu toàn Style từ ảnh gốc** rồi duyệt các glyph vượt ngưỡng. Khi đổi ngưỡng ảnh, cần vector hóa lại trước khi duyệt. **Ghép glyph thiếu từ thành phần có mẫu** có thể suy ra i từ ị khi có đúng ba contour tách rõ và dấu nặng ở dưới baseline. Nếu không đủ chắc chắn, giữ thiếu; không cắt vào contour liền thân.
+
+### Ảnh nền trắng và bộ tách dòng
+
+Nút Tạo bộ font dùng ảnh đen–trắng sạch trực tiếp; với nền phức tạp, gọi lại `/api/font-image` để Gemini dựng ảnh nền trắng rồi lưu như ảnh con riêng, không thay ảnh gốc. Các outline đó mang nguồn `inferred/ai-redraw`. Lựa chọn Style trong tên được giữ. Gemini cung cấp phiên âm và vùng dòng; bộ tách dùng khoảng trắng thật để định vị từ và thành phần nét để tách chữ.
+
+`npm run check:clean` chạy fixture ảnh ChatGPT đã tạo trong hội thoại: 40 ký tự có outline, 29 qua ngưỡng hình học. Vùng dòng/phiên âm trong fixture được chú giải, chưa phải nghiệm thu Gemini nhận diện thực tế. Xem `reports/co-tet-clean-2026-11-19.md`.

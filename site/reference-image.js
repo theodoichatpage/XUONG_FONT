@@ -159,8 +159,10 @@ export function splitCleanWord(mask, box, chars) {
     region.set(ink.subarray(start, end), start);
   }
   const labels = new Int32Array(ink.length);
-  const tall = box => box.y1 - box.y0 + 1 >= (y1 - y0) * .47;
   let boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
+  // Crop padding and tall accents must not demote real lowercase bodies.
+  const bodyHeight = boxes.reduce((maximum,box)=>Math.max(maximum,box.y1-box.y0+1),0);
+  const tall = box => box.y1 - box.y0 + 1 >= bodyHeight * .47;
   if (mask.processing?.method !== 'threshold-only' && boxes.filter(tall).length === chars.length - 1) {
     // Two letters can touch at a tip or a serif even in very clean artwork.
     const candidate = boxes.filter(tall).sort((a, b) => (b.x1 - b.x0) - (a.x1 - a.x0))[0];
@@ -481,4 +483,45 @@ export function alignReferenceGlyphs(words) {
       };
     });
   }).flat());
+}
+
+// Use whitespace visible in the pixels to locate words inside a transcribed
+// line. No equal-width slicing, pixel deletion, stroke expansion or OCR outlines.
+export function locateLineWords(canvas, lines) {
+  const words=[];
+  for(const line of lines||[]){
+    const tokens=line.text.trim().split(/\s+/u),box=pixelBox(line.box,canvas);
+    const mask=wordInk(canvas,box),{frame,ink}=mask,gaps=[];
+    let start=-1;
+    for(let x=box.x0;x<=box.x1;x++){
+      let occupied=false;
+      if(x<box.x1)for(let y=box.y0;y<box.y1;y++)if(ink[(y-frame.y)*frame.w+x-frame.x]){occupied=true;break;}
+      if(!occupied&&start<0)start=x;
+      if(occupied&&start>=0){if(start>box.x0)gaps.push({x:Math.round((start+x)/2),width:x-start});start=-1;}
+    }
+    gaps.sort((a,b)=>b.width-a.width);
+    const chosen=gaps.slice(0,tokens.length-1);
+    if(chosen.length!==tokens.length-1||chosen.some(g=>g.width<2))continue;
+    // An ambiguous gap must not silently shift every following character.
+    if(chosen.length&&gaps[tokens.length-1]&&chosen.at(-1).width<gaps[tokens.length-1].width*1.4)continue;
+    const cuts=chosen.sort((a,b)=>a.x-b.x).map(g=>g.x);
+    tokens.forEach((text,i)=>words.push({text,box:[box.y0/canvas.height*1000,(cuts[i-1]??box.x0)/canvas.width*1000,box.y1/canvas.height*1000,(cuts[i]??box.x1)/canvas.width*1000]}));
+  }
+  return words;
+}
+
+export function isCleanReference(canvas){
+  const {data}=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+  let clean=0,total=0;
+  const stride=Math.max(1,Math.floor(canvas.width*canvas.height/200000));
+  for(let p=0;p<data.length/4;p+=stride){const i=p*4,min=Math.min(data[i],data[i+1],data[i+2]),max=Math.max(data[i],data[i+1],data[i+2]);if(min>=245||max<=40)clean++;total++;}
+  return clean/total>=.94;
+}
+
+export function refineDetectedWords(canvas, words, lines){
+  if(!lines?.length)return words;
+  const result=[],replaced=[];
+  for(const line of lines){const located=locateLineWords(canvas,[line]);if(located.length){result.push(...located);replaced.push(line);}}
+  result.push(...words.filter(word=>!replaced.some(line=>{const y=(word.box[0]+word.box[2])/2;return y>=line.box[0]&&y<=line.box[2];})));
+  return result;
 }
