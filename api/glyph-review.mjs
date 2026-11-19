@@ -67,27 +67,35 @@ function geminiError(info) {
   return json({ error: explainGeminiError(info), geminiStatus: info.status, geminiReason: info.reason }, status);
 }
 
-async function callGemini(key, body, preferred, testing, inventory, totalMs) {
+async function callGemini(key, body, preferred, testing, inventory, totalMs, fast) {
   const order = models.includes(preferred) ? [preferred, ...models.filter(model => model !== preferred)] : models;
   const deadline = AbortSignal.timeout(totalMs);
   const attemptTimeout = testing ? 4000 : inventory ? 9000 : 0;
   const request = JSON.parse(body);
+  const send = (model, thinkingLevel) => fetch(endpoint + model + ':generateContent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({ ...request, generationConfig: { ...request.generationConfig, thinkingConfig: { thinkingLevel } } }),
+    signal: attemptTimeout ? AbortSignal.any([deadline, AbortSignal.timeout(attemptTimeout)]) : deadline
+  });
   // Giữ lỗi 400 đầu tiên: nếu các mẫu sau cũng hỏng, đây thường là lý do thật.
   let earlier = null;
   for (const model of order) {
     const last = model === order.at(-1);
     try {
-      const result = await fetch(endpoint + model + ':generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          ...request, generationConfig: {
-            ...request.generationConfig,
-            thinkingConfig: { thinkingLevel: model.endsWith('-lite') ? 'minimal' : 'low' }
-          }
-        }),
-        signal: attemptTimeout ? AbortSignal.any([deadline, AbortSignal.timeout(attemptTimeout)]) : deadline
-      });
+      // Đọc và khoanh vùng chữ không cần suy luận dài: dùng mức suy nghĩ thấp nhất để phản hồi nhanh.
+      const level = fast || model.endsWith('-lite') ? 'minimal' : 'low';
+      let result = await send(model, level);
+      if (result.status === 400 && level === 'minimal' && !model.endsWith('-lite')) {
+        const info = await readGeminiError(result);
+        // Mẫu không nhận mức "minimal" thì thử lại chính mẫu đó với mức "low".
+        result = /thinking/i.test(info.message) ? await send(model, 'low') : null;
+        if (!result) {
+          if (isKeyError(info) || last) return { result: { ok: false, status: 400 }, model, info: earlier ?? info };
+          earlier ??= { ...info, model };
+          continue;
+        }
+      }
       if (result.ok) return { result, model };
       // Lỗi 400 không do khóa có thể là mẫu này không nhận tham số: thử mẫu kế tiếp.
       if (result.status === 400) {
@@ -154,7 +162,7 @@ export async function POST(request) {
           thinkingConfig: { thinkingLevel: 'low' } }
       });
     const totalMs = testing ? 13000 : familyAnalysis ? 80000 : 50000;
-    const { result, model, info } = await callGemini(key, body, preferredModel, testing, inventory, totalMs);
+    const { result, model, info } = await callGemini(key, body, preferredModel, testing, inventory, totalMs, familyAnalysis || inventory);
     if (!result.ok) return geminiError(info ?? await readGeminiError(result));
     const payload = await result.json();
     if (testing) {
