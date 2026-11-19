@@ -1635,5 +1635,28 @@ if (standaloneCheckerMount) {
   frame.loading = 'eager';
   frame.setAttribute('allow', 'clipboard-read; clipboard-write');
   standaloneCheckerMount.append(frame);
+  // Match the iframe height to its actual content so it never has a nested scrollbar.
+  // The checker is hosted on our own origin, so measuring its document is safe.
+  frame.addEventListener('load', () => {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.documentElement.style.overflowY = 'hidden';
+    doc.body.style.overflowY = 'hidden';
+    doc.body.style.margin = '0';
+    const resize = () => {
+      const root = doc.documentElement;
+      const body = doc.body;
+      const height = Math.max(root.scrollHeight, body.scrollHeight, body.offsetHeight);
+      if (height > 0) frame.style.height = height + 'px';
+    };
+    resize();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(resize);
+      observer.observe(doc.body);
+      observer.observe(doc.documentElement);
+    }
+    if (doc.fonts?.ready) doc.fonts.ready.then(resize);
+    frame.contentWindow?.addEventListener('resize', resize);
+  });
 }
 async function runFontQuality(records) { await editorFontCheck.run(records); }
