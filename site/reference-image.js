@@ -1,14 +1,15 @@
 import svgpath from 'svgpath';
 import { MAX_SIDE, makeGlyph } from './engine.js';
+import { placeReferenceWords } from './reference-placement.js';
 
 const { unifyReferenceA } = require('../src/refine-outline');
 const { connectedComponents } = require('../src/blob-core');
 const { band, LOWERCASE, XH } = require('../src/metrics');
 
-export async function referenceCanvas(file, crop) {
+export async function referenceCanvas(file, crop, {native=false}={}) {
   const image = await createImageBitmap(file);
   try {
-    const scale = Math.min(1, MAX_SIDE / Math.max(image.width, image.height));
+    const scale = native ? 1 : Math.min(1, MAX_SIDE / Math.max(image.width, image.height));
     const width = Math.max(1, Math.round(image.width * scale));
     const height = Math.max(1, Math.round(image.height * scale));
     const { x, y, w, h } = crop ?? { x: 0, y: 0, w: width, h: height };
@@ -73,7 +74,13 @@ export function wordInk(canvas, box, settings) {
   const darkBorder = border.subarray(0, threshold + 1).reduce((sum, n) => sum + n, 0);
   const light = settings?.polarity === 'light' || (settings?.polarity !== 'dark' && darkBorder > borderCount / 2);
   const ink = pixels.map(value => Number(light ? value > threshold : value <= threshold));
-  if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink };
+  // Direct reconstruction: no expansion into gray neighbors, no morphology,
+  // no synthetic cleanup. Uncertain backgrounds remain visible for review.
+  if (!settings?.legacyCleanup) {
+    return { frame, ink, coverage: ink.map(value=>value*255), preserveOutline:true,
+      processing:{threshold,light,method:'threshold-only',morphology:false} };
+  }
+  if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink, preserveOutline:true };
   const whiteBorder = border.subarray(235).reduce((sum, n) => sum + n, 0);
   const blackPixels = histogram.subarray(0, 40).reduce((sum, n) => sum + n, 0);
   const edgePixels = histogram.subarray(40, 216).reduce((sum, n) => sum + n, 0);
@@ -153,7 +160,7 @@ export function splitCleanWord(mask, box, chars) {
   const labels = new Int32Array(ink.length);
   const tall = box => box.y1 - box.y0 + 1 >= (y1 - y0) * .47;
   let boxes = connectedComponents(region, frame.w, frame.h, 3, labels);
-  if (boxes.filter(tall).length === chars.length - 1) {
+  if (mask.processing?.method !== 'threshold-only' && boxes.filter(tall).length === chars.length - 1) {
     // Two letters can touch at a tip or a serif even in very clean artwork.
     const candidate = boxes.filter(tall).sort((a, b) => (b.x1 - b.x0) - (a.x1 - a.x0))[0];
     if (candidate) {
@@ -363,7 +370,7 @@ export async function traceSymbol(mask, bbox, char, wordBox) {
   const glyph = await makeGlyph(symbolInk, w, bounds, char, coverage, mask.preserveOutline);
   if (!completeTildeO(glyph)) throw new Error('Chữ thiếu thân hoặc dấu ngã.');
   const bodyTop = mask.preserveOutline ? lowercaseBodyTop(symbolInk, w, bounds, char) : undefined;
-  return { ...glyph, preserveOutline: mask.preserveOutline,
+  return { ...glyph, preserveOutline: mask.preserveOutline, processing:mask.processing,
     referenceBodyTop: Number.isFinite(bodyTop) ? y + bodyTop : undefined,
     referenceInsets: mask.preserveOutline ? opticalInsets(symbolInk, w, bounds) : undefined, pixelCrop: { x: x + bounds.x0, y: y + bounds.y0,
     w: bounds.x1 - bounds.x0 + 1, h: bounds.y1 - bounds.y0 + 1 } };
@@ -378,6 +385,7 @@ function median(values) {
 // Every letter from the same image uses the same conversion from pixels to font units.
 export function alignReferenceGlyphs(words) {
   const glyphs = words.flat();
+  if (glyphs.length && glyphs.every(glyph=>glyph.pixelOutline)) return placeReferenceWords(words);
   const clean = glyphs.length > 0 && glyphs.every(glyph => glyph.preserveOutline);
   const baselineAnchors = clean ? glyphs.filter(({ char }) => {
     const [base, ...marks] = char.normalize('NFD');

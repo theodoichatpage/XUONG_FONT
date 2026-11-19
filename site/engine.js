@@ -172,9 +172,9 @@ async function traceCrop(img, scale, photograph, preserveOutline) {
   await traceReady;
   const svg = await potrace(img, {
     turdsize: 0,
-    alphamax: preserveOutline ? .9 : photograph ? 0.88 : 0.86,
-    opticurve: 1,
-    opttolerance: (preserveOutline ? .2 : photograph ? 1.2 : 0.38) * scale,
+    alphamax: preserveOutline ? .35 : photograph ? 0.88 : 0.86,
+    opticurve: preserveOutline ? 0 : 1,
+    opttolerance: (preserveOutline ? .05 : photograph ? 1.2 : 0.38) * scale,
     extractcolors: false,
   });
   const outline = [...svg.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].map(match => match[1]).join(' ');
@@ -194,7 +194,9 @@ export async function makeGlyph(ink, width, box, char, coverage, preserveOutline
     ? fitLetterU(crop, PAD * scale, traced) : traced;
   if (!d) throw new Error('Không tìm thấy nét chữ ' + char);
   const glyph = placeGlyph(d, crop, PAD * scale, char);
-  return { char, ...glyph, d: fitted || preserveOutline ? glyph.d : refineOutline(glyph.d, char), source: 'Ảnh mẫu' };
+  return { char, ...glyph, d: fitted || preserveOutline ? glyph.d : refineOutline(glyph.d, char),
+    ...(preserveOutline ? { origin:'direct', preserveOutline:true,
+      pixelOutline: svgpathLib(traced).translate(-PAD*scale,-PAD*scale).scale(1/scale).round(4).toString() } : {}), source: 'Ảnh mẫu' };
 }
 
 export function exportFont(name, glyphs, spacing, metrics) {

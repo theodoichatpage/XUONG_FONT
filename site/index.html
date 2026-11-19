@@ -41,6 +41,7 @@
 
 <main>
   <div id="font-workspace" class="workspace" role="tabpanel" aria-labelledby="open-font-workspace">
+    <details id="family-image-workspace" class="panel family-image-workspace"></details>
     <section class="panel source" aria-labelledby="source-title">
       <div class="panel-title"><h2 id="source-title">Ảnh mẫu và dựng chữ</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
       <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn, kéo hoặc dán ảnh (Ctrl+V)</strong><small id="filename">PNG, JPG, WebP</small></label>
@@ -57,8 +58,8 @@
           <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>Tạo bộ font</button>
           <button id="stop-design" type="button" hidden>Dừng</button>
         </div>
-        <label class="check auto-draw"><input id="auto-draw" type="checkbox" checked> Làm sạch và vẽ bổ sung bằng Gemini</label>
-        <p id="ai-scan-help" class="help">Thêm đủ ảnh rồi dựng chữ có mẫu trước.</p>
+        <label class="check auto-draw"><input id="auto-draw" type="checkbox"> Ghép dấu còn thiếu từ contour có mẫu (bản suy luận)</label>
+        <p id="ai-scan-help" class="help">Khu vực này dành cho ảnh cùng một Style. Dùng Tạo Family từ ảnh khi có nhiều Weight/Italic. Chữ có mẫu được truy vết trực tiếp, không qua ảnh AI vẽ lại. Chữ suy luận là bản nháp cần duyệt.</p>
         <details id="ai-scan-report" class="scan-report" hidden>
           <summary id="ai-scan-summary" aria-live="polite">Kết quả dựng chữ</summary>
           <p id="ai-scan-result" class="tool-popover"></p>
@@ -178,7 +179,7 @@
         <div class="tool-row">
           <button type="submit">Lưu tên</button>
           <a id="collection-download" class="download">Tải font</a>
-          <button id="collection-family-open" type="button">Tạo family</button>
+          <button id="open-image-family" type="button">Family từ ảnh đã lưu</button><button id="collection-family-open" type="button">Tạo family</button>
           <button id="collection-quality" type="button">Đánh giá font</button>
           <button id="collection-family-quality" type="button">Đánh giá family</button>
           <button id="collection-edit" type="button">Mở để chỉnh sửa</button>
@@ -192,16 +193,16 @@
       <div id="collection-preview" aria-hidden="true"></div>
     </div>
 <section id="family-dialog" aria-labelledby="family-title" hidden>
-  <div class="viewer-toolbar"><h2 id="family-title" tabindex="-1">Tạo family 16 kiểu</h2><button id="family-close" type="button">Ẩn phần tạo family</button></div>
+  <div class="viewer-toolbar"><h2 id="family-title" tabindex="-1">Tạo kiểu còn thiếu trong family</h2><button id="family-close" type="button">Ẩn phần tạo family</button></div>
   <div class="family-body">
     <p id="family-source"></p>
-    <p class="help">Mẫu family gồm 8 mức độ đậm, mỗi mức có kiểu đứng và kiểu nghiêng. Kiểu gốc giữ nguyên; các kiểu tự sinh là bản nháp cần duyệt dấu, lòng chữ và khoảng cách. Kiểu nghiêng tự động là phép nghiêng hình, chưa thay thế Italic được thiết kế riêng.</p>
+    <p class="help">Family không bắt buộc đủ 16 kiểu. Mặc định chỉ chọn kiểu đứng chưa có. Các số 200–900 là mã độ đậm OpenType, không phải độ dày nét. Không có tỷ lệ tăng nét cố định đúng cho mọi font. Kiểu gốc giữ nguyên; các kiểu tự sinh là bản nháp cần duyệt dấu, lòng chữ và khoảng cách. Kiểu nghiêng tự động là phép nghiêng hình, chưa thay thế Italic được thiết kế riêng.</p>
     <div class="family-options"><label for="family-base-weight">Font gốc tương ứng với<select id="family-base-weight"><option value="200">ExtraLight</option><option value="300">Light</option><option value="400" selected>Regular</option><option value="500">Medium</option><option value="600">SemiBold</option><option value="700">Bold</option><option value="800">ExtraBold</option><option value="900">Black</option></select></label><label for="family-italic-angle">Góc nghiêng bản nháp (độ)<input id="family-italic-angle" type="number" min="1" max="20" value="12"></label></div>
-    <div class="tool-row family-select-actions"><button id="family-select-all" type="button">Chọn đủ 16 kiểu</button><button id="family-select-upright" type="button">Chỉ kiểu đứng</button><button id="family-select-none" type="button">Bỏ chọn</button><output id="family-selection-count">16 / 16 kiểu</output></div>
+    <div class="tool-row family-select-actions"><button id="family-select-all" type="button">Chọn mọi kiểu chưa có</button><button id="family-select-upright" type="button">Chỉ kiểu đứng</button><button id="family-select-none" type="button">Bỏ chọn</button><output id="family-selection-count">16 / 16 kiểu</output></div>
     <div id="family-style-picker" class="family-style-picker" aria-label="Chọn 16 kiểu family"></div>
     <label for="family-text">Nội dung so sánh</label>
     <textarea id="family-text" rows="2" maxlength="240">Tiếng Việt · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ · 123</textarea>
-    <button id="family-create" type="button" class="primary">Tạo các kiểu đã chọn</button>
+    <button id="family-create" type="button" class="primary">Kiểm tra và tạo bản nháp</button>
     <p id="family-status" class="help" role="status" aria-live="polite"></p>
     <div id="family-results"></div>
   </div>

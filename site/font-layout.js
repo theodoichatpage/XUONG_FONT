@@ -159,6 +159,7 @@ export function fontKerning(glyphs) {
 export function balanceGlyphSpacing(glyphs, adjustment) {
   const gap = Math.max(22, 46 + adjustment);
   return glyphs.map(glyph => {
+    if (glyph.preserveOutline) return {...glyph,advance:Math.max(1,glyph.advance+adjustment)};
     if (!/^[\p{L}\p{N}]$/u.test(glyph.char)) return { ...glyph, advance: Math.max(1, glyph.advance + adjustment) };
     const { box, rows } = profile(glyph);
     const middle = rows.filter(row => row.y >= XH * .25 && row.y <= XH * .72);

@@ -38,3 +38,16 @@ npm run check:font -- --json font-audit.json path/to/font.ttf
 ```
 
 Lệnh kiểm tra các điểm lệch đường chuẩn, đoạn thẳng cùng hướng, chỗ gãy, đường gần ngang hoặc gần đứng và đoạn rất ngắn. Đọc cảnh báo theo mã Unicode rồi đối chiếu với mẫu phóng lớn để giữ các góc và chi tiết có chủ ý của kiểu chữ.
+
+
+## Family từ ảnh và phục dựng trực tiếp
+
+Trong **Tạo font mới**, mở **Tạo Family từ ảnh · Đối chiếu glyph gốc**. Đặt tên một lần; dự án có 16 vị trí, lưu được khi chưa có glyph. Thêm nhiều ảnh, phân tích bằng khóa Gemini ở thanh trên, xác nhận những phân loại chưa chắc chắn, rồi phục dựng Style đang chọn. Phân loại dựa hình dạng không có nhãn luôn cần xác nhận. Không sinh 16 kiểu từ một outline bằng offset/shear.
+
+Glyph trực tiếp: threshold có kiểm soát → Potrace WASM (không morphology, không tối ưu gộp Bézier) → một scale đồng nhất → SVG path → TTF. Không AI vẽ lại ảnh mẫu. Chữ dính không tách an toàn, watermark che nét và nguồn thiếu phải được duyệt hoặc cung cấp ảnh tốt hơn. Không có cách tự phục hồi chắc chắn nét bị che.
+
+Chọn glyph để xem ảnh gốc/vector/glyph render từ TTF, overlay và các phép đo riêng. Đây là ngưỡng rà soát của Xưởng, không phải chứng nhận giống tuyệt đối. Duyệt/khóa chỉ sau đối chiếu; glyph khóa không bị phục dựng lại tự động. Có lịch sử 10 outline/glyph. Ghép dấu chỉ dùng contour dấu có mẫu, đánh dấu suy luận. Các ký tự chưa đủ thành phần giữ trống.
+
+Dự án ở IndexedDB `xuong-font-family-projects` v1, độc lập với `xuong-font-collection` và `xuong-font-references`; không migration phá dữ liệu. Backup JSON chứa ảnh, glyph và lịch sử; khôi phục thành bản riêng. Bấm lưu TTF vào Bộ sưu tập để dùng luồng cũ; bấm mở Style và lưu phần sửa về Style để chuyển qua lại. Font xuất thiếu ký tự được ghi là DRAFT. Family chỉ xuất các Style đã qua điều kiện kỹ thuật, duyệt glyph và người dùng xác nhận thử ứng dụng.
+
+Kiểm thử: `npm run check:quality`, `npm run check:family`, `npm run check:reconstruction`. Bài raster reconstruction cần `@napi-rs/canvas` trong môi trường kiểm thử (hoặc runtime do Work cung cấp), không cần cho website hay máy người dùng. Có thể truyền đường dẫn ảnh screenshot được chú giải như trong `scripts/check-reconstruction.cjs`. Xem [báo cáo ảnh thực](reports/reconstruction-2026-11-19.md) và [tình trạng triển khai](reports/implementation-2026-11-19.md).

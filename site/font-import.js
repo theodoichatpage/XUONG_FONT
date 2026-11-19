@@ -9,10 +9,15 @@ export async function importFontFile(record) {
   const scale = 1000 / font.unitsPerEm;
   const glyphs = new Map();
   const indexChars = new Map();
+  const aliases = new Map();
+  for (const [code,index] of Object.entries(font.tables.cmap.glyphIndexMap)) {
+    if (!aliases.has(index)) aliases.set(index,[]);
+    aliases.get(index).push(Number(code));
+  }
   for (let i = 0; i < font.glyphs.length; i++) {
     const glyph = font.glyphs.get(i);
     const d = svgpath(glyph.path.toPathData(3)).scale(scale).round(3).toString();
-    for (const code of glyph.unicodes) {
+    for (const code of aliases.get(i) || []) {
       if (code < 32 || code > 0x10ffff || code >= 0xd800 && code <= 0xdfff) continue;
       const char = String.fromCodePoint(code);
       glyphs.set(char, { char, d, advance: Math.round(glyph.advanceWidth * scale), source: 'Font gốc' });

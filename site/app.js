@@ -1,12 +1,14 @@
-import { makeQualitySVG, qualityProofs } from './font-quality.js';
+import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
+import { setupFamilyWorkspace } from './family-workspace.js';
 import { createFontCheckPanel } from './font-check-panel.js';
+import { reviewMarkRepairs } from './ai-mark-repair.js';
 import { adjustGlyphMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
-import { inventoryImage, redrawFontImage } from './ai-design.js';
+import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
 import { balanceGlyphSpacing, fitLowercaseT, fitLowercaseQ, fitLowercaseUStems, fontKerning, measureLeftStem, matchLeftStem, balanceFontStrokes } from './font-layout.js';
@@ -17,7 +19,12 @@ const $ = id => document.getElementById(id);
 const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
-let glyphs = new Map();
+class ProtectedGlyphMap extends Map {
+  set(char,glyph){if(this.get(char)?.locked&&this.get(char)!==glyph)return this;return super.set(char,glyph);}
+  delete(char){return this.get(char)?.locked?false:super.delete(char);}
+  clear(){for(const [char,glyph]of this)if(!glyph.locked)super.delete(char);}
+}
+let glyphs = new ProtectedGlyphMap();
 let markCandidates = [], lastMarkChange = [], auditRepairPending = false;
 let importedMetrics;
 let loadedSourceBlob;
@@ -28,6 +35,7 @@ let selected;
 let fontFace;
 let downloadURL;
 let currentFontExport;
+let repairRecheckPending = false;
 let revision = 0;
 let loadingRevision = 0;
 const references = [];
@@ -72,7 +80,7 @@ let referenceImagesNeedSave = false;
 try {
   const saved = JSON.parse(localStorage.getItem(storageKey));
   if (saved) {
-    glyphs = new Map(saved.glyphs.filter(glyph => !['AI suy đoán', 'AI theo ảnh'].includes(glyph.source))
+    glyphs = new ProtectedGlyphMap(saved.glyphs.filter(glyph => !['AI suy đoán', 'AI theo ảnh'].includes(glyph.source))
       .map(glyph => [glyph.char, glyph]));
     for (const [char, glyph] of glyphs) {
       if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base ?? char.normalize('NFD')[0])) glyphs.delete(char);
@@ -650,13 +658,13 @@ function inkBounds(ink, width) {
 }
 
 function updateComposed() {
-  const composed = composeVietnamese(glyphs);
+  const composed = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   for (const [char, glyph] of glyphs) {
     if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base)) glyphs.delete(char);
   }
   for (const glyph of composed) {
     const active = [...glyph.char.normalize('NFD')].slice(1).some(mark => toneSamples.has(mark) && glyphs.has(mark));
-    if (glyphs.get(glyph.char)?.source !== 'Font gốc' && (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active)) glyphs.set(glyph.char, glyph);
+    if (glyphs.get(glyph.char)?.origin !== 'direct' && !glyphs.get(glyph.char)?.locked && glyphs.get(glyph.char)?.source !== 'Font gốc' && (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active)) glyphs.set(glyph.char, glyph);
   }
 }
 
@@ -689,7 +697,7 @@ async function trace(single) {
     image.height = area.h;
     image.getContext('2d').putImageData(source, -area.x, -area.y);
     const rect = { x0: 0, y0: 0, x1: image.width, y1: image.height };
-    const mask = wordInk(image, rect);
+    const mask = wordInk(image, rect, {polarity: $('polarity').value, threshold: Number($('threshold').value)});
     const tone = chars.length === 1 && toneSamples.has(chars[0]);
     const parts = tone ? [rect] : mask.preserveOutline ? splitReferenceWord(mask, rect, chars) : [];
     const traced = new Map();
@@ -722,7 +730,7 @@ async function trace(single) {
         if (traced.has(char)) continue;
         status(`Đang dựng nét chữ ${i + 1}/${chars.length}…`);
         const box = boxes[i];
-        const glyph = await makeGlyph(ink, width, box, char);
+        const glyph = await makeGlyph(ink, width, box, char, undefined, true);
         if (activeReference >= 0) {
           glyph.reference = { index: activeReference, crop: {
             x: area.x + box.x0, y: area.y + box.y0, w: box.x1 - box.x0 + 1, h: box.y1 - box.y0 + 1
@@ -735,7 +743,7 @@ async function trace(single) {
     if (replacements.length && !window.confirm(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`)) {
       return status('Đã hủy thay nét.');
     }
-    for (const [char, glyph] of traced) glyphs.set(char, glyph);
+    for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
     persistReferences();
@@ -839,7 +847,7 @@ function scheduleFont() {
       return;
     }
     try {
-      const active = importedMetrics ? savedGlyphs : savedGlyphs.map(fitLowercaseT).map(fitLowercaseQ).map(fitLowercaseUStems);
+      const active = importedMetrics ? savedGlyphs : savedGlyphs.map(g=>g.preserveOutline?g:fitLowercaseUStems(fitLowercaseQ(fitLowercaseT(g))));
       const name = $('name').value.trim() || 'Xuong Font';
       let ascent = importedMetrics?.ascent ?? ASCENT, descent = importedMetrics?.descent ?? DESCENT;
       for (const glyph of active) {
@@ -861,8 +869,9 @@ function scheduleFont() {
       downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
       download.download = (name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
-      currentFontExport = { name, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId };
+      currentFontExport = { name, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
+      if (repairRecheckPending) { repairRecheckPending = false; await editorFontCheck.run([currentFontExport], { propose: false }); }
     } catch (error) {
       if (turn === revision) $('missing').textContent = 'Không xuất được font · ' + error.message;
     }
@@ -907,7 +916,7 @@ function detectedText(words) {
   return words.map(word => fontText(word.text)).join('');
 }
 
-async function traceDetectedWords(image, detectedWords, signal, index) {
+async function traceDetectedWords(image, detectedWords, signal, index, settings) {
   const words = detectedWords.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
   const neighbors = words.map(word => word.area);
   const imageGlyphs = [];
@@ -916,11 +925,11 @@ async function traceDetectedWords(image, detectedWords, signal, index) {
     if (chars.some(char => !charset.includes(char))) continue;
     const expanded = expandWordBox(original, neighbors, image);
     let area = expanded;
-    let mask = wordInk(image, area);
+    let mask = wordInk(image, area, settings);
     let parts = splitReferenceWord(mask, area, chars);
     if (!parts.length || inkCrossesBox(mask, area)) {
       area = original;
-      mask = wordInk(image, area);
+      mask = wordInk(image, area, settings);
       if (inkCrossesBox(mask, area)) continue;
       parts = splitReferenceWord(mask, area, chars);
     }
@@ -939,19 +948,6 @@ async function traceDetectedWords(image, detectedWords, signal, index) {
   return alignReferenceGlyphs(imageGlyphs);
 }
 
-async function traceGeneratedRow(image, chars, signal) {
-  const area = { x0: 0, y0: 0, x1: image.width, y1: image.height };
-  const mask = wordInk(image, area);
-  const boxes = splitWordByGaps(mask, area, chars.length);
-  if (boxes.length !== chars.length) throw new Error('Ảnh trả về chưa tách được theo đúng số ô.');
-  const glyphs = [];
-  for (const [index, char] of chars.entries()) {
-    signal.throwIfAborted();
-    glyphs.push({ ...await traceSymbol(mask, boxes[index], char), source: 'Vẽ bổ sung' });
-  }
-  return alignReferenceGlyphs([glyphs]);
-}
-
 async function runFontJob() {
   if (busy || loading || !references.length || !connectedGeminiModel || connectionRequest) return;
   const key = geminiKey.value.trim();
@@ -967,13 +963,6 @@ async function runFontJob() {
   let model = connectedGeminiModel;
   let accepted = 0;
   const autoDraw = $('auto-draw').checked;
-  const imageWarnings = [];
-  let imageServiceBlocked = false;
-  function noteImageError(label, error) {
-    controller.signal.throwIfAborted();
-    imageWarnings.push(label + ' · ' + error.message);
-    imageServiceBlocked = [400, 401, 403, 404, 429].includes(error.status);
-  }
   try {
     const observed = new Set();
     const traced = new Map();
@@ -1019,22 +1008,6 @@ async function runFontJob() {
         for (const char of fontText(text)) if (charset.includes(char)) observed.add(char);
       }
       const imageGlyphs = await traceDetectedWords(image, detectedWords, controller.signal, index);
-      const originalChars = new Set(imageGlyphs.map(glyph => glyph.char));
-      const needsCleanup = detectedWords.some(word => [...fontText(word.text)].some(char =>
-        charset.includes(char) && !originalChars.has(char) && !usableGlyph(char)));
-      if (autoDraw && !imageServiceBlocked && needsCleanup) {
-        try {
-          reportDesign(progress + ' · Đang làm sạch những chữ chưa tách được.');
-          const clean = await redrawFontImage([image], { mode: 'clean' }, key, controller.signal);
-          const checked = await inventoryImage(clean, key, model, controller.signal);
-          if (detectedText(checked.words) !== detectedText(detectedWords)) throw new Error('Ảnh làm sạch đã đổi nội dung chữ.');
-          for (const glyph of await traceDetectedWords(clean, checked.words, controller.signal)) {
-            if (!originalChars.has(glyph.char) && !usableGlyph(glyph.char)) imageGlyphs.push({ ...glyph, source: 'Ảnh làm sạch' });
-          }
-        } catch (error) {
-          noteImageError(progress, error);
-        }
-      }
       controller.signal.throwIfAborted();
       for (const glyph of imageGlyphs) {
         const { char, pixelCrop } = glyph;
@@ -1044,7 +1017,7 @@ async function runFontJob() {
           || previous.glyph.source === glyph.source && previous.pixels >= pixels)) continue;
         if (glyph.source !== 'Ảnh mẫu' && glyphs.get(char)?.source === 'Ảnh mẫu') continue;
         traced.set(char, { glyph, pixels });
-        glyphs.set(char, glyph);
+        if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
       }
       updateComposed();
       accepted = traced.size;
@@ -1054,47 +1027,8 @@ async function runFontJob() {
     inventory = { id: crypto.randomUUID(), observed: [...observed], traced: [...traced.keys()] };
     persistReferences();
 
-    if (autoDraw && !skipped.length && !imageServiceBlocked && observed.size) {
-      const referenceImages = [];
-      for (const entry of references.filter(entry => entry.settings?.detectedWords?.length).slice(0, 2)) {
-        referenceImages.push(await referenceCanvas(entry.file));
-      }
-      const groups = [
-        ['Chữ hoa', [...'ABCDEFGHIJKLMNOPQRSTUVWXYZĐ']],
-        ['Chữ thường', lowercase],
-        ['Số', [...'0123456789']],
-        ['Dấu câu và ký hiệu', punctuation]
-      ];
-      for (const [label, chars] of groups) {
-        const missing = chars.filter(char => !usableGlyph(char) && !observed.has(char));
-        for (let start = 0; start < missing.length && !imageServiceBlocked; start += 9) {
-          controller.signal.throwIfAborted();
-          const batch = missing.slice(start, start + 9);
-          reportDesign('Đang vẽ ' + label.toLowerCase() + ' · ' + batch.join(' '));
-          try {
-            const image = await redrawFontImage(referenceImages, { mode: 'row', chars: batch }, key, controller.signal);
-            // Validate letters and digits independently of the segmentation count.
-            if (batch.every(char => /[\p{L}\p{N}]/u.test(char))) {
-              const result = await inventoryImage(image, key, model, controller.signal);
-              if (detectedText(result.words) !== batch.join('')) throw new Error('Ảnh trả về sai ký tự hoặc thứ tự.');
-            }
-            for (const glyph of await traceGeneratedRow(image, batch, controller.signal)) glyphs.set(glyph.char, glyph);
-            refresh();
-          } catch (error) { noteImageError(label + ' ' + batch.join(' '), error); }
-        }
-      }
-      if (!imageServiceBlocked && [...toneSamples.keys()].some(mark => !glyphs.has(mark))) {
-        reportDesign('Đang vẽ các dấu tiếng Việt theo ảnh mẫu.');
-        try {
-          const image = await redrawFontImage(referenceImages, { mode: 'marks' }, key, controller.signal);
-          for (const glyph of await traceGeneratedRow(image, [...toneSamples.keys()], controller.signal)) {
-            if (!glyphs.has(glyph.char)) glyphs.set(glyph.char, glyph);
-          }
-        } catch (error) { noteImageError('Dấu mẫu', error); }
-      }
-    }
     controller.signal.throwIfAborted();
-    for (const glyph of composeVietnamese(glyphs)) glyphs.set(glyph.char, glyph);
+    if (autoDraw) for (const glyph of composeVietnamese(glyphs,()=>false,{requireReferenceMarks:true})) if (!glyphs.has(glyph.char)) glyphs.set(glyph.char,glyph);
     const unresolved = [...observed].filter(char => !traced.has(char) && glyphs.get(char)?.source !== 'Ảnh mẫu');
     const missing = charset.filter(char => !usableGlyph(char));
     const generated = [...glyphs.values()].filter(glyph => glyph.source === 'Vẽ bổ sung' && charset.includes(glyph.char));
@@ -1103,7 +1037,7 @@ async function runFontJob() {
       `Đã có ${charset.length - missing.length}/${charset.length} ký tự. ${accepted} ký tự dựng từ ảnh lượt này, ${generated.length} ký tự vẽ bổ sung.`,
       unresolved.length ? 'Có mẫu, chưa tách được: ' + unresolved.join(' ') + '.' : '',
       missing.length ? 'Còn thiếu: ' + missing.join(' ') + '.' : '',
-      ...skipped, ...imageWarnings
+      ...skipped
     ].filter(Boolean).join('\n'));
     if (geminiKey.value.trim() === key) {
       connectedGeminiModel = model;
@@ -1228,7 +1162,7 @@ $('import-tone-sheet').addEventListener('click', async () => {
     const next = new Map([...glyphs, ...samples]);
     const generated = applyReferenceMarks(next, [...samples.keys()]);
     for (const glyph of generated) next.set(glyph.char, glyph);
-    glyphs = next;
+    glyphs = new ProtectedGlyphMap(next);
     refresh();
     const message = `Đã nhập ${samples.size} dấu mẫu và cập nhật ${generated.length} chữ có dấu.`;
     status(message);
@@ -1267,7 +1201,7 @@ $('apply-tone-samples').addEventListener('click', () => {
 
 $('accents').addEventListener('click', () => {
   if (busy) return;
-  const generated = composeVietnamese(glyphs);
+  const generated = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   if (!generated.length) return status('Hãy thêm chữ nguyên âm gốc trước, ví dụ A, E hoặc O.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);
   refresh();
@@ -1408,7 +1342,8 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
       if (!drafts.has(glyph.char)) drafts.set(glyph.char, glyph);
     }
   }
-  glyphs = drafts;
+  auditRepairPending=false; markCandidates=[];
+  glyphs = new ProtectedGlyphMap(drafts);
   importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}) };
   loadedSourceBlob = record.blob;
   $('name').value = (record.name + (editOnly ? '' : ' Việt hóa')).slice(0, 40);
@@ -1425,6 +1360,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
 // Accent changes are previewed from the current outlines, then committed once.
 
 function previewMarkSpacing() {
+  if (auditRepairPending) return;
   if ($('mark-spacing-tools').hidden) return;
   auditRepairPending = false;
   const gap = Number($('mark-gap').value), scale = Number($('mark-scale').value) / 100;
@@ -1468,19 +1404,22 @@ function previewMarkSpacing() {
   $('apply-mark-spacing').disabled = !markCandidates.length || (gap === 0 && scale === 1);
 }
 $('open-mark-spacing').addEventListener('click', () => {
+  auditRepairPending=false;
   $('mark-spacing-tools').hidden = false;
   $('mark-spacing-scope').value = selected && [...selected.normalize('NFD')].length > 1 ? 'selected' : 'all';
   previewMarkSpacing();
   $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
 });
-$('close-mark-spacing').addEventListener('click', () => { $('mark-spacing-tools').hidden = true; });
-for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', previewMarkSpacing);
+$('close-mark-spacing').addEventListener('click', () => { auditRepairPending=false; markCandidates=[]; $('mark-spacing-tools').hidden = true; });
+for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', () => { auditRepairPending=false; previewMarkSpacing(); });
 $('apply-mark-spacing').addEventListener('click', () => {
   if (!auditRepairPending) previewMarkSpacing();
   if (!markCandidates.length) return;
   auditRepairPending = false;
   lastMarkChange = markCandidates.slice();
+  if (lastMarkChange.some(({char,before}) => glyphs.get(char) !== before)) { status('Bộ chữ đã thay đổi. Hãy đánh giá lại trước khi áp dụng.'); return; }
   for (const {char, after} of lastMarkChange) glyphs.set(char, after);
+  repairRecheckPending = true;
   refresh();
   $('mark-gap').value = 0; $('mark-scale').value = 100;
   previewMarkSpacing();
@@ -1489,7 +1428,7 @@ $('apply-mark-spacing').addEventListener('click', () => {
 });
 $('undo-mark-spacing').addEventListener('click', () => {
   for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) glyphs.set(char, before);
-  lastMarkChange = []; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
+  lastMarkChange = []; repairRecheckPending = true; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });
 
 $('rule-search').addEventListener('input', () => {
@@ -1541,15 +1480,43 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
     if (!isQualityEditorSource(result)) { status('Hãy bấm Mở font này để chỉnh sửa trước khi chỉnh dấu.'); return; }
     $('open-mark-spacing').click();
   },
-  onRepair: async (result, candidates) => {
+  onAIRepair: (result,candidates) => proposeQualityRepairs(result,candidates,{ai:true}),
+  onRepair: proposeQualityRepairs
+});
+async function verifyMarkRepairDraft(snapshot, proposals, threshold) {
+  const makeRecord = entries => {
+    const active=[...entries.values()].filter(g=>!toneSamples.has(g.char));
+    let ascent=importedMetrics?.ascent ?? ASCENT, descent=importedMetrics?.descent ?? DESCENT;
+    for(const glyph of active){const b=glyphBounds(glyph);ascent=Math.max(ascent,Math.ceil(b.y+b.height+24));descent=Math.min(descent,Math.floor(b.y-24));}
+    const bytes=exportFont($('name').value||'Xuong Font',active,0,{...importedMetrics,ascent,descent,kerning:importedMetrics?.kerning??[],wordSpace:importedMetrics?.wordSpace});
+    return {name:'Bản kiểm sửa dấu',blob:new Blob([bytes],{type:'font/ttf'})};
+  };
+  const baseline=await assessFont(makeRecord(snapshot),{minGap:threshold});
+  const key=f=>f.rule+'|'+f.chars;
+  const baselineProblems=new Set(baseline.findings.filter(f=>f.status==='fail'||f.rule==='pair-collision'||f.rule==='mark-stack').map(key));
+  let accepted=proposals.slice(); const skipped=[];
+  for(let round=0;round<3&&accepted.length;round++) {
+    status('Đang kiểm file TTF bản sửa, lượt '+(round+1)+' / 3…');
+    const draft=new Map(snapshot);for(const p of accepted)draft.set(p.char,p.after);
+    const report=await assessFont(makeRecord(draft),{minGap:threshold});
+    const newProblems=report.findings.filter(f=>(f.status==='fail'||f.rule==='pair-collision'||f.rule==='mark-stack')&&!baselineProblems.has(key(f)));
+    const rejected=accepted.filter(p=>!report.measured.some(m=>m.char===p.char&&m.gap>=threshold)||newProblems.some(f=>!f.chars||f.chars.includes(p.char)));
+    if(!rejected.length)return {accepted,skipped};
+    skipped.push(...rejected.map(p=>p.char+' (chưa vượt kiểm tra file xuất)'));
+    accepted=accepted.filter(p=>!rejected.includes(p));
+  }
+  return {accepted:[],skipped:[...skipped,...accepted.map(p=>p.char+' (chưa kiểm xong)')]};
+}
+async function proposeQualityRepairs(result, candidates, {ai=false} = {}) {
     if (!isQualityEditorSource(result)) await openQualityFont(result);
     if (!isQualityEditorSource(result)) {
       status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi sửa.');
       return;
     }
-    const threshold = 16; // Fixed conservative review threshold; automatic proposals never edit outlines until approval.
-    const proposals = [];
+    const threshold = result.threshold?.minGap ?? 16; // Fixed conservative review threshold; automatic proposals never edit outlines until approval.
+    let proposals = [];
     const skipped = [];
+    const snapshot = new Map(glyphs);
     for (const finding of candidates) {
       const char = finding.chars;
       const before = glyphs.get(char);
@@ -1568,6 +1535,28 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
       status('Chưa có dấu rời đủ điều kiện sửa tự động. Dấu liền thân và các nét giao nhau cần duyệt bằng mắt.');
       return;
     }
+    if (ai) {
+      const key = geminiKey.value.trim();
+      if (!key) { status('Nhập khóa Gemini và kiểm tra kết nối trước khi yêu cầu AI đối chiếu.'); return; }
+      try {
+        const review = await reviewMarkRepairs(proposals,key,connectedGeminiModel,status);
+        proposals = review.accepted;
+        skipped.push(...review.skipped.map(item=>item.char+' ('+item.reason+')'));
+      } catch(error) { status('AI chưa duyệt được bản sửa: '+error.message+'. Font vẫn giữ nguyên.'); return; }
+    }
+    // Read the actual proposed TTF before allowing an edit. Drop changes that
+    // leave the gap unresolved or introduce a measured collision/technical error.
+    if (proposals.length) {
+      let checked;
+      try { checked = await verifyMarkRepairDraft(snapshot,proposals,threshold); }
+      catch(error) { status('Chưa kiểm được bản sửa: '+error.message+'. Giữ nguyên font.'); return; }
+      skipped.push(...checked.skipped);
+      proposals = checked.accepted;
+    }
+    if (snapshot.size !== glyphs.size || [...snapshot].some(([char,glyph])=>glyphs.get(char)!==glyph)) {
+      status('Font đã thay đổi trong khi kiểm tra. Hãy đánh giá lại.'); return;
+    }
+    if (!proposals.length) { status('Chưa có bản sửa vượt qua kiểm tra'+(ai?' và đối chiếu AI':'')+'. Giữ nguyên font. Bỏ qua: '+skipped.join(', ')); return; }
     $('open-font-workspace').click();
     $('mark-spacing-tools').hidden = false;
     $('mark-spacing-scope').value = 'selected';
@@ -1579,12 +1568,12 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
     const proof = $('mark-spacing-proof');
     proof.replaceChildren();
     const ns = 'http://www.w3.org/2000/svg';
-    for (const {char,before,after} of proposals.slice(0,24)) {
+    for (const {char,before,after,aiReason} of proposals) {
       const a=glyphBounds(before),b=glyphBounds(after),left=Math.min(a.x,b.x)-30;
       const bottom=Math.min(a.y,b.y)-30,right=Math.max(a.x+a.width,b.x+b.width)+30;
       const top=Math.max(a.y+a.height,b.y+b.height)+30;
       const card=document.createElement('div'),title=document.createElement('strong');
-      title.textContent=char;card.append(title);
+      title.textContent=char+(aiReason?' · '+aiReason:'');card.append(title);
       for(const [label,glyph] of [['Trước',before],['Sau',after]]) {
         const figure=document.createElement('figure'),caption=document.createElement('figcaption');
         caption.textContent=label;
@@ -1603,8 +1592,10 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
         if(!proposal || glyphs.get(char)!==proposal.before){status('Glyph đã thay đổi; hãy chạy lại sửa tự động.');return;}
         glyphs.set(char,proposal.after);
         markCandidates=markCandidates.filter(item=>item.char!==char);
-        auditRepairPending=false;
+        auditRepairPending=markCandidates.length>0;
         lastMarkChange=[proposal];
+        repairRecheckPending=true;
+        card.remove();
         refresh();
         $('undo-mark-spacing').disabled=false;
         status('Đã áp dụng riêng chữ '+char+'. Có thể hoàn tác.');
@@ -1618,12 +1609,11 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
       actions.append(accept,reject);card.append(actions);
       proof.append(card);
     }
-    $('mark-spacing-report').textContent='Đề xuất '+proposals.length+' chữ có dấu rời; bỏ qua '+skipped.length+' chữ không chắc chắn. Không thay hình dạng nét. Xem trước rồi bấm Áp dụng, hoặc đóng để hủy.';
+    $('mark-spacing-report').textContent='Đã kiểm file TTF'+(ai?' và đối chiếu AI':'')+': '+proposals.length+' bản sửa dấu. Bỏ qua: '+(skipped.join(', ')||'không')+'. Xem trước rồi Áp dụng; Xưởng sẽ tự kiểm lại sau sửa. Chữ thiếu và các lỗi khác vẫn cần xử lý riêng.';
     $('apply-mark-spacing').disabled=false;
     $('mark-spacing-tools').scrollIntoView({block:'nearest'});
     status('Đã chuẩn bị '+proposals.length+' đề xuất sửa dấu. Chưa thay đổi font. Duyệt hình trước/sau rồi bấm Áp dụng.');
-  }
-});
+}
 // Licensed ColorME checker runs as a same-origin, locally hosted isolated page.
 const standaloneCheckerMount = $('standalone-font-check');
 if (standaloneCheckerMount) {
@@ -1660,3 +1650,27 @@ if (standaloneCheckerMount) {
   });
 }
 async function runFontQuality(records) { await editorFontCheck.run(records); }
+
+// Family projects use their own additive IndexedDB database. Existing fonts and references stay intact.
+let familyEditorToken;
+const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
+  traceWords: (image,words,signal,settings) => traceDetectedWords(image,words,signal,undefined,settings),
+  getKey: () => geminiKey.value.trim(), getModel: () => connectedGeminiModel,
+  exportStyle: async (family,style) => {
+    let ascent=ASCENT,descent=DESCENT;
+    for(const glyph of style.glyphs){const b=glyphBounds(glyph);ascent=Math.max(ascent,Math.ceil(b.y+b.height+24));descent=Math.min(descent,Math.floor(b.y-24));}
+    const bytes=exportFont(family+' '+style.name,style.glyphs,0,{familyName:family,styleName:style.name,weight:style.weight,italic:style.italic,angle:style.metrics?.angle??0,ascent,descent,kerning:style.metrics?.kerning??[],wordSpace:style.metrics?.wordSpace??300});
+    return new Blob([bytes],{type:'font/ttf'});
+  },
+  openStyle: async (family,style,{capture=false}={}) => {
+    if(capture) return importedMetrics?.familyEditorToken===familyEditorToken ? [...glyphs.values()] : null;
+    const byChar=new Map(style.glyphs.map(g=>[g.char,g]));
+    const bytes=exportFont(family+' '+style.name,style.glyphs,0,{familyName:family,styleName:style.name,weight:style.weight,italic:style.italic,angle:style.metrics?.angle??0});
+    const opened=await fontCollection.editRecord({name:family+' '+style.name,family,style:style.name,weight:style.weight,italic:style.italic,filename:family+'.ttf',blob:new Blob([bytes],{type:'font/ttf'})});
+    if(!opened)throw Error('Chưa mở Style trong trình sửa.');
+    for(const [char,g]of glyphs){const original=byChar.get(char);if(original)glyphs.set(char,{...original,...g,approved:original.approved,locked:original.locked});}
+    familyEditorToken=crypto.randomUUID();importedMetrics.familyEditorToken=familyEditorToken;refresh();
+  },
+  saveCollection: record=>fontCollection.storeProjectStyle(record)
+});
+$('open-image-family').addEventListener('click',()=>{$('open-font-workspace').click();familyWorkspace.open();});

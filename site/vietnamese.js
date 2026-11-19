@@ -45,7 +45,7 @@ function undotI(glyph) {
   return { ...glyph, d: stem.shape.d };
 }
 
-export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false } = {}) {
+export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false, requireReferenceMarks = false } = {}) {
   const result = [];
   for (const char of accented) {
     if (['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
@@ -57,6 +57,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     const useCompactHorn = !replaceHorn && marks.includes(horn) && glyphs.get(horned)?.hornStyle === 'compact';
     const base = useHornedSample ? horned : root;
     if (useHornedSample) marks.splice(marks.indexOf(horn), 1);
+    if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||sample.source==='Ảnh mẫu'||sample.source==='Font gốc');})) continue;
     let original = glyphs.get(base);
     if (original && base === 'i' && !marks.includes('\u0323')) original = undotI(original);
     if (!original) continue;
@@ -109,7 +110,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       } else top += 123;
       paths.push(svgpath(templates[mark]).unarc().translate(x, y).round(1).toString());
     }
-    result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', base,
+    result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', origin:'inferred', approved:false, locked:false, base,
       ...(useCompactHorn && char === horned ? { hornStyle: 'compact' } : {}) });
   }
   return result;

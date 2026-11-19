@@ -2,6 +2,7 @@ import opentype from 'opentype.js';
 import ClipperLib from 'clipper-lib';
 import svg2ttf from 'svg2ttf';
 import { familyWeights, familyStyles } from './family-styles.js';
+import { familyPreflight, missingFamilyStyles } from './family-validation.js';
 const { applyStyleMetadata } = require('../src/font-style-metadata');
 const escapeXML = value => String(value).replace(/[&<>"']/g, ch => '&#' + ch.codePointAt(0) + ';');
 const { addKerning } = require('../src/kern-table');
@@ -71,8 +72,11 @@ function embolden(path, amount) {
 }
 
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
+  if (record.projectId || record.fromImages) throw new Error('Family từ ảnh cần ảnh riêng của từng Style. Mở Tạo Family từ ảnh để tiếp tục; không sinh Bold bằng offset hoặc Italic bằng shear.');
   const original = await record.blob.arrayBuffer();
   const source = opentype.parse(original);
+  const preflight = familyPreflight(source, { baseWeight: options.baseWeight });
+  if (!preflight.ready) throw new Error('Chưa thể tạo family. ' + preflight.problems.join('. '));
   if (source.tables.fvar) throw new Error('Chọn một kiểu chữ tĩnh để tạo family.');
   if (source.tables.post?.italicAngle || (source.tables.os2?.fsSelection & 1)) throw new Error('Chọn kiểu đứng làm font gốc để tránh nghiêng chữ hai lần.');
   const base = familyWeights.find(item => item.weight === Number(options.baseWeight))
@@ -96,7 +100,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     const [a,b] = key.split(',').map(Number);
     return indexChars.has(a) && indexChars.has(b) ? [[indexChars.get(a),indexChars.get(b),value]] : [];
   });
-  const targets = [...new Set(chosen)].map(style => familyStyles.find(item => item.style === style));
+  const targets = missingFamilyStyles(chosen, options.existingStyles || []).map(style => familyStyles.find(item => item.style === style));
   if (targets.some(item => !item)) throw new Error('Kiểu family không hợp lệ.');
   for (const target of targets) {
     const { style, weight, italic } = target;
@@ -115,6 +119,15 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       const originalPath = old.path ?? new opentype.Path();
       let path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
       if (italic) path = slantPath(path, angle);
+      if (amount && originalPath.commands.length) {
+        // Offset can erase a counter or weld a detached accent. Reject that draft.
+        const topology = value => {
+          const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
+          const positive=polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
+          return [polygons.length, Math.min(positive,polygons.length-positive)].join(':');
+        };
+        if (topology(originalPath) !== topology(path)) throw new Error('Biến đổi làm mất lòng chữ hoặc nối/tách nét tại ' + (old.unicodes?.map(c=>String.fromCodePoint(c)).join('/') || '#' + i) + '. Giữ bản gốc; cần thiết kế lại mức đậm này.');
+      }
       // Avoid Glyph's constructor: opentype.js 1.x drops Unicode aliases there.
       const glyph = { unicodes: codePointsByGlyph.get(i) || [],
         advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path };
@@ -146,14 +159,19 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     bytes = applyStyleMetadata(bytes, { weight, italic, angle });
     // Verify the exported bytes before handing them to storage or preview.
     const checked = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    const outputCheck = familyPreflight(checked);
+    const outputProblems = outputCheck.problems.filter(message => message !== 'Cần chọn kiểu đứng.');
+    if (outputProblems.length) throw new Error(outputProblems.join('. '));
+    if (checked.tables.os2?.usWeightClass !== weight || !!(checked.tables.os2?.fsSelection & 1) !== italic) throw new Error('Metadata bản xuất không khớp kiểu đã chọn.');
     for (const [code, index] of Object.entries(source.tables.cmap.glyphIndexMap)) {
       const point = Number(code);
       if (index && point >= 32 && !checked.charToGlyphIndex(String.fromCodePoint(point))) {
         throw new Error('Bản xuất bị thiếu ký tự ' + String.fromCodePoint(point));
       }
+      if (index && point >= 32 && source.glyphs.get(index).path.commands.length && !checked.charToGlyph(String.fromCodePoint(point)).path.commands.length) throw new Error('Bản xuất làm rỗng glyph ' + String.fromCodePoint(point));
     }
     await onResult({ name: family + ' ' + style, family, filename: family + '-' + style.replace(/ /g, '') + '.ttf',
-      blob: new Blob([bytes], { type: 'font/ttf' }), style, weight, italic, draft: true, isSource: false, text });
+      blob: new Blob([bytes], { type: 'font/ttf' }), style, weight, italic, draft: true, quality: { coverage: outputCheck.coverage.counts, checkedAt: new Date().toISOString(), optical: 'not-tested', method: 'outline-offset', oblique: italic }, isSource: false, text });
     } catch (error) {
       if (!options.onError) throw error;
       await options.onError(style, error);
