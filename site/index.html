@@ -87,7 +87,7 @@
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="glyph-toolbar">
         <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
-        <div class="tool-row"><button id="accents">Tạo dấu tiếng Việt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
+        <div class="tool-row"><button id="accents">Tạo dấu tiếng Việt</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
         <div class="selection-row">
           <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
           <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
@@ -95,6 +95,19 @@
       </div>
 
       <div class="glyph-scroll" tabindex="0" role="region" aria-label="Danh sách ký tự">
+        <section id="mark-spacing-tools" class="mark-spacing-tools" hidden aria-labelledby="mark-spacing-title">
+          <div class="inline"><h3 id="mark-spacing-title">Kích thước và khoảng cách dấu</h3><button id="close-mark-spacing" type="button">Đóng</button></div>
+          <label for="mark-spacing-scope">Áp dụng cho</label>
+          <select id="mark-spacing-scope"><option value="all">Tất cả chữ có dấu</option><option value="selected">Chữ đang chọn</option><option value="upper">Chữ hoa có dấu</option><option value="lower">Chữ thường có dấu</option></select>
+          <label for="mark-gap">Tăng khoảng cách dấu với thân chữ: <output id="mark-gap-value">20</output> đơn vị / 1000 em</label>
+          <input id="mark-gap" type="range" min="0" max="140" step="2" value="20">
+          <label for="mark-scale">Kích thước dấu: <output id="mark-scale-value">100</output>%</label>
+          <input id="mark-scale" type="range" min="60" max="140" step="2" value="100">
+          <div id="mark-spacing-proof" class="mark-spacing-proof" aria-label="Trước và sau chỉnh dấu"></div>
+          <p id="mark-spacing-report" class="help" role="status"></p>
+          <div class="tool-row"><button id="apply-mark-spacing" type="button" class="primary">Áp dụng chỉnh dấu</button><button id="undo-mark-spacing" type="button" disabled>Hoàn tác chỉnh dấu</button></div>
+          <p class="help">Giữ nguyên thân chữ và khoảng cách giữa các chữ. Dấu đã dính liền thân chữ sẽ được bỏ qua; râu ơ, ư và gạch Đ không bị di chuyển.</p>
+        </section>
         <div class="glyph-legend"><span><i class="dot filled"></i> Theo ảnh</span><span><i class="dot composed"></i> Ghép dấu</span><span><i class="dot"></i> Còn thiếu</span></div>
         <details class="tone-tools">
           <summary>Dấu mẫu</summary>

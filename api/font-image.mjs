@@ -1,6 +1,7 @@
+import { vietnameseDesignInstruction } from '../src/vietnamese-design-rules.mjs';
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent';
 
-const visualStyle = 'Keep the reference font’s proportions, weight, counters, terminals and stroke contrast. Pure black ink on a flat pure white background. No rulers, borders, labels, shadows or decoration.';
+const visualStyle = vietnameseDesignInstruction + ' Keep the reference font’s proportions, weight, counters, terminals and stroke contrast. Pure black ink on a flat pure white background. No rulers, borders, labels, shadows or decoration.';
 const row = 'Exactly one horizontal row with large, equal white gaps between glyphs. Leave generous white margins. No glyphs may touch.';
 
 function promptFor(mode, chars) {

@@ -268,3 +268,10 @@ dialog::backdrop{background:#221a17bd}
 @media(min-width:1024px) and (min-height:520px){body{grid-template-rows:auto minmax(0,1fr)}}
 @media(max-width:1100px){.masthead-start{gap:12px}.masthead .studio-tabs button,.masthead .studio-tabs #open-font-collection{padding:7px 9px;font-size:13px}.masthead-actions{gap:8px}}
 @media(max-width:620px){.masthead-start{width:100%;justify-content:space-between;gap:8px}.brand{gap:6px;font-size:11px;letter-spacing:.06em}.brand-logo{width:30px;height:30px}.masthead .studio-tabs button,.masthead .studio-tabs #open-font-collection{font-size:12px;padding:7px}.masthead-actions{margin-left:auto}}
+
+.mark-spacing-tools{padding:12px;margin-bottom:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.mark-spacing-tools h3{margin:0;font-size:15px}.mark-spacing-tools label{margin-top:10px}
+.mark-spacing-proof{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.mark-spacing-proof>div{display:flex;flex-wrap:wrap;justify-content:center;background:var(--paper);padding:5px;border-radius:6px}
+.mark-spacing-proof strong{width:100%;text-align:center}.mark-spacing-proof figure{width:50%;margin:0;text-align:center;font-size:12px}
+.mark-spacing-proof svg{width:100%;height:95px;fill:var(--red)}

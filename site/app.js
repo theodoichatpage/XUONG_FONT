@@ -1,3 +1,4 @@
+import { adjustGlyphMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
@@ -15,6 +16,7 @@ const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
 let glyphs = new Map();
+let markCandidates = [], lastMarkChange = [];
 let importedMetrics;
 let source;
 let crop;
@@ -864,6 +866,7 @@ function scheduleFont() {
 }
 
 function refresh() {
+  previewMarkSpacing();
   save();
   renderGlyphs();
   renderPreview();
@@ -1396,4 +1399,72 @@ setupFontCollection(() => currentFontExport, async (record, { editOnly = false }
   status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
     + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
   return true;
+});
+
+// Accent changes are previewed from the current outlines, then committed once.
+
+function previewMarkSpacing() {
+  if ($('mark-spacing-tools').hidden) return;
+  const gap = Number($('mark-gap').value), scale = Number($('mark-scale').value) / 100;
+  $('mark-gap-value').textContent = gap;
+  $('mark-scale-value').textContent = Math.round(scale * 100);
+  const scope = $('mark-spacing-scope').value;
+  markCandidates = [];
+  let skipped = 0;
+  for (const [char, glyph] of glyphs) {
+    const decomposition = [...char.normalize('NFD')];
+    if (decomposition.length < 2 || !decomposition.slice(1).some(mark => mark !== '\u031b')) continue;
+    if (scope === 'selected' && char !== selected) continue;
+    if (scope === 'upper' && char !== char.toUpperCase()) continue;
+    if (scope === 'lower' && char !== char.toLowerCase()) continue;
+    const root = decomposition[0];
+    const baseChar = decomposition.includes('\u031b') ? (root + '\u031b').normalize('NFC') : root;
+    const adjusted = adjustGlyphMarks(glyph, glyphs.get(baseChar), { gap, scale });
+    if (adjusted) markCandidates.push({ char, before: glyph, after: adjusted });
+    else skipped++;
+  }
+  const proof = $('mark-spacing-proof'); proof.replaceChildren();
+  const examples = markCandidates.filter(item => item.char === selected);
+  for (const item of markCandidates) if (examples.length < 6 && !examples.includes(item)) examples.push(item);
+  const ns = 'http://www.w3.org/2000/svg';
+  for (const { char, before, after } of examples.slice(0, 6)) {
+    const a = glyphBounds(before), b = glyphBounds(after);
+    const left = Math.min(a.x,b.x)-30, bottom = Math.min(a.y,b.y)-30;
+    const right = Math.max(a.x+a.width,b.x+b.width)+30, top = Math.max(a.y+a.height,b.y+b.height)+30;
+    const card = document.createElement('div');
+    const title = document.createElement('strong'); title.textContent = char; card.append(title);
+    for (const [label, glyph] of [['Trước', before], ['Sau', after]]) {
+      const figure = document.createElement('figure'), caption = document.createElement('figcaption'); caption.textContent = label;
+      const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', `${left} ${-top} ${right-left} ${top-bottom}`);
+      const path = document.createElementNS(ns, 'path'); path.setAttribute('d', glyph.d); path.setAttribute('transform','scale(1,-1)');
+      svg.append(path); figure.append(svg, caption); card.append(figure);
+    }
+    proof.append(card);
+  }
+  $('mark-spacing-report').textContent = `${markCandidates.length} chữ có thể chỉnh.` + (skipped ? ` Bỏ qua ${skipped} chữ do dấu dính thân hoặc thiếu chữ gốc.` : '')
+    + (!markCandidates.length ? ' Hãy chọn chữ có dấu hoặc đổi phạm vi.' : ' Xem trước tối đa 6 chữ; chỉ thay đổi khi bấm Áp dụng.');
+  $('apply-mark-spacing').disabled = !markCandidates.length || (gap === 0 && scale === 1);
+}
+$('open-mark-spacing').addEventListener('click', () => {
+  $('mark-spacing-tools').hidden = false;
+  $('mark-spacing-scope').value = selected && [...selected.normalize('NFD')].length > 1 ? 'selected' : 'all';
+  previewMarkSpacing();
+  $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
+});
+$('close-mark-spacing').addEventListener('click', () => { $('mark-spacing-tools').hidden = true; });
+for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', previewMarkSpacing);
+$('apply-mark-spacing').addEventListener('click', () => {
+  previewMarkSpacing();
+  if (!markCandidates.length) return;
+  lastMarkChange = markCandidates.slice();
+  for (const {char, after} of lastMarkChange) glyphs.set(char, after);
+  refresh();
+  $('mark-gap').value = 0; $('mark-scale').value = 100;
+  previewMarkSpacing();
+  $('undo-mark-spacing').disabled = false;
+  status('Đã chỉnh dấu cho ' + lastMarkChange.length + ' chữ. Thân chữ và khoảng cách giữa các chữ được giữ nguyên.');
+});
+$('undo-mark-spacing').addEventListener('click', () => {
+  for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) glyphs.set(char, before);
+  lastMarkChange = []; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });

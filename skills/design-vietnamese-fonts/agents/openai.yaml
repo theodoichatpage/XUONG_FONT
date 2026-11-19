@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thiết kế font Việt cho Xưởng Font"
+  short_description: "Dựng, Việt hóa và kiểm tra dấu trong Xưởng Font"
+  default_prompt: "Dùng $design-vietnamese-fonts để dựng và kiểm tra font tiếng Việt trong Xưởng Font."
