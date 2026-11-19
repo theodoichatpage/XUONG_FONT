@@ -919,10 +919,10 @@ function detectedText(words) {
 async function traceDetectedWords(image, detectedWords, signal, index, settings) {
   const words = detectedWords.map(({ text, box }) => ({ text, area: pixelBox(box, image) }));
   const neighbors = words.map(word => word.area);
-  const imageGlyphs = [];
+  const imageGlyphs = [], diagnostics=[];
   for (const { text, area: original } of words) {
     const chars = [...fontText(text)];
-    if (chars.some(char => !charset.includes(char))) continue;
+    if (chars.some(char => !charset.includes(char))) {diagnostics.push({text,box:original,status:'unsupported-character'});continue;}
     const expanded = expandWordBox(original, neighbors, image);
     let area = expanded;
     let mask = wordInk(image, area, settings);
@@ -930,10 +930,11 @@ async function traceDetectedWords(image, detectedWords, signal, index, settings)
     if (!parts.length || inkCrossesBox(mask, area)) {
       area = original;
       mask = wordInk(image, area, settings);
-      if (inkCrossesBox(mask, area)) continue;
+      if (inkCrossesBox(mask, area)) {diagnostics.push({text,box:original,status:'ink-crosses-box'});continue;}
       parts = splitReferenceWord(mask, area, chars);
     }
     const wordGlyphs = [];
+    diagnostics.push({text,box:original,status:parts.length?'segmented':'no-safe-separation',expected:chars.length,parts:parts.length});
     for (const [offset, part] of parts.entries()) {
       signal.throwIfAborted();
       const char = chars[offset];
@@ -945,7 +946,7 @@ async function traceDetectedWords(image, detectedWords, signal, index, settings)
     }
     if (wordGlyphs.length) imageGlyphs.push(wordGlyphs);
   }
-  return alignReferenceGlyphs(imageGlyphs);
+  const result=alignReferenceGlyphs(imageGlyphs);result.diagnostics=diagnostics;return result;
 }
 
 $('ai-scan').addEventListener('click', async()=>{
@@ -1591,6 +1592,7 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
   },
   saveCollection: record=>fontCollection.storeProjectStyle(record)
 });
+$('review-source-glyph').addEventListener('click',()=>void familyWorkspace.reviewGlyph(selected,importedMetrics));
 $('open-image-family').addEventListener('click',()=>{$('open-font-workspace').click();familyWorkspace.open();});
 
 // Keep the normal name/image/create workflow first. Advanced proofing stays below it.
