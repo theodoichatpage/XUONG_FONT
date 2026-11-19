@@ -2,7 +2,7 @@ import opentype from 'opentype.js';
 import ClipperLib from 'clipper-lib';
 const { addKerning } = require('../src/kern-table');
 
-const styles = { Medium: [500, 6], SemiBold: [600, 12], Bold: [700, 20] };
+const styles = { 'Ultra Light': [200, -14], Light: [300, -7], Medium: [500, 0], SemiBold: [600, 12], Bold: [700, 20] };
 
 function contours(path) {
   const paths = [];

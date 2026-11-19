@@ -374,7 +374,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   });
   $('family-create').addEventListener('click', async () => {
     if (familyRunning || !familyRecord) return;
-    const styles = [['family-medium','Medium'],['family-semibold','SemiBold'],['family-bold','Bold']]
+    const styles = [['family-ultralight','Ultra Light'],['family-light','Light'],['family-medium','Medium'],['family-semibold','SemiBold'],['family-bold','Bold']]
       .filter(([id]) => $(id).checked).map(([,style]) => style);
     if (!styles.length) { $('family-status').textContent = 'Chọn ít nhất một kiểu chữ.'; return; }
     familyRunning = true;
