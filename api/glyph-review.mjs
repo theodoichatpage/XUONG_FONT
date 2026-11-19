@@ -4,6 +4,8 @@ import { repairDecisionSchema, validateRepairCandidates, validateRepairDecisions
 import { analysisSchema, validateFamilyAnalysis } from '../src/family-analysis.mjs';
 import { readGeminiError, isKeyError, explainGeminiError } from '../src/gemini-error.mjs';
 
+export const maxDuration = 90;
+
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const models = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
 const retryStatuses = new Set([404, 500, 502, 503, 504]);
@@ -65,12 +67,15 @@ function geminiError(info) {
   return json({ error: explainGeminiError(info), geminiStatus: info.status, geminiReason: info.reason }, status);
 }
 
-async function callGemini(key, body, preferred, testing, inventory) {
+async function callGemini(key, body, preferred, testing, inventory, totalMs) {
   const order = models.includes(preferred) ? [preferred, ...models.filter(model => model !== preferred)] : models;
-  const deadline = AbortSignal.timeout(testing ? 13000 : 27000);
+  const deadline = AbortSignal.timeout(totalMs);
   const attemptTimeout = testing ? 4000 : inventory ? 9000 : 0;
   const request = JSON.parse(body);
+  // Giữ lỗi 400 đầu tiên: nếu các mẫu sau cũng hỏng, đây thường là lý do thật.
+  let earlier = null;
   for (const model of order) {
+    const last = model === order.at(-1);
     try {
       const result = await fetch(endpoint + model + ':generateContent', {
         method: 'POST',
@@ -87,13 +92,19 @@ async function callGemini(key, body, preferred, testing, inventory) {
       // Lỗi 400 không do khóa có thể là mẫu này không nhận tham số: thử mẫu kế tiếp.
       if (result.status === 400) {
         const info = await readGeminiError(result);
-        if (isKeyError(info) || model === order.at(-1)) return { result, model, info };
+        if (isKeyError(info) || last) return { result, model, info: earlier ?? info };
+        earlier ??= { ...info, model };
         continue;
       }
-      if (!retryStatuses.has(result.status) || model === order.at(-1)) return { result, model };
+      if (!retryStatuses.has(result.status) || last) {
+        return { result, model, info: earlier ?? await readGeminiError(result) };
+      }
       await result.body?.cancel();
     } catch (error) {
-      if (!attemptTimeout || error.name !== 'TimeoutError' || deadline.aborted || model === order.at(-1)) throw error;
+      if (!attemptTimeout || error.name !== 'TimeoutError' || deadline.aborted || last) {
+        error.earlier = earlier;
+        throw error;
+      }
     }
   }
 }
@@ -142,7 +153,8 @@ export async function POST(request) {
         generationConfig: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 1024,
           thinkingConfig: { thinkingLevel: 'low' } }
       });
-    const { result, model, info } = await callGemini(key, body, preferredModel, testing, inventory);
+    const totalMs = testing ? 13000 : familyAnalysis ? 80000 : 50000;
+    const { result, model, info } = await callGemini(key, body, preferredModel, testing, inventory, totalMs);
     if (!result.ok) return geminiError(info ?? await readGeminiError(result));
     const payload = await result.json();
     if (testing) {
@@ -163,6 +175,8 @@ export async function POST(request) {
     }
     return json({ verdict: review.verdict, findings: review.findings.slice(0, 3), action: review.action, model }, 200);
   } catch (error) {
-    return json({ error: error.name === 'TimeoutError' ? 'Gemini phản hồi quá lâu. Hãy thử lại.' : 'Chưa đọc được kết quả từ Gemini.' }, 502);
+    const base = error.name === 'TimeoutError' ? 'Gemini phản hồi quá lâu. Hãy thử lại.' : 'Chưa đọc được kết quả từ Gemini.';
+    const earlier = error.earlier ? ' Trước đó mẫu ' + error.earlier.model + ' báo: ' + explainGeminiError(error.earlier) : '';
+    return json({ error: base + earlier }, 502);
   }
 }
