@@ -1522,6 +1522,27 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   onMarks: result => {
     if (!isQualityEditorSource(result)) { status('Hãy bấm Mở font này để chỉnh sửa trước khi chỉnh dấu.'); return; }
     $('open-mark-spacing').click();
+  },
+  onRepair: async (result, candidates) => {
+    if (!isQualityEditorSource(result)) await openQualityFont(result);
+    if (!isQualityEditorSource(result)) {
+      status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi đề xuất sửa.');
+      return;
+    }
+    const finding = candidates.find(item => glyphs.has(item.chars));
+    if (!finding) { status('Không tìm thấy glyph gốc để chỉnh. Không thay đổi font.'); return; }
+    selected = finding.chars;
+    $('open-font-workspace').click();
+    $('open-mark-spacing').click();
+    $('mark-spacing-scope').value = 'selected';
+    // Translate only the detached mark; never resize or redraw a distinctive outline.
+    const measured = Number(finding.value);
+    const threshold = Number(document.querySelector('#editor-font-check [data-role="gap"]')?.value) || 16;
+    const delta = Number.isFinite(measured) ? Math.max(2,Math.min(140,Math.ceil((threshold-measured+2)/2)*2)) : 20;
+    $('mark-gap').value = String(delta);
+    $('mark-scale').value = '100';
+    previewMarkSpacing();
+    status('Đã tạo đề xuất sửa khoảng cách dấu cho '+finding.chars+'. So sánh trước/sau rồi bấm Áp dụng nếu phù hợp; các cảnh báo giao nét không bị sửa tự động.');
   }
 });
 const standaloneFontCheck = createFontCheckPanel($('standalone-font-check'), {
