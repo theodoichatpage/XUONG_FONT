@@ -1,6 +1,7 @@
 import svgpath from 'svgpath';
 import { MAX_SIDE, makeGlyph } from './engine.js';
 import { placeReferenceWords } from './reference-placement.js';
+import { isReferenceInk, referenceLuminance } from './reference-mask.js';
 
 const { unifyReferenceA } = require('../src/refine-outline');
 const { connectedComponents } = require('../src/blob-core');
@@ -32,7 +33,7 @@ function region(canvas, box, pad = 0) {
 }
 
 function luminance(data, p) {
-  return (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
+  return referenceLuminance(data,p);
 }
 
 function otsu(histogram, count) {
@@ -73,7 +74,7 @@ export function wordInk(canvas, box, settings) {
   const borderCount = border.reduce((sum, n) => sum + n, 0);
   const darkBorder = border.subarray(0, threshold + 1).reduce((sum, n) => sum + n, 0);
   const light = settings?.polarity === 'light' || (settings?.polarity !== 'dark' && darkBorder > borderCount / 2);
-  const ink = pixels.map(value => Number(light ? value > threshold : value <= threshold));
+  const ink = pixels.map(value => isReferenceInk(value,threshold,light));
   // Direct reconstruction: no expansion into gray neighbors, no morphology,
   // no synthetic cleanup. Uncertain backgrounds remain visible for review.
   if (!settings?.legacyCleanup) {

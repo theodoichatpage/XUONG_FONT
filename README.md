@@ -51,3 +51,10 @@ Chọn glyph để xem ảnh gốc/vector/glyph render từ TTF, overlay và cá
 Dự án ở IndexedDB `xuong-font-family-projects` v1, độc lập với `xuong-font-collection` và `xuong-font-references`; không migration phá dữ liệu. Backup JSON chứa ảnh, glyph và lịch sử; khôi phục thành bản riêng. Bấm lưu TTF vào Bộ sưu tập để dùng luồng cũ; bấm mở Style và lưu phần sửa về Style để chuyển qua lại. Font xuất thiếu ký tự được ghi là DRAFT. Family chỉ xuất các Style đã qua điều kiện kỹ thuật, duyệt glyph và người dùng xác nhận thử ứng dụng.
 
 Kiểm thử: `npm run check:quality`, `npm run check:family`, `npm run check:reconstruction`. Bài raster reconstruction cần `@napi-rs/canvas` trong môi trường kiểm thử (hoặc runtime do Work cung cấp), không cần cho website hay máy người dùng. Có thể truyền đường dẫn ảnh screenshot được chú giải như trong `scripts/check-reconstruction.cjs`. Xem [báo cáo ảnh thực](reports/reconstruction-2026-11-19.md) và [tình trạng triển khai](reports/implementation-2026-11-19.md).
+
+
+### Kiểm giữ nét mảnh và chữ i từ ảnh thực
+
+`npm run check:fidelity` kiểm hàm đối chiếu sản phẩm với cutoff 0, hai polarity, contour chéo, mất serif nhỏ và proof cũ. Truyền đường dẫn ảnh “Ba tên Việt trên nền trắng(4).png” để chạy 13 glyph trực tiếp theo các crop chú giải. Bài này cần runtime rasterizer như check:reconstruction. [Báo cáo bổ sung](reports/lowercase-reference-2026-11-19.md) phân biệt rõ ị trực tiếp và i suy luận bằng tái sử dụng hai contour, không vẽ lại thân.
+
+Trong Family, bấm **Đối chiếu toàn Style từ ảnh gốc** rồi duyệt các glyph vượt ngưỡng. Khi đổi ngưỡng ảnh, cần vector hóa lại trước khi duyệt. **Ghép glyph thiếu từ thành phần có mẫu** có thể suy ra i từ ị khi có đúng ba contour tách rõ và dấu nặng ở dưới baseline. Nếu không đủ chắc chắn, giữ thiếu; không cắt vào contour liền thân.

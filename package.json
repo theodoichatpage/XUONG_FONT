@@ -10,7 +10,8 @@
     "check:font": "fontbakery check-typenetwork -n -c outline_alignment_miss -c outline_colinear_vectors -c outline_jaggy_segments -c outline_semi_vertical -c outline_short_segments",
     "check:quality": "node scripts/check-font-quality.cjs",
     "check:family": "node scripts/check-family.cjs",
-    "check:reconstruction": "node scripts/check-reconstruction.cjs"
+    "check:reconstruction": "node scripts/check-reconstruction.cjs",
+    "check:fidelity": "node scripts/check-reference-fidelity.cjs"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",
