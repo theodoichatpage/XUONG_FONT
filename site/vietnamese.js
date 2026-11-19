@@ -82,7 +82,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
         const source = glyphBounds(sample);
         if (source.width > 0 && source.height > 0) {
           if (mark === '\u031b') {
-            const scale = Math.min(130 / source.height, bounds.width * .60 / source.width);
+            const scale = sample.nativeSize ? Math.min(1, bounds.width * .60 / source.width)
+              : Math.min(130 / source.height, bounds.width * .60 / source.width);
             const width = source.width * scale, height = source.height * scale;
             const overlap = Math.min(width * .32, bounds.width * .12);
             const right = bounds.x + bounds.width;
@@ -93,7 +94,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             continue;
           }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
-          const scale = Math.min(targetHeight / source.height, bounds.width * 1.2 / source.width);
+          // Dấu dựng từ nét chữ đã có giữ nguyên cỡ để không làm mảnh nét.
+          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - 28 - height;
           else top += height + 28;
@@ -146,4 +148,138 @@ export function applyCompactLowercaseHorns(glyphs) {
     return selected.has(base) && marks.includes('\u031b');
   };
   return composeVietnamese(drafts, matches).filter(glyph => matches(glyph.char));
+}
+
+// ---------- Dựng dấu mẫu và Đ/đ từ nét chữ đã có ----------
+// Theo quy tắc trong skill design-vietnamese-fonts: sắc/huyền thon dần về đầu dưới, mũ là chevron
+// (không dùng caron), trăng là cung cong với hai đầu bằng, nặng đối chiếu dấu chấm, hỏi gọn và khác
+// dấu chấm hỏi, gạch Đ nằm giữa cap-height, gạch đ nằm giữa x-height và ascender.
+// Độ dày lấy từ thân chữ l/I của chính bộ font. Kết quả luôn là "suy luận" và cần duyệt.
+
+const round1 = value => Math.round(value * 10) / 10;
+const polygon = points => 'M' + points.map(([x, y]) => round1(x) + ' ' + round1(y)).join(' L') + ' Z';
+
+// Nét dày đều dọc theo một đường tâm, hai đầu bằng.
+function strokeAlong(points, width) {
+  const left = [], right = [];
+  points.forEach((point, i) => {
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1;
+    const nx = -dy / length * width / 2, ny = dx / length * width / 2;
+    left.push([point[0] + nx, point[1] + ny]);
+    right.push([point[0] - nx, point[1] - ny]);
+  });
+  return polygon([...left, ...right.reverse()]);
+}
+
+export function measureStem(glyphs) {
+  for (const char of ['l', 'I', 'i']) {
+    const glyph = glyphs.get(char);
+    if (!glyph?.d) continue;
+    const box = glyphBounds(glyph);
+    if (box.width > 0 && box.height / box.width >= 3) return box.width;
+  }
+  return 90;
+}
+
+export function deriveMarkSamples(glyphs) {
+  const stem = measureStem(glyphs), t = Math.max(28, Math.min(130, stem * .82));
+  const marks = new Map();
+  const add = (mark, d) => marks.set(mark, { char: mark, d, advance: 0, source: 'Dựng từ nét chữ', origin: 'inferred',
+    nativeSize: true, approved: false, locked: false });
+
+  // Sắc và huyền: nét xiên, đầu trên rộng hơn đầu dưới.
+  const acuteH = Math.max(95, 1.9 * t), span = .55 * acuteH, slope = Math.sin(Math.atan2(acuteH, span));
+  const wide = 1.12 * t / slope, narrow = .72 * t / slope;
+  add('́', polygon([[0, 0], [narrow, 0], [span + wide, acuteH], [span, acuteH]]));
+  add('̀', polygon([[span, 0], [span + narrow, 0], [wide, acuteH], [0, acuteH]]));
+
+  // Mũ: chevron đỉnh bằng.
+  const capH = Math.max(95, 2 * t), half = 1.3 * capH, angle = Math.atan2(capH, half);
+  const leg = t / Math.sin(angle), notch = capH - t / Math.cos(angle), flat = .3 * t;
+  add('̂', polygon([[-half, 0], [-half + leg, 0], [0, notch], [half - leg, 0], [half, 0], [flat, capH], [-flat, capH]]));
+
+  // Trăng: cung tròn, hai đầu cắt ngang.
+  const breveH = Math.max(95, 1.7 * t), breveW = Math.max(110, 1.45 * breveH);
+  const arc = Array.from({ length: 25 }, (_, i) => {
+    const a = Math.PI * (1 + i / 24);
+    return [Math.cos(a) * (breveW - t / 2), breveH + Math.sin(a) * (breveH - t / 2)];
+  });
+  add('̆', strokeAlong(arc, t * .92));
+
+  // Ngã: sóng một nhịp, đầu trái thấp, đầu phải cao.
+  const waveW = Math.max(200, 3.4 * t), amplitude = .4 * t + 12;
+  add('̃', strokeAlong(Array.from({ length: 33 }, (_, i) => {
+    const phase = Math.PI * (-.3 + 2.6 * i / 32);
+    return [-waveW / 2 + waveW * i / 32, amplitude * Math.sin(phase)];
+  }), t * .95));
+
+  // Hỏi: móc gọn và một chân ngắn.
+  const hookT = .78 * t, radius = .9 * hookT, foot = .55 * hookT, center = foot + radius;
+  const hook = Array.from({ length: 21 }, (_, i) => {
+    const a = Math.PI * (1.05 - 1.55 * i / 20);
+    return [Math.cos(a) * radius, center + Math.sin(a) * radius];
+  });
+  add('̉', strokeAlong([...hook, [0, 0]], hookT));
+
+  // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
+  const period = glyphs.get('.');
+  if (period?.d) add('̣', svgpath(period.d).round(1).toString());
+  else {
+    const r = .62 * t;
+    add('̣', polygon(Array.from({ length: 16 }, (_, i) => [Math.cos(i * Math.PI / 8) * r, Math.sin(i * Math.PI / 8) * r])));
+  }
+
+  // Râu: nét cong vươn lên bên phải, gốc nối vào thân.
+  const hornH = Math.max(110, 1.9 * t), hornW = 1.05 * t + 40;
+  add('̛', strokeAlong(Array.from({ length: 17 }, (_, i) => {
+    const s = i / 16;
+    return [hornW * Math.sin(s * Math.PI / 2), hornH * .9 * s * s];
+  }), t * .9));
+  return { marks, stem, thickness: t };
+}
+
+// Chiều của contour lớn nhất trong glyph: gạch phải cùng chiều để chỗ chồng lên thân được tô, không bị khoét.
+function outerDirection(d) {
+  let best = 0, contour = [];
+  const close = () => {
+    let area = 0;
+    for (let i = 0; i < contour.length; i++) {
+      const [x0, y0] = contour[i], [x1, y1] = contour[(i + 1) % contour.length];
+      area += x0 * y1 - x1 * y0;
+    }
+    if (Math.abs(area) > Math.abs(best)) best = area;
+    contour = [];
+  };
+  for (const segment of svgpath(d).abs().unarc().segments) {
+    if (segment[0] === 'M' && contour.length) close();
+    if (segment.length >= 3) contour.push(segment.slice(-2));
+  }
+  if (contour.length) close();
+  return Math.sign(best) || 1;
+}
+
+function addBar(glyph, char, center, x0, x1, stem) {
+  const half = .39 * stem, offset = Math.max(0, 40 - x0);
+  const corners = [[x0, center - half], [x1, center - half], [x1, center + half], [x0, center + half]];
+  const bar = polygon(outerDirection(glyph.d) > 0 ? corners : corners.reverse());
+  return { char, d: svgpath(glyph.d + ' ' + bar).translate(offset, 0).round(1).toString(),
+    advance: Math.max(glyph.advance + offset, Math.ceil(x1 + offset + 40)),
+    source: 'Dựng từ nét chữ', origin: 'inferred', approved: false, locked: false, base: glyph.char };
+}
+
+export function deriveBarredD(glyphs, stem = measureStem(glyphs)) {
+  const result = [];
+  const upper = glyphs.get('D'), lower = glyphs.get('d');
+  if (upper?.d) {
+    const b = glyphBounds(upper);
+    result.push(addBar(upper, 'Đ', b.y + b.height * .47, b.x - .55 * stem, b.x + stem + Math.min(b.width * .3, 1.4 * stem), stem));
+  }
+  if (lower?.d) {
+    const b = glyphBounds(lower), o = glyphs.get('o');
+    const xHeight = o?.d ? glyphBounds(o).y + glyphBounds(o).height : b.y + b.height * .75;
+    const right = b.x + b.width;
+    result.push(addBar(lower, 'đ', (xHeight + b.y + b.height) / 2, right - stem - Math.min(b.width * .35, 1.4 * stem), right + .45 * stem, stem));
+  }
+  return result;
 }

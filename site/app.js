@@ -9,7 +9,7 @@ import { adjustGlyphMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
+import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -1049,6 +1049,28 @@ $('import-tone-sheet').addEventListener('click', async () => {
     $('import-tone-sheet').disabled = false;
     renderReferences();
   }
+});
+
+// Không có ảnh dấu: dựng dấu mẫu và Đ/đ theo độ dày nét của chính bộ chữ. Không thay nét lấy từ ảnh.
+$('derive-marks').addEventListener('click', () => {
+  if (busy || loading) return;
+  const real = glyph => glyph && (glyph.locked || glyph.origin === 'direct' || ['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyph.source));
+  if (!['A', 'E', 'O', 'a', 'e', 'o'].some(char => glyphs.get(char)?.d)) return status('Cần có chữ nguyên âm gốc trước, ví dụ A, E, O hoặc a, e, o.');
+  const { marks, stem } = deriveMarkSamples(glyphs);
+  const next = new Map(glyphs);
+  const madeMarks = [...marks].filter(([mark]) => !real(glyphs.get(mark)));
+  for (const [mark, glyph] of madeMarks) next.set(mark, glyph);
+  const barred = deriveBarredD(next, stem).filter(glyph => !real(glyphs.get(glyph.char)));
+  for (const glyph of barred) next.set(glyph.char, glyph);
+  const generated = composeVietnamese(next);
+  for (const glyph of generated) next.set(glyph.char, glyph);
+  glyphs = new ProtectedGlyphMap(next);
+  refresh();
+  const message = `Đã dựng ${madeMarks.length} dấu mẫu theo độ dày nét ${Math.round(stem)} đơn vị`
+    + (barred.length ? `, ${barred.map(glyph => glyph.char).join(' ')}` : '')
+    + ` và ghép ${generated.length} chữ có dấu. Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.`;
+  status(message);
+  reportDesign(message);
 });
 
 $('apply-lowercase-horns').addEventListener('click', () => {
