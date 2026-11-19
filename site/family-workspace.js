@@ -230,7 +230,8 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       for(const [index,file]of images.entries()){
         const layout=layouts?.[index],digest=await digestReference(file),entry=project.images.find(i=>i.digest===digest);
         if(!entry)continue;
-        entry.layoutText=layout?.text?.trim()||undefined;entry.layoutStyle=entry.layoutText?layout.style||'Regular':undefined;
+        // Ô nội dung để trống (ví dụ sau khi tải lại trang) thì giữ nội dung đã gõ trước đó cho đúng ảnh này.
+        const text=layout?.text?.trim();if(text){entry.layoutText=text;entry.layoutStyle=layout.style||'Regular';}
         currentIds.add(entry.id);
       }
       flowImages=currentIds;
@@ -246,7 +247,9 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
         // Ảnh dựng theo nội dung người dùng gõ không gửi Gemini vẽ lại nền.
         if(isCleanReference(canvas)||image.layoutText)continue;
         say('Gemini đang dựng chữ đen trên nền trắng: '+image.name+'…');
-        const prepared=await redrawFontImage([canvas],{mode:'clean'},getKey(),signal||new AbortController().signal);
+        let prepared;
+        try{prepared=await redrawFontImage([canvas],{mode:'clean'},getKey(),signal||new AbortController().signal);}
+        catch(error){if(signal?.aborted)throw error;throw Error('Ảnh "'+image.name+'" chưa có nội dung chữ nên Xưởng phải nhờ Gemini vẽ lại, và Gemini báo lỗi: '+error.message+' Cách không cần Gemini: gõ nội dung chữ dưới ảnh, mỗi dòng ảnh một dòng, rồi bấm lại Tạo bộ font.');}
         const blob=await new Promise(resolve=>prepared.toBlob(resolve,'image/png'));if(!blob)throw Error('Chưa lưu được ảnh Gemini trả về.');
         if(blob.size>15*1024*1024||project.images.length>=100||project.images.reduce((sum,i)=>sum+i.blob.size,0)+blob.size>80*1024*1024)throw Error('Ảnh Gemini vượt giới hạn lưu dự án; ảnh gốc vẫn được giữ.');
         const child={id:crypto.randomUUID(),name:'Nền trắng — '+image.name,blob,digest:await digestReference(blob),parentImageId:image.id,styleId:image.styleId,confirmed:true,role:'ai-redrawn'};
@@ -268,5 +271,6 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     finally{flowRunning=false;flowSignal=undefined;flowTarget=undefined;flowImages=undefined;}
   }
   const restoration=(async()=>{try{await renderProjects();const id=localStorage.getItem('xuong-font-active-family');if(id){project=await loadFamilyProject(id);if(project)render();}}catch(error){say('Không mở được dự án đã lưu: '+error.message);}})();
-  return {createFromCurrent,async projectStyles(){await restoration;return project?.styles||[];},async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;root.open=true;$('advanced').open=true;render();await showProof();$('proof-section').scrollIntoView({block:'start'});},open:()=>{root.open=true;root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
+  return {createFromCurrent,async projectStyles(){await restoration;return project?.styles||[];},
+    async storedLayout(file){await restoration;if(!project)return;const digest=await digestReference(file),image=project.images.find(i=>i.digest===digest&&i.layoutText);return image?{text:image.layoutText,style:image.layoutStyle}:undefined;},async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;root.open=true;$('advanced').open=true;render();await showProof();$('proof-section').scrollIntoView({block:'start'});},open:()=>{root.open=true;root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
 }

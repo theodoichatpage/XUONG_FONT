@@ -195,6 +195,18 @@ function renderReferences() {
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
 }
 
+// Ô nội dung trống nhưng bộ font đã có nội dung gõ trước đó cho đúng ảnh này: điền lại.
+async function restoreLayoutText(index) {
+  try {
+    const entry = references[index];
+    const stored = entry && await familyWorkspace.storedLayout(entry.file);
+    if (!stored?.text || activeReference !== index || $('layout-text').value.trim()) return;
+    $('layout-text').value = stored.text;
+    if (stored.style) $('layout-style').value = stored.style;
+    rememberReference(); renderReferences(); persistReferences();
+  } catch { /* Không có dự án: giữ ô trống. */ }
+}
+
 // Ảnh đang mở đọc nội dung từ ô nhập; các ảnh khác dùng nội dung đã lưu.
 function localLayoutReady() {
   return references.length > 0 && references.every((entry, index) =>
@@ -234,6 +246,7 @@ async function showReference(index) {
       $('layout-text').value = settings?.layoutText ?? '';
       $('layout-style').value = settings?.layoutStyle || 'Regular';
       activeReference = index;
+      if (!$('layout-text').value.trim()) void restoreLayoutText(index);
       useImage(image, entry.file.name);
       crop = settings?.crop;
       renderSource();
