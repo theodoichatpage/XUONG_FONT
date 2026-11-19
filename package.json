@@ -11,7 +11,8 @@
     "check:quality": "node scripts/check-font-quality.cjs",
     "check:family": "node scripts/check-family.cjs",
     "check:reconstruction": "node scripts/check-reconstruction.cjs",
-    "check:fidelity": "node scripts/check-reference-fidelity.cjs"
+    "check:fidelity": "node scripts/check-reference-fidelity.cjs",
+    "check:inputs": "node scripts/check-family-inputs.cjs"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",

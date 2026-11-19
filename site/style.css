@@ -351,3 +351,7 @@ dialog::backdrop{background:#221a17bd}
 @media(min-width:1024px) and (min-height:520px){.workspace{grid-template-rows:auto minmax(0,1fr)}.family-image-workspace{align-self:start}.workspace:has(>.family-image-workspace[open]){grid-template-rows:minmax(0,1fr)}.family-image-workspace[open]{height:100%;overflow:auto;overscroll-behavior:contain}}
 .workspace:has(>.family-image-workspace[open])>.source,.workspace:has(>.family-image-workspace[open])>.glyph-panel,.workspace:has(>.family-image-workspace[open])>.workspace-side{display:none}
 .family-image-workspace>summary{position:sticky;top:0;background:var(--panel);z-index:1}
+
+/* The only entry point is the existing name, image picker and Create button. */
+.family-image-workspace .fp-upload{display:none}.family-image-workspace.fp-guided [data-fp=images] section[data-confirmed=true]{display:none}.family-image-workspace [data-fp=continue]{margin-block:12px}.family-image-workspace [data-fp=advanced]>summary{cursor:pointer;font-weight:600;padding:12px 0}.family-image-workspace [data-fp=quick-status]{margin-top:12px}
+@media(min-width:1024px) and (min-height:520px){.workspace{grid-template-rows:minmax(0,1fr) auto}.workspace:has(>.family-image-workspace[open]){grid-template-rows:minmax(0,1fr)}}

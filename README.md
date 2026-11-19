@@ -42,7 +42,7 @@ Lệnh kiểm tra các điểm lệch đường chuẩn, đoạn thẳng cùng h
 
 ## Family từ ảnh và phục dựng trực tiếp
 
-Trong **Tạo font mới**, mở **Tạo Family từ ảnh · Đối chiếu glyph gốc**. Đặt tên một lần; dự án có 16 vị trí, lưu được khi chưa có glyph. Thêm nhiều ảnh, phân tích bằng khóa Gemini ở thanh trên, xác nhận những phân loại chưa chắc chắn, rồi phục dựng Style đang chọn. Phân loại dựa hình dạng không có nhãn luôn cần xác nhận. Không sinh 16 kiểu từ một outline bằng offset/shear.
+Trong **Tạo font mới**, dùng ngay ô **Tên bộ font** trên thanh trên, vùng **Ảnh mẫu và dựng chữ** và nút **Tạo bộ font**. Không nhập lại tên, không tải lại ảnh và không cần tạo dự án riêng. Nút này tự lưu Family, phân tích ảnh, phục dựng và đối chiếu, rồi đưa kết quả về Bộ ký tự / Thử tiêu đề. Chỉ ảnh chưa phân loại chắc chắn mới cần xác nhận hoặc bỏ qua rồi bấm Tiếp tục tạo bộ font. Ma trận và công cụ kỹ thuật nằm trong Chỉnh sửa và soát chữ (nâng cao) ở dưới màn hình. Phân loại dựa hình dạng không có nhãn luôn cần xác nhận. Không sinh 16 kiểu từ một outline bằng offset/shear.
 
 Glyph trực tiếp: threshold có kiểm soát → Potrace WASM (không morphology, không tối ưu gộp Bézier) → một scale đồng nhất → SVG path → TTF. Không AI vẽ lại ảnh mẫu. Chữ dính không tách an toàn, watermark che nét và nguồn thiếu phải được duyệt hoặc cung cấp ảnh tốt hơn. Không có cách tự phục hồi chắc chắn nét bị che.
 

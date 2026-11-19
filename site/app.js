@@ -1,4 +1,5 @@
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
+import { digestReference } from './family-inputs.js';
 import { setupFamilyWorkspace } from './family-workspace.js';
 import { createFontCheckPanel } from './font-check-panel.js';
 import { reviewMarkRepairs } from './ai-mark-repair.js';
@@ -8,7 +9,6 @@ import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
-import { inventoryImage } from './ai-design.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
 import { balanceGlyphSpacing, fitLowercaseT, fitLowercaseQ, fitLowercaseUStems, fontKerning, measureLeftStem, matchLeftStem, balanceFontStrokes } from './font-layout.js';
@@ -948,115 +948,15 @@ async function traceDetectedWords(image, detectedWords, signal, index, settings)
   return alignReferenceGlyphs(imageGlyphs);
 }
 
-async function runFontJob() {
-  if (busy || loading || !references.length || !connectedGeminiModel || connectionRequest) return;
-  const key = geminiKey.value.trim();
-  if (!key) return;
-  const controller = new AbortController();
-  designRun = controller;
-  busy = true;
-  renderReferences();
-  $('trace').disabled = $('single').disabled = true;
-  connectionButton.disabled = true;
-  $('stop-design').hidden = false;
-  $('stop-design').disabled = false;
-  let model = connectedGeminiModel;
-  let accepted = 0;
-  const autoDraw = $('auto-draw').checked;
-  try {
-    const observed = new Set();
-    const traced = new Map();
-    const skipped = [];
-    for (const [index, entry] of references.entries()) {
-      controller.signal.throwIfAborted();
-      if (geminiKey.value.trim() !== key) throw new Error('Khóa đã đổi. Kiểm tra kết nối rồi chạy lại.');
-      const progress = `Ảnh ${index + 1}/${references.length}`;
-      const saved = () => `Đã cập nhật ${accepted} ký tự.`;
-      const started = performance.now();
-      const waiting = () => reportDesign(`${progress} · Chờ Gemini ${Math.floor((performance.now() - started) / 1000)} giây. ${saved()}`);
-      let image, detectedWords = entry.settings?.detectedWords;
-      try {
-        image = await referenceCanvas(entry.file);
-        controller.signal.throwIfAborted();
-        if (!detectedWords?.length) {
-          waiting();
-          const timer = setInterval(waiting, 1000);
-          try {
-            const result = await inventoryImage(image, key, model, controller.signal);
-            model = result.model ?? model;
-            detectedWords = result.words;
-            if (detectedWords.length) {
-              entry.settings = { ...entry.settings, detectedWords };
-              persistReferences();
-            }
-          } finally {
-            clearInterval(timer);
-          }
-        }
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        if (error.status && error.status < 500) throw new Error(`${progress} · ${error.message}`);
-        skipped.push(`${progress} · ${error.message}`);
-        continue;
-      }
-      if (!detectedWords.length) {
-        skipped.push(progress + ' · Chưa nhận ra chữ trong ảnh.');
-        continue;
-      }
-      reportDesign(`${progress} · Đang dựng nét từ ảnh. ${saved()}`);
-      for (const { text } of detectedWords) {
-        for (const char of fontText(text)) if (charset.includes(char)) observed.add(char);
-      }
-      const imageGlyphs = await traceDetectedWords(image, detectedWords, controller.signal, index);
-      controller.signal.throwIfAborted();
-      for (const glyph of imageGlyphs) {
-        const { char, pixelCrop } = glyph;
-        const pixels = pixelCrop.w * pixelCrop.h;
-        const previous = traced.get(char);
-        if (previous && (previous.glyph.source === 'Ảnh mẫu' && glyph.source !== 'Ảnh mẫu'
-          || previous.glyph.source === glyph.source && previous.pixels >= pixels)) continue;
-        if (glyph.source !== 'Ảnh mẫu' && glyphs.get(char)?.source === 'Ảnh mẫu') continue;
-        traced.set(char, { glyph, pixels });
-        if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
-      }
-      updateComposed();
-      accepted = traced.size;
-      refresh();
-    }
-    controller.signal.throwIfAborted();
-    inventory = { id: crypto.randomUUID(), observed: [...observed], traced: [...traced.keys()] };
-    persistReferences();
-
-    controller.signal.throwIfAborted();
-    if (autoDraw) for (const glyph of composeVietnamese(glyphs,()=>false,{requireReferenceMarks:true})) if (!glyphs.has(glyph.char)) glyphs.set(glyph.char,glyph);
-    const unresolved = [...observed].filter(char => !traced.has(char) && glyphs.get(char)?.source !== 'Ảnh mẫu');
-    const missing = charset.filter(char => !usableGlyph(char));
-    const generated = [...glyphs.values()].filter(glyph => glyph.source === 'Vẽ bổ sung' && charset.includes(glyph.char));
-    refresh();
-    reportDesign([
-      `Đã có ${charset.length - missing.length}/${charset.length} ký tự. ${accepted} ký tự dựng từ ảnh lượt này, ${generated.length} ký tự vẽ bổ sung.`,
-      unresolved.length ? 'Có mẫu, chưa tách được: ' + unresolved.join(' ') + '.' : '',
-      missing.length ? 'Còn thiếu: ' + missing.join(' ') + '.' : '',
-      ...skipped
-    ].filter(Boolean).join('\n'));
-    if (geminiKey.value.trim() === key) {
-      connectedGeminiModel = model;
-      saveGeminiPreference();
-    }
-  } catch (error) {
-    const detail = controller.signal.aborted ? 'Đã dừng theo yêu cầu.' : error.message;
-    reportDesign(`Đã dựng ${accepted} ký tự từ ảnh. Các lô đã hoàn tất được giữ lại. ${detail}`);
-  } finally {
-    designRun = undefined;
-    busy = false;
-    $('stop-design').hidden = true;
-    $('trace').disabled = $('single').disabled = false;
-    connectionButton.disabled = !geminiKey.value.trim();
-    renderReferences();
-  }
-}
-
-$('ai-scan').addEventListener('click', runFontJob);
+$('ai-scan').addEventListener('click', async()=>{
+  if(busy||loading)return;
+  if(!references.length){status('Thêm ảnh mẫu rồi bấm Tạo bộ font.');return;}
+  if(!geminiKey.value.trim()){status('Nhập khóa Gemini ở thanh trên để tạo bộ font.');return;}
+  const controller=new AbortController();designRun=controller;busy=true;$('name').disabled=true;renderReferences();
+  $('stop-design').hidden=false;$('stop-design').disabled=false;
+  try{await familyWorkspace.createFromCurrent({...currentFamilyInput(),signal:controller.signal});}
+  finally{busy=false;$('name').disabled=false;designRun=undefined;$('stop-design').hidden=true;renderReferences();}
+});
 $('stop-design').addEventListener('click', () => {
   if (!designRun) return;
   designRun.abort();
@@ -1653,8 +1553,26 @@ async function runFontQuality(records) { await editorFontCheck.run(records); }
 
 // Family projects use their own additive IndexedDB database. Existing fonts and references stay intact.
 let familyEditorToken;
+function currentFamilyInput(){
+  return {name:$('name').value,images:references.map(entry=>entry.file),
+    composeMissing:$('auto-draw').checked,workspace:{name:$('name').value,glyphs:[...glyphs.values()],importedMetrics,sample:$('sample').value,spacing:$('spacing').value}};
+}
 const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
   traceWords: (image,words,signal,settings) => traceDetectedWords(image,words,signal,undefined,settings),
+  getCurrentInput:currentFamilyInput,
+  onProgress:message=>{status(message);reportDesign(message);},
+  onResult:async(project,style)=>{
+    $('name').value=project.name+(style.id==='Regular'?'':' '+style.id);
+    const indices=new Map();for(const [index,entry]of references.entries())indices.set(await digestReference(entry.file),index);
+    glyphs=new ProtectedGlyphMap(style.glyphs.map(g=>{
+      const image=project.images.find(i=>i.id===g.sourceImageId),index=image?indices.get(image.digest):undefined;
+      return [g.char,{...g,...(index!=null?{reference:{index,crop:g.pixelCrop}}:{})}];
+    }));
+    importedMetrics={familyName:project.name,styleName:style.name,weight:style.weight,italic:style.italic,angle:style.metrics?.angle??0,
+      ascent:ASCENT,descent:DESCENT,kerning:style.metrics?.kerning??[],wordSpace:style.metrics?.wordSpace??300,sourceProjectId:project.id};
+    loadedSourceBlob=undefined;selected=glyphs.has('i')?'i':style.glyphs[0]?.char;
+    auditRepairPending=false;markCandidates=[];$('spacing').value=0;refresh();
+  },
   getKey: () => geminiKey.value.trim(), getModel: () => connectedGeminiModel,
   exportStyle: async (family,style) => {
     let ascent=ASCENT,descent=DESCENT;
@@ -1674,3 +1592,6 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
   saveCollection: record=>fontCollection.storeProjectStyle(record)
 });
 $('open-image-family').addEventListener('click',()=>{$('open-font-workspace').click();familyWorkspace.open();});
+
+// Keep the normal name/image/create workflow first. Advanced proofing stays below it.
+$('font-workspace').append($('family-image-workspace'));
