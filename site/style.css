@@ -360,3 +360,15 @@ dialog::backdrop{background:#221a17bd}
 .image-style-confirmation .fp-images {display:grid;grid-template-columns:minmax(0,1fr);}
 .image-style-confirmation .fp-images section {min-width:0;max-width:100%;}
 .image-style-confirmation select {width:100%;}
+
+/* Keep long image confirmations inside their column instead of painting over
+   the following family row. Source images keep a usable size while scrolling. */
+@media(min-width:1024px) and (min-height:520px){
+  .workspace > .source{overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+  .workspace > .source > *{flex-shrink:0}
+  .source #stage{flex:0 0 auto}
+  .source .source-image-wrap{flex:0 0 auto;min-height:120px;container-type:normal}
+  .source #image{max-height:310px;max-width:100%}
+}
+.image-style-confirmation{min-width:0;overflow-wrap:anywhere}
+.image-style-confirmation button{margin-top:4px;max-width:100%;white-space:normal}
