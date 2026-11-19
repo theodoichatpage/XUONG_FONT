@@ -1,4 +1,5 @@
 import {assessFont,makeQualitySVG} from './font-quality.js';
+import {vietnameseCheckCharacters} from './font-coverage.js';
 const labels={present:'Có glyph',missing:'Thiếu glyph',blank:'Glyph rỗng',components:'Có thành phần ghép; chưa xác minh vị trí dấu'};
 const statuses={fail:'Lỗi',warning:'Cần xem lại',pass:'Đã kiểm',manual:'Duyệt bằng mắt',info:'Thông tin'};
 export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,onMarks,onRepair,standalone=false}={}){
@@ -22,11 +23,76 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
       options.replaceChildren();
       for(const name of googleNames.filter(name=>name.toLowerCase().includes(search.value.trim().toLowerCase()))){
         const button=document.createElement('button');button.type='button';button.textContent=name;
-        button.addEventListener('click',()=>{search.value=name;updateOptions();window.open('https://fonts.google.com/specimen/'+encodeURIComponent(name.replace(/ /g,'+')),'_blank','noopener');});
+        button.addEventListener('click',()=>{search.value=name;updateOptions();checkGoogleFont(name);});
         options.append(button);
       }
     };
     search.addEventListener('input',updateOptions);updateOptions();
+  }
+  let googleRequest=0;
+  async function checkGoogleFont(name){
+    if(!standalone)return;
+    const request=++googleRequest;
+    const status=root.querySelector('[data-role=live-status]');
+    status.textContent='Đang tải và kiểm tra '+name+' từ Google Fonts…';
+    const family='"XuongCheckGoogle'+request+'"';
+    const chars=vietnameseCheckCharacters;
+    try{
+      const cssUrl='https://fonts.googleapis.com/css2?family='+encodeURIComponent(name).replace(/%20/g,'+')+':wght@400&display=swap&text='+encodeURIComponent(chars.join('')+'Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.');
+      const response=await fetch(cssUrl);
+      if(!response.ok)throw Error('Google Fonts không trả về stylesheet ('+response.status+').');
+      const css=await response.text();
+      const urls=[...css.matchAll(/url\(([^)]+)\)/g)].map(m=>m[1].replace(/^['"]|['"]$/g,''));
+      if(!urls.length)throw Error('Không tìm thấy file font từ Google Fonts.');
+      const fontResponse=await fetch(urls[0]);if(!fontResponse.ok)throw Error('Không tải được file font.');
+      const blob=await fontResponse.blob();
+      const face=new FontFace(family,await blob.arrayBuffer());
+      await face.load();
+      if(request!==googleRequest)return;
+      document.fonts.add(face);
+      const canvas=document.createElement('canvas');canvas.width=180;canvas.height=160;
+      const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      if(!ctx)throw Error('Trình duyệt không hỗ trợ Canvas.');
+      const pixels=(char,font)=>{
+        ctx.clearRect(0,0,180,160);ctx.fillStyle='#000';ctx.font='72px '+font;
+        ctx.textBaseline='alphabetic';ctx.fillText(char,12,100);
+        return ctx.getImageData(0,0,180,160).data;
+      };
+      const diff=(a,b)=>{for(let i=3;i<a.length;i+=4)if(a[i]!==b[i])return true;return false;};
+      const missing=[];
+      for(const char of chars){
+        const actual=pixels(char,family+', monospace');
+        const mono=pixels(char,'monospace');
+        const serif=pixels(char,'serif');
+        // A glyph is considered supported only if the chosen font differs from both fallbacks.
+        if(!diff(actual,mono)||!diff(actual,serif))missing.push(char);
+      }
+      if(request!==googleRequest)return;
+      const present=chars.length-missing.length;
+      const $r=role=>root.querySelector('[data-role="'+role+'"]');
+      $r('showcase-name').textContent=name;
+      $r('paper-name').textContent=name.toUpperCase();
+      $r('showcase-description').textContent='Google Fonts · kiểm tra khả năng hiển thị bằng Canvas (không phải xác minh cmap).';
+      $r('showcase-badge').textContent=missing.length?'✕ Thiếu '+missing.length+' ký tự':'✓ Đủ 146 ký tự';
+      $r('showcase-count').textContent=present+' / '+chars.length+' ký tự hiển thị · '+missing.length+' thiếu';
+      $r('showcase-progress').style.width=(present/chars.length*100)+'%';
+      $r('paper-stamp').textContent=missing.length?'Thiếu '+missing.length:'✓ Đủ ký tự';
+      $r('paper-state').textContent='GOOGLE FONTS · KIỂM TRA TRỰC TIẾP';
+      $r('missing-characters').hidden=!missing.length;
+      $r('missing-characters').textContent=missing.length?'Chữ thiếu: '+missing.join(' '):'';
+      const glyphs=$r('paper-glyphs');glyphs.replaceChildren();
+      for(const char of ['Ặ','ẫ','Ỡ','ự']){
+        const cell=document.createElement('div'),glyph=document.createElement('strong'),label=document.createElement('small');
+        glyph.textContent=char;glyph.style.fontFamily=family+', sans-serif';
+        if(missing.includes(char))glyph.style.color='#d83c32';
+        label.textContent=missing.includes(char)?'THIẾU':char;
+        cell.append(glyph,label);glyphs.append(cell);
+      }
+      const sentence=$r('paper-sentence');sentence.replaceChildren();
+      sentence.textContent='Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.';
+      sentence.style.fontFamily=family+', sans-serif';
+      status.textContent='Đã kiểm tra '+name+' trực tiếp từ Google Fonts.';
+    }catch(error){if(request===googleRequest)status.textContent='Không kiểm tra được '+name+': '+error.message;}
   }
   const $=role=>root.querySelector('[data-role="'+role+'"]');
   const selected=()=>results[Number($('font').value)];
