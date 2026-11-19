@@ -258,3 +258,13 @@ dialog::backdrop{background:#221a17bd}
 .studio-tabs #open-font-collection:hover{color:var(--red);background:var(--accent)}
 .studio-tabs #open-font-collection[aria-selected=true]:hover{color:white;background:var(--red-dark)}
 #collection-empty{padding:20px;color:var(--muted)}
+
+/* Primary navigation shares the brand row. */
+.masthead-start{display:flex;align-items:center;gap:24px;min-width:0}
+.masthead .studio-tabs{padding:0;border:0;background:transparent;gap:6px;flex-shrink:0}
+.masthead .studio-tabs button,.masthead .studio-tabs #open-font-collection{padding:8px 12px;border-radius:7px;color:#ead7c7;font-size:14px;white-space:nowrap}
+.masthead .studio-tabs button[aria-selected=true],.masthead .studio-tabs #open-font-collection[aria-selected=true]{color:white;background:var(--red)}
+.masthead .studio-tabs button:hover:not(:disabled){color:white;background:#493933}
+@media(min-width:1024px) and (min-height:520px){body{grid-template-rows:auto minmax(0,1fr)}}
+@media(max-width:1100px){.masthead-start{gap:12px}.masthead .studio-tabs button,.masthead .studio-tabs #open-font-collection{padding:7px 9px;font-size:13px}.masthead-actions{gap:8px}}
+@media(max-width:620px){.masthead-start{width:100%;justify-content:space-between;gap:8px}.brand{gap:6px;font-size:11px;letter-spacing:.06em}.brand-logo{width:30px;height:30px}.masthead .studio-tabs button,.masthead .studio-tabs #open-font-collection{font-size:12px;padding:7px}.masthead-actions{margin-left:auto}}
