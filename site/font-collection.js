@@ -139,7 +139,7 @@ function familyName(value) {
 
 const nameOrder = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 
-export function setupFontCollection(getCurrentFont) {
+export function setupFontCollection(getCurrentFont, vietnamize) {
   const $ = id => document.getElementById(id);
   const dialog = $('font-collection');
   const files = $('collection-files');
@@ -342,6 +342,14 @@ export function setupFontCollection(getCurrentFont) {
       await accessFonts('readwrite', store => store.put({ ...record, name: next }));
       await refresh(record.id);
       status.textContent = 'Đã lưu tên font.';
+    });
+  });
+
+  $('collection-vietnamize').addEventListener('click', () => {
+    const record = records.find(item => item.id === selectedId);
+    if (!record) return;
+    run(async () => {
+      if (await vietnamize(record)) dialog.close();
     });
   });
 

@@ -48,7 +48,7 @@ function undotI(glyph) {
 export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false } = {}) {
   const result = [];
   for (const char of accented) {
-    if (['Ảnh mẫu', 'Ảnh làm sạch'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
+    if (['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
     const [root, ...marks] = char.normalize('NFD');
     const horn = '\u031b';
     const horned = (root + horn).normalize('NFC');

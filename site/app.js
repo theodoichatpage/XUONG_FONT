@@ -1,3 +1,4 @@
+import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns } from './vietnamese.js';
@@ -14,6 +15,7 @@ const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
 let glyphs = new Map();
+let importedMetrics;
 let source;
 let crop;
 let dragStart;
@@ -70,6 +72,7 @@ try {
     for (const [char, glyph] of glyphs) {
       if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base ?? char.normalize('NFD')[0])) glyphs.delete(char);
     }
+    importedMetrics = saved.importedMetrics;
     $('name').value = saved.name;
     $('sample').value = saved.sample;
     if (saved.spacing != null) $('spacing').value = saved.spacing;
@@ -85,7 +88,7 @@ function save() {
   try {
     localStorage.setItem(storageKey, JSON.stringify({
       glyphs: [...glyphs.values()], name: $('name').value,
-      sample: $('sample').value, spacing: $('spacing').value
+      sample: $('sample').value, spacing: $('spacing').value, importedMetrics
     }));
   } catch {
     status('Trình duyệt không lưu được bộ chữ. Hãy tải font trước khi đóng trang.');
@@ -647,7 +650,7 @@ function updateComposed() {
   }
   for (const glyph of composed) {
     const active = [...glyph.char.normalize('NFD')].slice(1).some(mark => toneSamples.has(mark) && glyphs.has(mark));
-    if (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active) glyphs.set(glyph.char, glyph);
+    if (glyphs.get(glyph.char)?.source !== 'Font gốc' && (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active)) glyphs.set(glyph.char, glyph);
   }
 }
 
@@ -821,7 +824,7 @@ function scheduleFont() {
   download.removeAttribute('href');
   download.setAttribute('aria-disabled', 'true');
   debounce = setTimeout(async () => {
-    const savedGlyphs = charset.map(usableGlyph).filter(Boolean);
+    const savedGlyphs = importedMetrics ? [...glyphs.values()].filter(glyph => !toneSamples.has(glyph.char)) : charset.map(usableGlyph).filter(Boolean);
     if (!savedGlyphs.length) {
       if (fontFace) document.fonts.delete(fontFace);
       fontFace = undefined;
@@ -830,16 +833,16 @@ function scheduleFont() {
       return;
     }
     try {
-      const active = savedGlyphs.map(fitLowercaseT).map(fitLowercaseQ).map(fitLowercaseUStems);
+      const active = importedMetrics ? savedGlyphs : savedGlyphs.map(fitLowercaseT).map(fitLowercaseQ).map(fitLowercaseUStems);
       const name = $('name').value.trim() || 'Xuong Font';
-      let ascent = ASCENT, descent = DESCENT;
+      let ascent = importedMetrics?.ascent ?? ASCENT, descent = importedMetrics?.descent ?? DESCENT;
       for (const glyph of active) {
         const { y, height } = glyphBounds(glyph);
         ascent = Math.max(ascent, Math.ceil(y + height + 24));
         descent = Math.min(descent, Math.floor(y - 24));
       }
-      const balanced = balanceGlyphSpacing(active, Number($('spacing').value));
-      const ttf = exportFont(name, balanced, 0, { ascent, descent, kerning: fontKerning(balanced) });
+      const balanced = importedMetrics ? active : balanceGlyphSpacing(active, Number($('spacing').value));
+      const ttf = exportFont(name, balanced, 0, { ascent, descent, kerning: importedMetrics?.kerning ?? fontKerning(balanced), wordSpace: importedMetrics?.wordSpace });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;
@@ -1272,6 +1275,7 @@ $('remove').addEventListener('click', () => {
 $('reset').addEventListener('click', () => {
   if (busy || !window.confirm('Xóa tất cả ký tự trong bộ đang làm?')) return;
   glyphs.clear();
+  importedMetrics = undefined;
   selected = undefined;
   refresh();
   status('Đã xóa bộ ký tự.');
@@ -1369,4 +1373,25 @@ $('sample').addEventListener('wheel', event => {
   if (fixedWorkspace.matches) event.preventDefault();
 }, { passive: false });
 
-setupFontCollection(() => currentFontExport);
+setupFontCollection(() => currentFontExport, async record => {
+  if (busy || loading) throw new Error('Hãy đợi tác vụ đang chạy hoàn tất.');
+  if (glyphs.size && !confirm('Mở font này để Việt hóa? Bộ chữ đang làm sẽ được thay bằng font đã chọn.')) return false;
+  const imported = await importFontFile(record);
+  const missingBefore = charset.filter(char => !imported.glyphs.has(char));
+  const drafts = new Map(imported.glyphs);
+  importAccentSamples(drafts);
+  for (const glyph of composeVietnamese(drafts)) {
+    if (!drafts.has(glyph.char)) drafts.set(glyph.char, glyph);
+  }
+  glyphs = drafts;
+  importedMetrics = imported.metrics;
+  $('name').value = (record.name + ' Việt hóa').slice(0, 40);
+  $('sample').value = 'Tiếng Việt · Trường học · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ';
+  $('spacing').value = 0;
+  refresh();
+  const added = missingBefore.filter(char => glyphs.has(char));
+  const missing = charset.filter(char => !glyphs.has(char));
+  status('Đã thêm ' + added.length + ' ký tự. ' + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
+    + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
+  return true;
+});
