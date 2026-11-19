@@ -9,6 +9,7 @@ import { adjustGlyphMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
+import { borrowMissing } from './borrow-glyphs.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -1051,6 +1052,26 @@ $('import-tone-sheet').addEventListener('click', async () => {
   }
 });
 
+// Ô còn trống (ví dụ số 0–9) lấy từ kiểu gần nhất trong cùng bộ font, làm dày/mỏng theo chênh lệch độ đậm.
+$('borrow-glyphs').addEventListener('click', async () => {
+  if (busy || loading) return;
+  const weight = importedMetrics?.weight, italic = !!importedMetrics?.italic;
+  if (!Number.isFinite(weight)) return status('Mở một kiểu trong bộ font trước (bấm Tạo bộ font hoặc mở từ Bộ sưu tập).');
+  const styles = await familyWorkspace.projectStyles();
+  const { added, rejected, donors } = borrowMissing({ styles, target: glyphs, weight, italic, chars: charset });
+  if (!donors.length) return status('Bộ font chưa có kiểu nào khác có chữ để lấy. Hãy dựng kiểu kia từ ảnh trước, ví dụ ảnh số ở kiểu Medium.');
+  for (const glyph of added) glyphs.set(glyph.char, glyph);
+  refresh();
+  const groups = new Map();
+  for (const glyph of added) groups.set(glyph.borrowedFrom, [...(groups.get(glyph.borrowedFrom) || []), glyph]);
+  const message = (added.length ? 'Đã lấy ' + added.length + ' chữ: ' + [...groups].map(([name, list]) =>
+    list.map(g => g.char).join(' ') + ' từ ' + name + ' (' + (list[0].weightShift >= 0 ? 'làm dày ' : 'làm mỏng ') + Math.abs(list[0].weightShift) + ' đơn vị mỗi bên nét)').join('; ') + '. Đây là nét suy luận, hãy xem lại.'
+    : 'Không có chữ còn thiếu nào có sẵn ở kiểu khác (' + donors.join(', ') + ').')
+    + (rejected.length ? ' Bỏ qua ' + rejected.join(' ') + ' vì làm dày sẽ bít lòng chữ hoặc làm đứt nét.' : '');
+  status(message);
+  reportDesign(message);
+});
+
 // Không có ảnh dấu: dựng dấu mẫu và Đ/đ theo độ dày nét của chính bộ chữ. Không thay nét lấy từ ảnh.
 $('derive-marks').addEventListener('click', () => {
   if (busy || loading) return;
@@ -1097,6 +1118,9 @@ $('apply-tone-samples').addEventListener('click', () => {
 
 $('accents').addEventListener('click', () => {
   if (busy) return;
+  // Chưa có dấu mẫu nào từ ảnh: dựng dấu từ nét chữ đã có thay vì báo lỗi.
+  const hasMarkSamples = [...toneSamples.keys()].some(mark => glyphs.get(mark)?.d);
+  if (!hasMarkSamples) { $('derive-marks').click(); return; }
   const generated = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   if (!generated.length) return status('Hãy thêm chữ nguyên âm gốc trước, ví dụ A, E hoặc O.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);

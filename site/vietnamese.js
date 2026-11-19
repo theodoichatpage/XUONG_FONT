@@ -95,7 +95,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
           // Dấu dựng từ nét chữ đã có giữ nguyên cỡ để không làm mảnh nét.
-          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
+          // Mũ và trăng dựng từ nét không được rộng quá thân nguyên âm.
+          const widthLimit = sample.nativeSize && (mark === '̂' || mark === '̆') ? .85 : 1.2;
+          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * widthLimit / source.width);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - 28 - height;
           else top += height + 28;
@@ -194,9 +196,9 @@ export function deriveMarkSamples(glyphs) {
   add('́', polygon([[0, 0], [narrow, 0], [span + wide, acuteH], [span, acuteH]]));
   add('̀', polygon([[span, 0], [span + narrow, 0], [wide, acuteH], [0, acuteH]]));
 
-  // Mũ: chevron đỉnh bằng.
-  const capH = Math.max(95, 2 * t), half = 1.3 * capH, angle = Math.atan2(capH, half);
-  const leg = t / Math.sin(angle), notch = capH - t / Math.cos(angle), flat = .3 * t;
+  // Mũ: chevron đỉnh bằng, nét nhẹ hơn thân và hẹp hơn nguyên âm (skill: kiểm độ rộng theo nguyên âm).
+  const capT = .88 * t, capH = Math.max(90, 1.75 * capT), half = 1.15 * capH, angle = Math.atan2(capH, half);
+  const leg = capT / Math.sin(angle), notch = capH - capT / Math.cos(angle), flat = .3 * capT;
   add('̂', polygon([[-half, 0], [-half + leg, 0], [0, notch], [half - leg, 0], [half, 0], [flat, capH], [-flat, capH]]));
 
   // Trăng: cung tròn, hai đầu cắt ngang.
