@@ -844,7 +844,7 @@ function scheduleFont() {
         descent = Math.min(descent, Math.floor(y - 24));
       }
       const balanced = importedMetrics ? active : balanceGlyphSpacing(active, Number($('spacing').value));
-      const ttf = exportFont(name, balanced, 0, { familyName: importedMetrics?.familyName, styleName: importedMetrics?.styleName, weight: importedMetrics?.weight, ascent, descent, kerning: importedMetrics?.kerning ?? fontKerning(balanced), wordSpace: importedMetrics?.wordSpace });
+      const ttf = exportFont(name, balanced, 0, { italic: importedMetrics?.italic, angle: importedMetrics?.angle, familyName: importedMetrics?.familyName, styleName: importedMetrics?.styleName, weight: importedMetrics?.weight, ascent, descent, kerning: importedMetrics?.kerning ?? fontKerning(balanced), wordSpace: importedMetrics?.wordSpace });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();
       if (turn !== revision) return;

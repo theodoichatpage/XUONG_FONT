@@ -5,6 +5,7 @@
 const svg2ttf = require('svg2ttf');
 const ttf2woff = require('ttf2woff');
 const { addKerning } = require('./kern-table');
+const { applyStyleMetadata } = require('./font-style-metadata');
 const { UPM, ASCENT, DESCENT, XH, CAP } = require('./metrics');
 
 const esc = (ch) => '&#x' + ch.codePointAt(0).toString(16).toUpperCase() + ';';
@@ -16,13 +17,13 @@ const escAttr = (s) => s.replace(/[&<>"']/g, (c) => `&#x${c.codePointAt(0).toStr
  * @param {{wordSpace?:number}} opts
  * @returns {Buffer} TTF
  */
-function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT, kerning = [], familyName = name, styleName = 'Regular', weight = 400 } = {}) {
+function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DESCENT, kerning = [], familyName = name, styleName = 'Regular', weight = 400, italic = false, angle = 12 } = {}) {
   const id = name.replace(/[^A-Za-z0-9_-]+/g, '') || 'DrawYourFont';
   const parts = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg"><defs>`,
     `<font id="${id}" horiz-adv-x="${wordSpace}">`,
-    `<font-face font-family="${escAttr(familyName)}" font-weight="${weight}" units-per-em="${UPM}" ascent="${ascent}" descent="${descent}" x-height="${XH}" cap-height="${CAP}"/>`,
+    `<font-face font-family="${escAttr(familyName)}" font-weight="${weight}" font-style="${italic ? 'Italic' : 'Regular'}" units-per-em="${UPM}" ascent="${ascent}" descent="${descent}" x-height="${XH}" cap-height="${CAP}"/>`,
     `<missing-glyph horiz-adv-x="${Math.round(UPM / 2)}"/>`,
     `<glyph glyph-name="space" unicode="${esc(' ')}" horiz-adv-x="${wordSpace}" d=""/>`,
   ];
@@ -33,7 +34,7 @@ function buildTTF(name, glyphs, { wordSpace = 300, ascent = ASCENT, descent = DE
   }
   parts.push(`</font></defs></svg>`);
   const ttf = svg2ttf(parts.join('\n'), { familyname: familyName, subfamilyname: styleName, fullname: name, description: 'Made with draw-your-font', url: 'https://github.com/danilo-znamerovszkij/draw-your-font' });
-  return Buffer.from(kerning.length ? addKerning(ttf.buffer, kerning) : ttf.buffer);
+  return Buffer.from(applyStyleMetadata(kerning.length ? addKerning(ttf.buffer, kerning) : ttf.buffer, { weight, italic, angle }));
 }
 
 function toWoff(ttf) {

@@ -1,3 +1,4 @@
+import { familyWeights, familyStyles, identifyFamilyStyle } from './family-styles.js';
 import { createFontFamily } from './font-family.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
@@ -84,10 +85,11 @@ async function addFont(record) {
     request.onsuccess = () => {
       const existing = request.result.find(item => item.digest === digest);
       if (existing) {
+        if (record.generatedFrom != null) store.put({ ...existing, ...record, id: existing.id, digest });
         result = { id: existing.id, duplicate: true };
       } else {
         const previous = record.generatedFrom != null
-          ? request.result.find(item => item.generatedFrom === record.generatedFrom && item.style === record.style && item.family === record.family)
+          ? request.result.find(item => item.family === record.family && identifyFamilyStyle(item) === identifyFamilyStyle(record))
           : isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
         const add = previous ? store.put({ ...record, digest, id: previous.id }) : store.add({ ...record, digest });
         add.onsuccess = () => { result = { id: add.result, duplicate: false }; };
@@ -213,6 +215,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     $('collection-empty').hidden = !!record;
     if (!record) return;
     name.value = record.name;
+    renderFamilyMatrix(record);
     preview.textContent = sample.value;
     objectURL = URL.createObjectURL(record.blob);
     download.href = objectURL;
@@ -246,13 +249,40 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     }
     groups = [...grouped.values()].sort((a, b) => nameOrder.compare(a.family, b.family));
     for (const group of groups) {
-      group.members.sort((a, b) => nameOrder.compare(a.name, b.name));
+      group.members.sort((a, b) => familyStyles.findIndex(style => style.style === identifyFamilyStyle(a)) - familyStyles.findIndex(style => style.style === identifyFamilyStyle(b)) || nameOrder.compare(a.name,b.name));
       if (group.members.some(record => record.id === selectedId)) expandedFamilies.add(group.key);
     }
     $('collection-fonts').hidden = !records.length;
     $('collection-count').textContent = '(' + records.length + ')';
     renderFamilies(true);
     if (collectionVisible()) await showSelection();
+  }
+
+  function renderFamilyMatrix(selectedRecord) {
+    const group = groups.find(group => group.members.some(item => item.id === selectedRecord.id));
+    const matrix = $('collection-family-matrix'); matrix.replaceChildren();
+    if (!group) return;
+    const title = document.createElement('h3');
+    const slots = new Set(group.members.map(identifyFamilyStyle).filter(style => familyStyles.some(item => item.style === style)));
+    title.textContent = group.family + ' · ' + slots.size + ' / 16 vị trí'; matrix.append(title);
+    const grid = document.createElement('div'); grid.className = 'family-matrix';
+    for (const weight of familyWeights) {
+      const label = document.createElement('strong'); label.textContent = weight.name; grid.append(label);
+      for (const italic of [false,true]) {
+        const style = weight.name + (italic ? ' Italic' : '');
+        const member = group.members.find(item => identifyFamilyStyle(item) === style);
+        const button = document.createElement('button'); button.type = 'button';
+        button.textContent = (italic ? 'Nghiêng' : 'Đứng') + ' · ' + (member ? member.draft ? 'Bản nháp' : 'Đã có' : 'Còn thiếu');
+        button.title = style; button.disabled = !member;
+        button.setAttribute('aria-pressed', String(member?.id === selectedRecord.id));
+        button.addEventListener('click', () => {
+          if (working || familyRunning) return;
+          selectedId = member.id; renderFamilies(true); showSelection();
+        });
+        grid.append(button);
+      }
+    }
+    matrix.append(grid);
   }
 
   function renderFamilies(revealSelected = false, focusKey) {
@@ -410,6 +440,26 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   let familyRecord;
   let familyRunning = false;
   const familyAssets = [];
+  const picker = $('family-style-picker');
+  for (const weight of familyWeights) {
+    const row = document.createElement('div'); row.className = 'family-picker-row';
+    const title = document.createElement('strong'); title.textContent = weight.name + ' · ' + weight.weight; row.append(title);
+    for (const italic of [false, true]) {
+      const style = weight.name + (italic ? ' Italic' : '');
+      const label = document.createElement('label'); label.className = 'check';
+      const check = document.createElement('input'); check.type = 'checkbox'; check.checked = true; check.value = style; check.name = 'family-style';
+      label.append(check, document.createTextNode(style)); row.append(label);
+    }
+    picker.append(row);
+  }
+  function updateFamilyCount() {
+    $('family-selection-count').textContent = picker.querySelectorAll('input:checked').length + ' / 16 kiểu';
+  }
+  picker.addEventListener('change', updateFamilyCount);
+  for (const [id, condition] of [['family-select-all', () => true],['family-select-none', () => false],['family-select-upright', input => !input.value.endsWith(' Italic')]]) $(id).addEventListener('click', () => {
+    if (familyRunning) return;
+    picker.querySelectorAll('input').forEach(input => { input.checked = condition(input); }); updateFamilyCount();
+  });
   $('collection-family-open').addEventListener('click', () => {
     if (working || familyRunning) return;
     familyRecord = records.find(record => record.id === selectedId);
@@ -417,7 +467,9 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     const group = groups.find(group => group.members.some(record => record.id === familyRecord.id));
     familyRecord = { ...familyRecord, family: group?.family || familyRecord.name };
     $('family-status').textContent = '';
-    $('family-source').textContent = 'Font gốc: ' + familyRecord.name;
+    $('family-source').textContent = 'Font gốc: ' + familyRecord.name + '. Chọn đúng độ đậm gốc trước khi tạo.';
+    const anchor = familyStyles.find(style => style.style === identifyFamilyStyle(familyRecord));
+    $('family-base-weight').value = String(anchor?.weight || 400);
     familyDialog.hidden = false;
     $('family-title').focus();
     familyDialog.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -431,16 +483,28 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
   });
   $('family-create').addEventListener('click', async () => {
     if (familyRunning || !familyRecord) return;
-    const styles = [['family-ultralight','Ultra Light'],['family-light','Light'],['family-medium','Medium'],['family-semibold','SemiBold'],['family-bold','Bold']]
-      .filter(([id]) => $(id).checked).map(([,style]) => style);
+    if (familyRecord.italic || identifyFamilyStyle(familyRecord).endsWith(' Italic')) { $('family-status').textContent = 'Chọn một kiểu đứng làm font gốc để tránh nghiêng chữ hai lần.'; return; }
+    const styles = [...picker.querySelectorAll('input:checked')].map(input => input.value);
     if (!styles.length) { $('family-status').textContent = 'Chọn ít nhất một kiểu chữ.'; return; }
     familyRunning = true;
     $('family-create').disabled = $('family-close').disabled = true;
+    for (const input of familyDialog.querySelectorAll('input,select')) input.disabled = true;
     for (const asset of familyAssets) { URL.revokeObjectURL(asset.url); document.fonts.delete(asset.face); }
     familyAssets.length = 0;
     $('family-results').replaceChildren();
     $('family-status').textContent = 'Đang tạo family…';
+    let savedCount = 0;
+    const failures = [];
+    const anchor = familyWeights.find(item => item.weight === Number($('family-base-weight').value));
+    const sourceId = familyRecord.id;
     try {
+      // Record the source slot without altering the original file.
+      await accessFonts('readwrite', store => store.put({ ...familyRecord, style: anchor.name, weight: anchor.weight, italic: false }));
+      for (const member of records) {
+        if (member.id !== sourceId && groups.find(group => group.family === familyRecord.family)?.members.some(item => item.id === member.id)) {
+          await accessFonts('readwrite', store => store.put({ ...member, family: familyRecord.family, style: identifyFamilyStyle(member) }));
+        }
+      }
       await createFontFamily(familyRecord, styles, $('family-text').value, async result => {
         const face = new FontFace('family-proof-' + crypto.randomUUID(), await result.blob.arrayBuffer());
         let previewLoaded = false;
@@ -451,7 +515,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         const row = document.createElement('section');
         row.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--line)';
         const label = document.createElement('strong');
-        label.textContent = result.style;
+        label.textContent = result.style + (result.draft ? result.italic ? ' · Bản nháp nghiêng' : ' · Bản nháp' : ' · Font gốc');
         const proof = document.createElement('p');
         proof.style.cssText = 'font-size:32px;line-height:1.6;font-weight:400;font-style:normal;font-synthesis:none;letter-spacing:0;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap';
         if (previewLoaded) proof.style.fontFamily = face.family;
@@ -460,32 +524,34 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         const link = document.createElement('a');
         link.className = 'download'; link.href = url; link.download = result.filename; link.textContent = 'Tải ' + result.style;
         // Regular already exists as the selected source. Save only new styles.
-        if (result.style !== 'Regular') {
+        if (!result.isSource) {
           const { text, ...saved } = result;
           await addFont({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id });
         }
         const savedLabel = document.createElement('span');
-        savedLabel.textContent = result.style === 'Regular' ? 'Font gốc trong bộ sưu tập' : 'Đã tự lưu vào ' + result.family;
+        savedCount++;
+        savedLabel.textContent = result.isSource ? 'Font gốc trong bộ sưu tập' : 'Đã tự lưu vào ' + result.family;
         const editButton = document.createElement('button');
         editButton.disabled = true;
         editButton.dataset.familyEdit = '';
         editButton.type = 'button'; editButton.textContent = 'Chỉnh sửa ' + result.style;
         editButton.addEventListener('click', () => run(async () => {
-          const target = result.style === 'Regular' ? records.find(item => item.id === familyRecord.id)
-            : records.find(item => item.family === result.family && item.style === result.style && item.generatedFrom === (familyRecord.generatedFrom ?? familyRecord.id));
+          const target = result.isSource ? records.find(item => item.id === sourceId)
+            : records.find(item => item.family === result.family && identifyFamilyStyle(item) === result.style);
           if (target && await vietnamize(target, { editOnly: true })) { editingRecord = target; selectedId = target.id; selectTab(false); }
         }));
         const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,editButton,savedLabel);
         row.append(label,proof,actions); $('family-results').append(row);
-        $('family-status').textContent = 'Đã tạo ' + result.style + '.';
-      });
+        $('family-status').textContent = 'Đã hoàn tất ' + savedCount + ' / ' + styles.length + ': ' + result.style + '.';
+      }, { baseWeight: anchor.weight, angle: Number($('family-italic-angle').value), onError: (style, error) => { failures.push(style + ': ' + error.message); } });
       await refresh(familyRecord.id);
-      $('family-status').textContent = 'Đã tạo và tự lưu các kiểu vào family ' + familyRecord.family + '. Mở rộng tên family trong bộ sưu tập để chọn.';
+      $('family-status').textContent = 'Hoàn tất ' + savedCount + ' / ' + styles.length + ' kiểu trong family ' + familyRecord.family + '.' + (failures.length ? '\nChưa tạo được: ' + failures.join('\n') : ' Các kiểu mới đã tự lưu; hãy duyệt dấu và lòng chữ.');
     } catch (error) {
       await refresh(familyRecord.id);
       $('family-status').textContent = 'Tạo family chưa hoàn tất: ' + error.message + '. Các kiểu đã lưu vẫn có trong bộ sưu tập.';
     }
     finally { familyRunning = false; $('family-create').disabled = $('family-close').disabled = false;
+      for (const input of familyDialog.querySelectorAll('input,select')) input.disabled = false;
       familyDialog.querySelectorAll('[data-family-edit]').forEach(button => { button.disabled = false; });
     }
   });

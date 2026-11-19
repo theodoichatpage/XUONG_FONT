@@ -1,10 +1,20 @@
 import opentype from 'opentype.js';
 import ClipperLib from 'clipper-lib';
 import svg2ttf from 'svg2ttf';
+import { familyWeights, familyStyles } from './family-styles.js';
+const { applyStyleMetadata } = require('../src/font-style-metadata');
 const escapeXML = value => String(value).replace(/[&<>"']/g, ch => '&#' + ch.codePointAt(0) + ';');
 const { addKerning } = require('../src/kern-table');
 
-const styles = { 'Ultra Light': [200, -14], Light: [300, -7], Medium: [500, 0], SemiBold: [600, 12], Bold: [700, 20] };
+function slantPath(path, angle) {
+  const output = new opentype.Path(), shear = Math.tan(angle * Math.PI / 180);
+  output.commands = path.commands.map(command => {
+    const next = { ...command };
+    for (const [x,y] of [['x','y'],['x1','y1'],['x2','y2']]) if (Number.isFinite(next[x])) next[x] += shear * next[y];
+    return next;
+  });
+  return output;
+}
 
 function contours(path) {
   const paths = [];
@@ -60,10 +70,15 @@ function embolden(path, amount) {
   return output;
 }
 
-export async function createFontFamily(record, chosen, text, onResult) {
+export async function createFontFamily(record, chosen, text, onResult, options = {}) {
   const original = await record.blob.arrayBuffer();
   const source = opentype.parse(original);
-  if (source.tables.fvar) throw new Error('Chọn file Regular tĩnh để tạo family.');
+  if (source.tables.fvar) throw new Error('Chọn một kiểu chữ tĩnh để tạo family.');
+  if (source.tables.post?.italicAngle || (source.tables.os2?.fsSelection & 1)) throw new Error('Chọn kiểu đứng làm font gốc để tránh nghiêng chữ hai lần.');
+  const base = familyWeights.find(item => item.weight === Number(options.baseWeight))
+    || familyWeights.reduce((best,item) => Math.abs(item.weight - (source.tables.os2?.usWeightClass || 400)) < Math.abs(best.weight - (source.tables.os2?.usWeightClass || 400)) ? item : best);
+  const angle = Number(options.angle ?? 12);
+  if (!Number.isFinite(angle) || angle < 1 || angle > 20) throw new Error('Góc nghiêng cần từ 1 đến 20 độ.');
   const family = record.family || source.getEnglishName('preferredFamily') || source.getEnglishName('fontFamily') || record.name.replace(/(?:[ -]+Regular)$/i, '').trim();
   const upm = source.unitsPerEm;
   // cmap is authoritative: multiple code points can share one outline.
@@ -81,15 +96,25 @@ export async function createFontFamily(record, chosen, text, onResult) {
     const [a,b] = key.split(',').map(Number);
     return indexChars.has(a) && indexChars.has(b) ? [[indexChars.get(a),indexChars.get(b),value]] : [];
   });
-  for (const style of ['Regular', ...chosen]) {
-    const [weight, delta] = style === 'Regular' ? [400,0] : styles[style];
-    const amount = delta * upm / 1000;
+  const targets = [...new Set(chosen)].map(style => familyStyles.find(item => item.style === style));
+  if (targets.some(item => !item)) throw new Error('Kiểu family không hợp lệ.');
+  for (const target of targets) {
+    const { style, weight, italic } = target;
+    try {
+    const isSource = !italic && weight === base.weight;
+    if (isSource) {
+      await onResult({ name: family + ' ' + style, family, style, weight, italic, isSource: true, text,
+        filename: record.filename, blob: record.blob });
+      continue;
+    }
+    const amount = (target.offset - base.offset) * upm / 1000;
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
     for (let i = 0; i < source.glyphs.length; i++) {
       const old = source.glyphs.get(i);
       const originalPath = old.path ?? new opentype.Path();
-      const path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
+      let path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
+      if (italic) path = slantPath(path, angle);
       // Avoid Glyph's constructor: opentype.js 1.x drops Unicode aliases there.
       const glyph = { unicodes: codePointsByGlyph.get(i) || [],
         advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path };
@@ -104,7 +129,7 @@ export async function createFontFamily(record, chosen, text, onResult) {
     // Use the same TrueType writer as the editor's download flow.
     // This avoids a second CFF serialization path for imported outlines.
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg"><defs><font id="FamilyFont" horiz-adv-x="${upm / 2}">`,
-      `<font-face font-family="${escapeXML(family)}" font-weight="${weight}" units-per-em="${upm}" ascent="${ascent}" descent="${descent}"/>`];
+      `<font-face font-family="${escapeXML(family)}" font-weight="${weight}" font-style="${italic ? 'Italic' : 'Regular'}" units-per-em="${upm}" ascent="${ascent}" descent="${descent}"/>`];
     for (const [index, glyph] of glyphs.entries()) {
       const d = escapeXML(glyph.path.toPathData(3));
       if (index === 0) parts.push(`<missing-glyph horiz-adv-x="${glyph.advanceWidth}" d="${d}"/>`);
@@ -118,6 +143,7 @@ export async function createFontFamily(record, chosen, text, onResult) {
       fullname: family + ' ' + style, copyright: source.getEnglishName('copyright') || '', ts: 0 });
     let bytes = new Uint8Array(output.buffer);
     if (kerning.length) bytes = addKerning(bytes, kerning);
+    bytes = applyStyleMetadata(bytes, { weight, italic, angle });
     // Verify the exported bytes before handing them to storage or preview.
     const checked = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     for (const [code, index] of Object.entries(source.tables.cmap.glyphIndexMap)) {
@@ -127,6 +153,10 @@ export async function createFontFamily(record, chosen, text, onResult) {
       }
     }
     await onResult({ name: family + ' ' + style, family, filename: family + '-' + style.replace(/ /g, '') + '.ttf',
-      blob: new Blob([bytes], { type: 'font/ttf' }), style, text });
+      blob: new Blob([bytes], { type: 'font/ttf' }), style, weight, italic, draft: true, isSource: false, text });
+    } catch (error) {
+      if (!options.onError) throw error;
+      await options.onError(style, error);
+    }
   }
 }

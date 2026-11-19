@@ -293,3 +293,10 @@ dialog::backdrop{background:#221a17bd}
 .rule-illustration svg{display:block;width:100%;height:auto;overflow:hidden;background:white}
 .rule-illustration figcaption{margin-top:8px;color:var(--muted);font-size:13px;line-height:1.5}
 .rule-illustration figcaption span{display:block;font-size:12px;margin-top:3px}
+
+.family-options{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.family-select-actions{margin:14px 0}.family-style-picker{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:16px}
+.family-picker-row{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line);align-items:center}.family-picker-row:last-child{border:0}.family-picker-row .check{margin:0;font-size:14px}
+#family-status{white-space:pre-line}.family-matrix{display:grid;grid-template-columns:100px 1fr 1fr;gap:5px;margin:8px 0 14px;align-items:center}.family-matrix strong{font-size:13px}.family-matrix button{font-size:12px;padding:6px}.family-matrix button[aria-pressed=true]{border-color:var(--red);background:var(--accent)}
+#collection-family-matrix h3{font-size:16px;margin:16px 0 6px}
+@media(max-width:620px){.family-options{grid-template-columns:1fr}.family-picker-row{grid-template-columns:1fr 1fr}.family-picker-row strong{grid-column:1/-1}.family-matrix{grid-template-columns:80px 1fr 1fr}}

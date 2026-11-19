@@ -193,25 +193,22 @@
           <button id="collection-remove" type="button" class="quiet">Xóa font</button>
         </div>
       </form>
+      <section id="collection-family-matrix" aria-label="Các kiểu trong family"></section>
       <label for="collection-sample">Gõ thử</label>
       <textarea id="collection-sample" rows="2" maxlength="240">Sử Việt Kiêu Hùng · Tiếng Việt 123</textarea>
       <div id="collection-preview" aria-hidden="true"></div>
     </div>
 <section id="family-dialog" aria-labelledby="family-title" hidden>
-  <div class="viewer-toolbar"><h2 id="family-title" tabindex="-1">Tạo family từ Regular</h2><button id="family-close" type="button">Ẩn phần tạo family</button></div>
+  <div class="viewer-toolbar"><h2 id="family-title" tabindex="-1">Tạo family 16 kiểu</h2><button id="family-close" type="button">Ẩn phần tạo family</button></div>
   <div class="family-body">
     <p id="family-source"></p>
-    <p class="help">Tạo bản nháp và tự lưu các kiểu dưới cùng tên family trong bộ sưu tập. Tạo lại sẽ cập nhật kiểu đã có. Medium dùng độ dày bản gốc; Light và Ultra Light giảm nét, SemiBold và Bold tăng nét. Kiểm tra lòng chữ và dấu trước khi sử dụng. Bản xuất giữ đường nét và kerning cơ bản, các tính năng OpenType nâng cao cần đối chiếu.</p>
-    <div class="tool-row" style="margin:10px 0">
-      <label class="check"><input id="family-ultralight" type="checkbox" checked> Ultra Light</label>
-      <label class="check"><input id="family-light" type="checkbox" checked> Light</label>
-      <label class="check"><input id="family-medium" type="checkbox" checked> Medium</label>
-      <label class="check"><input id="family-semibold" type="checkbox" checked> SemiBold</label>
-      <label class="check"><input id="family-bold" type="checkbox" checked> Bold</label>
-    </div>
+    <p class="help">Mẫu family gồm 8 mức độ đậm, mỗi mức có kiểu đứng và kiểu nghiêng. Kiểu gốc giữ nguyên; các kiểu tự sinh là bản nháp cần duyệt dấu, lòng chữ và khoảng cách. Kiểu nghiêng tự động là phép nghiêng hình, chưa thay thế Italic được thiết kế riêng.</p>
+    <div class="family-options"><label for="family-base-weight">Font gốc tương ứng với<select id="family-base-weight"><option value="200">ExtraLight</option><option value="300">Light</option><option value="400" selected>Regular</option><option value="500">Medium</option><option value="600">SemiBold</option><option value="700">Bold</option><option value="800">ExtraBold</option><option value="900">Black</option></select></label><label for="family-italic-angle">Góc nghiêng bản nháp (độ)<input id="family-italic-angle" type="number" min="1" max="20" value="12"></label></div>
+    <div class="tool-row family-select-actions"><button id="family-select-all" type="button">Chọn đủ 16 kiểu</button><button id="family-select-upright" type="button">Chỉ kiểu đứng</button><button id="family-select-none" type="button">Bỏ chọn</button><output id="family-selection-count">16 / 16 kiểu</output></div>
+    <div id="family-style-picker" class="family-style-picker" aria-label="Chọn 16 kiểu family"></div>
     <label for="family-text">Nội dung so sánh</label>
     <textarea id="family-text" rows="2" maxlength="240">Tiếng Việt · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ · 123</textarea>
-    <button id="family-create" type="button" class="primary">Tạo family</button>
+    <button id="family-create" type="button" class="primary">Tạo các kiểu đã chọn</button>
     <p id="family-status" class="help" role="status" aria-live="polite"></p>
     <div id="family-results"></div>
   </div>
