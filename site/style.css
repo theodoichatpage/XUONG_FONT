@@ -395,3 +395,12 @@ dialog::backdrop{background:#221a17bd}
 .checker-showcase .checker-drop-hint{color:var(--muted)}
 .checker-showcase .checker-card-head{color:var(--red)}
 @media(max-width:800px){.checker-showcase .checker-paper-glyphs svg{height:80px}}
+
+/* Proof sheet and computed missing-character summary */
+.checker-showcase .checker-paper-glyphs>div{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:135px}
+.checker-showcase .checker-paper-glyphs strong{font:clamp(42px,5vw,72px)/1.25 var(--display);color:var(--ink)}
+.checker-showcase .checker-paper-glyphs small{font:10px var(--body);color:var(--muted)}
+.checker-showcase .checker-paper-stamp{font:italic 22px var(--display);text-align:right;color:var(--red);padding:2px 14px 8px}
+.checker-showcase .checker-missing-list{overflow-wrap:anywhere;line-height:1.8;color:var(--red);font-weight:600}
+.checker-showcase [data-role=showcase-badge]{font-weight:700;color:var(--red)}
+.checker-showcase [data-role=paper-state]{font-size:10px;letter-spacing:.04em}
