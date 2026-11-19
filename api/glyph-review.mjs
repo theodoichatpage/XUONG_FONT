@@ -2,6 +2,7 @@ import { inventoryInstruction } from '../src/gemini-font-prompts.mjs';
 import { vietnameseDesignInstruction } from '../src/vietnamese-design-rules.mjs';
 import { repairDecisionSchema, validateRepairCandidates, validateRepairDecisions } from '../src/repair-plan.mjs';
 import { analysisSchema, validateFamilyAnalysis } from '../src/family-analysis.mjs';
+import { readGeminiError, isKeyError, explainGeminiError } from '../src/gemini-error.mjs';
 
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/';
 const models = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
@@ -59,14 +60,9 @@ function isPng(value) {
   return typeof value === 'string' && value.length <= 1_400_000 && /^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(value);
 }
 
-function geminiError(status) {
-  const suffix = ' (Gemini HTTP ' + status + ').';
-  if (status === 401 || status === 403) return json({ error: 'Gemini từ chối khóa API hoặc quyền của dự án' + suffix }, 403);
-  if (status === 429) return json({ error: 'Đã chạm hạn mức Gemini. Xem Rate Limit trong Google AI Studio' + suffix }, 429);
-  if (status === 400) return json({ error: 'Gemini không chấp nhận yêu cầu. Kiểm tra khóa và trạng thái dự án trong Google AI Studio' + suffix }, 400);
-  if (status === 404) return json({ error: 'Các mẫu Gemini được thử không khả dụng cho dự án này' + suffix }, 502);
-  if (status === 503) return json({ error: 'Gemini đang quá tải trên các mẫu được thử. Hãy thử lại sau' + suffix }, 503);
-  return json({ error: 'Gemini chưa xử lý được yêu cầu' + suffix }, 502);
+function geminiError(info) {
+  const status = isKeyError(info) ? 401 : [400, 401, 403, 429, 503].includes(info.status) ? info.status : 502;
+  return json({ error: explainGeminiError(info), geminiStatus: info.status, geminiReason: info.reason }, status);
 }
 
 async function callGemini(key, body, preferred, testing, inventory) {
@@ -87,6 +83,13 @@ async function callGemini(key, body, preferred, testing, inventory) {
         }),
         signal: attemptTimeout ? AbortSignal.any([deadline, AbortSignal.timeout(attemptTimeout)]) : deadline
       });
+      if (result.ok) return { result, model };
+      // Lỗi 400 không do khóa có thể là mẫu này không nhận tham số: thử mẫu kế tiếp.
+      if (result.status === 400) {
+        const info = await readGeminiError(result);
+        if (isKeyError(info) || model === order.at(-1)) return { result, model, info };
+        continue;
+      }
       if (!retryStatuses.has(result.status) || model === order.at(-1)) return { result, model };
       await result.body?.cancel();
     } catch (error) {
@@ -139,8 +142,8 @@ export async function POST(request) {
         generationConfig: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 1024,
           thinkingConfig: { thinkingLevel: 'low' } }
       });
-    const { result, model } = await callGemini(key, body, preferredModel, testing, inventory);
-    if (!result.ok) return geminiError(result.status);
+    const { result, model, info } = await callGemini(key, body, preferredModel, testing, inventory);
+    if (!result.ok) return geminiError(info ?? await readGeminiError(result));
     const payload = await result.json();
     if (testing) {
       if (!payload.candidates?.length) return json({ error: 'Gemini chưa trả phản hồi kiểm tra. Hãy thử lại.' }, 502);

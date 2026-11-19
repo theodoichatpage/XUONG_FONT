@@ -1,4 +1,5 @@
 import { vietnameseDesignInstruction } from '../src/vietnamese-design-rules.mjs';
+import { readGeminiError, isKeyError, explainGeminiError } from '../src/gemini-error.mjs';
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent';
 
 const visualStyle = vietnameseDesignInstruction + ' Keep the reference font’s proportions, weight, counters, terminals and stroke contrast. Pure black ink on a flat pure white background. No rulers, borders, labels, shadows or decoration.';
@@ -40,14 +41,9 @@ export async function POST(request) {
       signal: AbortSignal.timeout(100000)
     });
     if (!response.ok) {
-      const message = {
-        400: 'Gemini không nhận yêu cầu tạo ảnh. Kiểm tra dự án và hạn mức.',
-        401: 'Khóa Gemini không hợp lệ.',
-        403: 'Khóa Gemini chưa có quyền tạo ảnh.',
-        404: 'Mẫu tạo ảnh Gemini chưa khả dụng cho dự án này.',
-        429: 'Đã chạm hạn mức tạo ảnh Gemini.'
-      }[response.status];
-      return fail(message ?? 'Gemini đang lỗi khi tạo ảnh.', message ? response.status : 502);
+      const info = await readGeminiError(response);
+      const status = isKeyError(info) ? 401 : [400, 401, 403, 404, 429].includes(info.status) ? info.status : 502;
+      return fail(explainGeminiError(info), status);
     }
     const payload = await response.json();
     const image = payload.candidates?.[0]?.content?.parts?.find(part => !part.thought && part.inlineData)?.inlineData;
