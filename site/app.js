@@ -1320,7 +1320,7 @@ function compareStrokes(apply) {
   result.textContent = `Đã cân nét dọc của ${first} theo ${second}. Bấm Đo nét để kiểm tra lại.`;
 }
 
-$('balance-font-strokes').addEventListener('click', () => {
+$('balance-font-strokes')?.addEventListener('click', () => {
   if (busy || loading) return;
   const result = $('stroke-result');
   const active = charset.map(usableGlyph).filter(Boolean);
@@ -1334,8 +1334,8 @@ $('balance-font-strokes').addEventListener('click', () => {
   refresh();
   result.textContent = `Đã đo ${measured} chữ và cân nét ${updates.length} chữ: ${updates.map(glyph => glyph.char).join(' ')}.`;
 });
-$('measure-strokes').addEventListener('click', () => compareStrokes(false));
-$('match-strokes').addEventListener('click', () => compareStrokes(true));
+$('measure-strokes')?.addEventListener('click', () => compareStrokes(false));
+$('match-strokes')?.addEventListener('click', () => compareStrokes(true));
 $('sample').addEventListener('input', () => { save(); renderPreview(); });
 $('size').addEventListener('input', renderPreview);
 $('name').addEventListener('input', () => { save(); scheduleFont(); });
