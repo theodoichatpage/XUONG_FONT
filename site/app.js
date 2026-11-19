@@ -18,7 +18,7 @@ const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
 let glyphs = new Map();
-let markCandidates = [], lastMarkChange = [];
+let markCandidates = [], lastMarkChange = [], auditRepairPending = false;
 let importedMetrics;
 let loadedSourceBlob;
 let source;
@@ -1410,6 +1410,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
 
 function previewMarkSpacing() {
   if ($('mark-spacing-tools').hidden) return;
+  auditRepairPending = false;
   const gap = Number($('mark-gap').value), scale = Number($('mark-scale').value) / 100;
   $('mark-gap-value').textContent = gap;
   $('mark-scale-value').textContent = Math.round(scale * 100);
@@ -1459,8 +1460,9 @@ $('open-mark-spacing').addEventListener('click', () => {
 $('close-mark-spacing').addEventListener('click', () => { $('mark-spacing-tools').hidden = true; });
 for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', previewMarkSpacing);
 $('apply-mark-spacing').addEventListener('click', () => {
-  previewMarkSpacing();
+  if (!auditRepairPending) previewMarkSpacing();
   if (!markCandidates.length) return;
+  auditRepairPending = false;
   lastMarkChange = markCandidates.slice();
   for (const {char, after} of lastMarkChange) glyphs.set(char, after);
   refresh();
@@ -1557,6 +1559,7 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
     // Reuse the established before/after proof and explicit apply/undo workflow.
     previewMarkSpacing();
     markCandidates = proposals;
+    auditRepairPending = true;
     const proof = $('mark-spacing-proof');
     proof.replaceChildren();
     const ns = 'http://www.w3.org/2000/svg';
