@@ -79,7 +79,7 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     $r('showcase-description').textContent=source+' · kiểm tra hiển thị 146 ký tự trong trình duyệt.';
     $r('showcase-badge').textContent=missing.length?'✕ Thiếu '+missing.length+' ký tự':'✓ Đủ dấu tiếng Việt';
     $r('showcase-count').textContent=count+' / '+browserChars.length+' ký tự tiếng Việt hiển thị được';
-    $r('showcase-progress').style.width=(count/browserChars.length*100).toFixed(1)+'%';
+    requestAnimationFrame(()=>{if(request===browserRequest)$r('showcase-progress').style.width=(count/browserChars.length*100).toFixed(1)+'%';});
     $r('paper-stamp').textContent=missing.length?'Thiếu '+missing.length:'Đạt';
     $r('paper-state').textContent='ĐÃ KIỂM TRA FONT';
     const missingList=$r('missing-characters');
