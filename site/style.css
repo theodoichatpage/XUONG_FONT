@@ -332,3 +332,10 @@ dialog::backdrop{background:#221a17bd}
 #font-checker #standalone-font-check{display:block;padding:0;margin:0;max-width:none;width:100%;background:transparent;border:0;box-shadow:none}
 #font-checker .colorme-check-frame{display:block;width:100%;height:720px;min-height:0;border:0;overflow:hidden;background:#f7f5f0;border-radius:16px}
 @media(max-width:700px){#font-checker .colorme-check-frame{border-radius:0}}
+
+/* Compact Vietnamese rules illustrations; full original opens when clicked. */
+#font-rules .rule-illustration a{display:flex;justify-content:center;align-items:center;min-height:0;max-height:220px;padding:8px;overflow:hidden}
+#font-rules .rule-illustration svg{display:block;width:auto;max-width:100%;height:auto;max-height:200px;object-fit:contain;flex:0 1 auto}
+#font-rules .rule-illustration img{display:block;width:auto;max-width:100%;height:auto;max-height:200px;object-fit:contain}
+#font-rules .rules-extra img{max-height:320px;max-width:min(100%,700px);object-fit:contain}
+@media(max-width:700px){#font-rules .rule-illustration a{max-height:170px}#font-rules .rule-illustration svg,#font-rules .rule-illustration img{max-height:150px}#font-rules .rules-extra img{max-height:240px}}
