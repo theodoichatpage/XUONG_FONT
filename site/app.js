@@ -18,7 +18,7 @@ const canvas = $('image');
 const ctx = canvas.getContext('2d');
 const storageKey = 'xuong-font-project-v1';
 let glyphs = new Map();
-let markCandidates = [], lastMarkChange = [];
+let markCandidates = [], lastMarkChange = [], auditRepairPending = false;
 let importedMetrics;
 let loadedSourceBlob;
 let source;
@@ -1410,6 +1410,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
 
 function previewMarkSpacing() {
   if ($('mark-spacing-tools').hidden) return;
+  auditRepairPending = false;
   const gap = Number($('mark-gap').value), scale = Number($('mark-scale').value) / 100;
   $('mark-gap-value').textContent = gap;
   $('mark-scale-value').textContent = Math.round(scale * 100);
@@ -1459,8 +1460,9 @@ $('open-mark-spacing').addEventListener('click', () => {
 $('close-mark-spacing').addEventListener('click', () => { $('mark-spacing-tools').hidden = true; });
 for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', previewMarkSpacing);
 $('apply-mark-spacing').addEventListener('click', () => {
-  previewMarkSpacing();
+  if (!auditRepairPending) previewMarkSpacing();
   if (!markCandidates.length) return;
+  auditRepairPending = false;
   lastMarkChange = markCandidates.slice();
   for (const {char, after} of lastMarkChange) glyphs.set(char, after);
   refresh();
@@ -1522,6 +1524,65 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   onMarks: result => {
     if (!isQualityEditorSource(result)) { status('Hãy bấm Mở font này để chỉnh sửa trước khi chỉnh dấu.'); return; }
     $('open-mark-spacing').click();
+  },
+  onRepair: async (result, candidates) => {
+    if (!isQualityEditorSource(result)) await openQualityFont(result);
+    if (!isQualityEditorSource(result)) {
+      status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi sửa.');
+      return;
+    }
+    const threshold = 16; // Fixed conservative review threshold; automatic proposals never edit outlines until approval.
+    const proposals = [];
+    const skipped = [];
+    for (const finding of candidates) {
+      const char = finding.chars;
+      const before = glyphs.get(char);
+      const parts = [...char.normalize('NFD')];
+      const root = parts[0];
+      const baseChar = parts.includes('\u031b') ? (root + '\u031b').normalize('NFC') : root;
+      const base = glyphs.get(baseChar);
+      const measured = Number(finding.value);
+      if (!before || !base || !Number.isFinite(measured) || measured < 0) { skipped.push(char); continue; }
+      const gap = Math.max(2, Math.min(140, Math.ceil((threshold - measured + 2) / 2) * 2));
+      const after = adjustGlyphMarks(before, base, { gap, scale: 1 });
+      if (!after || after.d === before.d) { skipped.push(char); continue; }
+      proposals.push({ char, before, after, gap, measured });
+    }
+    if (!proposals.length) {
+      status('Chưa có dấu rời đủ điều kiện sửa tự động. Dấu liền thân và các nét giao nhau cần duyệt bằng mắt.');
+      return;
+    }
+    $('open-font-workspace').click();
+    $('mark-spacing-tools').hidden = false;
+    $('mark-spacing-scope').value = 'selected';
+    selected = proposals[0].char;
+    // Reuse the established before/after proof and explicit apply/undo workflow.
+    previewMarkSpacing();
+    markCandidates = proposals;
+    auditRepairPending = true;
+    const proof = $('mark-spacing-proof');
+    proof.replaceChildren();
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const {char,before,after} of proposals.slice(0,24)) {
+      const a=glyphBounds(before),b=glyphBounds(after),left=Math.min(a.x,b.x)-30;
+      const bottom=Math.min(a.y,b.y)-30,right=Math.max(a.x+a.width,b.x+b.width)+30;
+      const top=Math.max(a.y+a.height,b.y+b.height)+30;
+      const card=document.createElement('div'),title=document.createElement('strong');
+      title.textContent=char;card.append(title);
+      for(const [label,glyph] of [['Trước',before],['Sau',after]]) {
+        const figure=document.createElement('figure'),caption=document.createElement('figcaption');
+        caption.textContent=label;
+        const svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');
+        svg.setAttribute('viewBox',left+' '+(-top)+' '+(right-left)+' '+(top-bottom));
+        path.setAttribute('d',glyph.d);path.setAttribute('transform','scale(1,-1)');
+        svg.append(path);figure.append(svg,caption);card.append(figure);
+      }
+      proof.append(card);
+    }
+    $('mark-spacing-report').textContent='Đề xuất '+proposals.length+' chữ có dấu rời; bỏ qua '+skipped.length+' chữ không chắc chắn. Không thay hình dạng nét. Xem trước rồi bấm Áp dụng, hoặc đóng để hủy.';
+    $('apply-mark-spacing').disabled=false;
+    $('mark-spacing-tools').scrollIntoView({block:'nearest'});
+    status('Đã chuẩn bị '+proposals.length+' đề xuất sửa dấu. Chưa thay đổi font. Duyệt hình trước/sau rồi bấm Áp dụng.');
   }
 });
 const standaloneFontCheck = createFontCheckPanel($('standalone-font-check'), {
