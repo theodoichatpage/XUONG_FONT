@@ -1,0 +1,297 @@
+/* vietnamese-font-check.blade.php: Tailwind step 2. Utilities live in the markup; built by work/tw/build-tools.sh (content: vietnamese-font-check.classes). */
+
+/*! tw-utilities */
+
+:where(.cmt) .tw-relative {
+  position: relative
+}
+
+:where(.cmt) .tw-flex {
+  display: flex
+}
+
+:where(.cmt) .tw-grid {
+  display: grid
+}
+
+:where(.cmt) .tw-aspect-\[1\] {
+  aspect-ratio: 1
+}
+
+:where(.cmt) .tw-h-\[32px\] {
+  height: 32px
+}
+
+:where(.cmt) .tw-cursor-pointer {
+  cursor: pointer
+}
+
+:where(.cmt) .tw-grid-cols-\[repeat\(auto-fill\,_minmax\(52px\,_1fr\)\)\] {
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr))
+}
+
+:where(.cmt) .tw-items-center {
+  align-items: center
+}
+
+:where(.cmt) .tw-justify-center {
+  justify-content: center
+}
+
+:where(.cmt) .tw-gap-\[6px\] {
+  gap: 6px
+}
+
+:where(.cmt) .tw-whitespace-nowrap {
+  white-space: nowrap
+}
+
+:where(.cmt) .tw-rounded-\[12px\] {
+  border-radius: 12px
+}
+
+:where(.cmt) .tw-rounded-\[999px\] {
+  border-radius: 999px
+}
+
+:where(.cmt) .tw-p-\[0_12px\] {
+  padding: 0 12px
+}
+
+:where(.cmt) .tw-p-\[5px_12px\] {
+  padding: 5px 12px
+}
+
+:where(.cmt) .tw-text-\[13px\] {
+  font-size: 13px
+}
+
+:where(.cmt) .tw-text-\[22px\] {
+  font-size: 22px
+}
+
+:where(.cmt) .tw-font-medium {
+  font-weight: 500
+}
+
+:where(.cmt) .tw-leading-\[1\.3\] {
+  line-height: 1.3
+}
+
+:where(.cmt) .tw-css-border-\[0\] {
+  border: 0
+}
+
+:where(.cmt) .tw-css-background-\[var\(--inset\,_\#F5F5F7\)\] {
+  background: var(--inset, #F5F5F7)
+}
+
+:where(.cmt) .tw-css-outline-\[none\] {
+  outline: none
+}
+
+:where(.cmt) .tw-css-color-\[var\(--ink\,_\#1D1D1F\)\] {
+  color: var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .tw-css-font-size-\[clamp\(26px\,_4vw\,_40px\)\] {
+  font-size: clamp(26px, 4vw, 40px)
+}
+
+:where(.cmt) .tw-css-word-break-\[break-word\] {
+  word-break: break-word
+}
+
+@media (max-width: 575.98px) {
+  :where(.cmt) .mq1-max-575-98\:tw-grid-cols-\[repeat\(auto-fill\2c _minmax\(44px\2c _1fr\)\)\] {
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr))
+  }
+}
+
+:where(.cmt) .\[\&\#vf-drop\.is-dragover\]\:tw-css-box-shadow-\[inset_0_0_0_1\.5px_var\(--ink\2c _\#1D1D1F\)\]#vf-drop.is-dragover {
+  box-shadow: inset 0 0 0 1.5px var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .\[\&\#vf-only\]\:tw-m-\[0\]#vf-only {
+  margin: 0
+}
+
+:where(.cmt) .\[\&\#vf-only\]\:tw-h-\[16px\]#vf-only {
+  height: 16px
+}
+
+:where(.cmt) .\[\&\#vf-only\]\:tw-w-\[16px\]#vf-only {
+  width: 16px
+}
+
+:where(.cmt) .\[\&\#vf-only\]\:tw-css-accent-color-\[var\(--ink\2c _\#1D1D1F\)\]#vf-only {
+  accent-color: var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .\[\&\.bad\]\:tw-css-background-\[var\(--cm-danger-bg\)\].bad {
+  background: var(--cm-danger-bg)
+}
+
+:where(.cmt) .\[\&\.bad\]\:tw-css-color-\[var\(--cm-danger\)\].bad {
+  color: var(--cm-danger)
+}
+
+:where(.cmt) .\[\&\.good\]\:tw-css-background-\[var\(--cm-success-bg\)\].good {
+  background: var(--cm-success-bg)
+}
+
+:where(.cmt) .\[\&\.good\]\:tw-css-color-\[var\(--cm-success\)\].good {
+  color: var(--cm-success)
+}
+
+:where(.cmt) .\[\&\.is-missing\:\:after\]\:tw-absolute.is-missing::after {
+  position: absolute
+}
+
+:where(.cmt) .\[\&\.is-missing\:\:after\]\:tw-bottom-\[2px\].is-missing::after {
+  bottom: 2px
+}
+
+:where(.cmt) .\[\&\.is-missing\:\:after\]\:tw-tracking-\[0\].is-missing::after {
+  letter-spacing: 0
+}
+
+:where(.cmt) .\[\&\.is-missing\:\:after\]\:tw-css-font-\[700_9px\/1_Inter\2c _Arial\2c _sans-serif\].is-missing::after {
+  font: 700 9px/1 Inter, Arial, sans-serif
+}
+
+:where(.cmt) .\[\&\.is-missing\:\:after\]\:tw-css-content-\[\'thi\1EBFu\'\].is-missing::after {
+  content: 'thiếu'
+}
+
+:where(.cmt) .\[\&\.is-missing\]\:tw-css-background-\[var\(--cm-danger-bg\)\].is-missing {
+  background: var(--cm-danger-bg)
+}
+
+:where(.cmt) .\[\&\.is-missing\]\:tw-css-color-\[var\(--cm-danger\)\].is-missing {
+  color: var(--cm-danger)
+}
+
+:where(.cmt) .\[\&\.mid\]\:tw-css-background-\[var\(--cm-warning-bg\)\].mid {
+  background: var(--cm-warning-bg)
+}
+
+:where(.cmt) .\[\&\.mid\]\:tw-css-color-\[var\(--cm-warning\)\].mid {
+  color: var(--cm-warning)
+}
+
+:where(.cmt) .\[\&\:focus\]\:tw-css-box-shadow-\[0_0_0_1\.5px_var\(--ink\2c _\#1D1D1F\)\]:focus {
+  box-shadow: 0 0 0 1.5px var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .\[\&\:hover\]\:tw-css-background-\[var\(--hairline\2c _rgba\(0\2c _0\2c _0\2c _\.08\)\)\]:hover {
+  background: var(--hairline, rgba(0, 0, 0, .08))
+}
+
+:where(.cmt) .\[\&_\>_div\]\:tw-whitespace-nowrap > div {
+  white-space: nowrap
+}
+
+:where(.cmt) .\[\&_\>_div\]\:tw-text-\[13px\] > div {
+  font-size: 13px
+}
+
+:where(.cmt) .\[\&_\>_div\]\:tw-css-color-\[var\(--ink-2\2c _\#6E6E73\)\] > div {
+  color: var(--ink-2, #6E6E73)
+}
+
+:where(.cmt) .\[\&_button\.active\]\:tw-css-background-\[var\(--surface\2c _\#fff\)\] button.active {
+  background: var(--surface, #fff)
+}
+
+:where(.cmt) .\[\&_button\.active\]\:tw-css-box-shadow-\[0_1px_2px_rgba\(17\2c _19\2c _21\2c _\.1\)\] button.active {
+  box-shadow: 0 1px 2px rgba(17, 19, 21, .1)
+}
+
+:where(.cmt) .\[\&_button\.active\]\:tw-css-color-\[var\(--ink\2c _\#1D1D1F\)\] button.active {
+  color: var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .\[\&_button\.is-active\]\:tw-css-background-\[var\(--inset\2c _\#F5F5F7\)\] button.is-active {
+  background: var(--inset, #F5F5F7)
+}
+
+:where(.cmt) .\[\&_button\:hover\]\:tw-css-background-\[var\(--inset\2c _\#F5F5F7\)\] button:hover {
+  background: var(--inset, #F5F5F7)
+}
+
+:where(.cmt) .\[\&_button\]\:tw-flex button {
+  display: flex
+}
+
+:where(.cmt) .\[\&_button\]\:tw-w-full button {
+  width: 100%
+}
+
+:where(.cmt) .\[\&_button\]\:tw-cursor-pointer button {
+  cursor: pointer
+}
+
+:where(.cmt) .\[\&_button\]\:tw-items-center button {
+  align-items: center
+}
+
+:where(.cmt) .\[\&_button\]\:tw-justify-between button {
+  justify-content: space-between
+}
+
+:where(.cmt) .\[\&_button\]\:tw-gap-\[10px\] button {
+  gap: 10px
+}
+
+:where(.cmt) .\[\&_button\]\:tw-rounded-\[12px\] button {
+  border-radius: 12px
+}
+
+:where(.cmt) .\[\&_button\]\:tw-p-\[9px_12px\] button {
+  padding: 9px 12px
+}
+
+:where(.cmt) .\[\&_button\]\:tw-text-left button {
+  text-align: left
+}
+
+:where(.cmt) .\[\&_button\]\:tw-text-\[15px\] button {
+  font-size: 15px
+}
+
+:where(.cmt) .\[\&_button\]\:tw-css-border-\[0\] button {
+  border: 0
+}
+
+:where(.cmt) .\[\&_button\]\:tw-css-background-\[none\] button {
+  background: none
+}
+
+:where(.cmt) .\[\&_button\]\:tw-css-color-\[var\(--ink\2c _\#1D1D1F\)\] button {
+  color: var(--ink, #1D1D1F)
+}
+
+:where(.cmt) .\[\&_small\]\:tw-mt-\[2px\] small {
+  margin-top: 2px
+}
+
+:where(.cmt) .\[\&_small\]\:tw-block small {
+  display: block
+}
+
+:where(.cmt) .\[\&_small\]\:tw-whitespace-nowrap small {
+  white-space: nowrap
+}
+
+:where(.cmt) .\[\&_small\]\:tw-text-\[13px\] small {
+  font-size: 13px
+}
+
+:where(.cmt) .\[\&_small\]\:tw-font-normal small {
+  font-weight: 400
+}
+
+:where(.cmt) .\[\&_small\]\:tw-css-color-\[var\(--ink-2\2c _\#6E6E73\)\] small {
+  color: var(--ink-2, #6E6E73)
+}
