@@ -407,10 +407,22 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       await accessFonts('readwrite', store => store.put(updated));
       editingRecord = updated;
       result = { id: updated.id, duplicate: false };
-    } else result = await addFont(record);
-    const { id, duplicate } = result;
+    } else {
+      // Cùng tên tức là cùng font đang làm tiếp (ví dụ sau khi tải lại trang): lưu đè bản mới nhất cùng tên,
+      // không tạo thêm một mục trùng tên. Muốn giữ bản cũ thì đổi tên trước khi lưu.
+      const all = await accessFonts('readonly', store => store.getAll());
+      const same = all.filter(item => item.name === record.name).sort((a, b) => Number(b.id) - Number(a.id))[0];
+      if (same) {
+        const updated = { ...same, ...record, id: same.id, digest: await fontDigest(record.blob) };
+        await accessFonts('readwrite', store => store.put(updated));
+        editingRecord = updated;
+        result = { id: same.id, duplicate: false, replaced: true };
+      } else result = await addFont(record);
+    }
+    const { id, duplicate, replaced } = result;
     await refresh(id);
-    status.textContent = duplicate ? 'Trùng font: ' + record.name + ' đã có trong bộ sưu tập.' : 'Đã lưu ' + record.name + '.';
+    status.textContent = duplicate ? 'Trùng font: ' + record.name + ' đã có trong bộ sưu tập.'
+      : replaced ? 'Đã cập nhật ' + record.name + ' (lưu đè bản cùng tên, không tạo mục mới).' : 'Đã lưu ' + record.name + '.';
   }));
 
   $('collection-rename').addEventListener('submit', event => {
