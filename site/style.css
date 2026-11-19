@@ -404,3 +404,9 @@ dialog::backdrop{background:#221a17bd}
 .checker-showcase .checker-missing-list{overflow-wrap:anywhere;line-height:1.8;color:var(--red);font-weight:600}
 .checker-showcase [data-role=showcase-badge]{font-weight:700;color:var(--red)}
 .checker-showcase [data-role=paper-state]{font-size:10px;letter-spacing:.04em}
+
+/* Standalone Vietnamese checker: only the requested hero, proof sheet and result cards. */
+#font-checker #standalone-font-check.checker-showcase>.check-toolbar,
+#font-checker #standalone-font-check.checker-showcase>[data-role="report"]{display:none!important}
+#font-checker #standalone-font-check.checker-showcase .checker-showcase-grid{margin-bottom:0}
+#font-checker #standalone-font-check.checker-showcase .checker-hero{padding-bottom:30px}
