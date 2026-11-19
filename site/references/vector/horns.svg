@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="horns" viewBox="0 0 304.39 86.48" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+  <defs style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <style style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      .horns-1 {
+        fill: #444;
+      }
+
+      .horns-2 {
+        fill: none;
+        stroke: #f06351;
+        stroke-miterlimit: 10;
+        stroke-width: 0.25px;
+      }
+      
+       /* @media (prefers-color-scheme: dark) {
+	  .horns-1 {
+	    fill: #ebebee;
+	      }
+	   }*/
+    </style>
+  </defs>
+  <g id="ou-horns" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="horns-1" d="M66.62,5.89a20.33,20.33,0,0,1,1.65,8.62q0,6.74-4,10.28T53.51,28.33a25.78,25.78,0,0,1,4.9,9A33.17,33.17,0,0,1,59.89,47,30.08,30.08,0,0,1,57.7,58.57a27.9,27.9,0,0,1-6.08,9.21,27.64,27.64,0,0,1-9.33,6.09,31.85,31.85,0,0,1-11.93,2.18,31.49,31.49,0,0,1-11.81-2.18,27.59,27.59,0,0,1-9.34-6.09,27.9,27.9,0,0,1-6.08-9.21A30.11,30.11,0,0,1,1,47,30.06,30.06,0,0,1,3.13,35.42,28,28,0,0,1,9.21,26.2a27.71,27.71,0,0,1,9.34-6.08,31.49,31.49,0,0,1,11.81-2.18,29.43,29.43,0,0,1,7.08.76q3.08.78,5.56,1.66c1.65.59,3.25,1.14,4.78,1.65a14.82,14.82,0,0,0,4.78.77c3.08,0,5.32-.69,6.74-2.07s2.12-3.44,2.12-6.2A12.89,12.89,0,0,0,60.89,11a15.4,15.4,0,0,0-1.24-3.19ZM51.38,47a25.16,25.16,0,0,0-1.48-8.68,21.31,21.31,0,0,0-4.19-7.09,20,20,0,0,0-6.61-4.78,21,21,0,0,0-8.75-1.77,20.49,20.49,0,0,0-8.68,1.77,20,20,0,0,0-6.55,4.78,21.5,21.5,0,0,0-4.2,7.09,26.39,26.39,0,0,0,0,17.37,21.46,21.46,0,0,0,4.2,7.08,19.23,19.23,0,0,0,6.55,4.73,21.11,21.11,0,0,0,8.68,1.71,21.58,21.58,0,0,0,8.75-1.71,19.18,19.18,0,0,0,6.61-4.73,21.17,21.17,0,0,0,4.19-7.08A25.22,25.22,0,0,0,51.38,47Z" transform="translate(-0.95 -2.46)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="horns-1" d="M117.33,74.63c-.16-1.49-.28-3.14-.36-5s-.11-3.3-.11-4.48h-.24A18.23,18.23,0,0,1,108.94,73a22.38,22.38,0,0,1-11.22,3Q87.2,76.05,82,69.79T76.69,53.25V19.35h8V50a39.88,39.88,0,0,0,.71,7.91,16.36,16.36,0,0,0,2.42,6.08,11.46,11.46,0,0,0,4.6,4,16.41,16.41,0,0,0,7.27,1.42,15.47,15.47,0,0,0,6.2-1.3,15.24,15.24,0,0,0,5.37-4,19.55,19.55,0,0,0,3.78-6.73,29.25,29.25,0,0,0,1.42-9.63V19.35h7c3.07,0,5.31-.68,6.73-2.06s2.13-3.45,2.13-6.2a13.29,13.29,0,0,0-.53-3.55,16,16,0,0,0-1.24-3.19l7-1.89a20.38,20.38,0,0,1,1.65,8.63q0,6.74-3.9,10.27t-10.75,3.55V62.47c0,1.5,0,3.42.12,5.79s.2,4.49.36,6.38h-7.68Z" transform="translate(-0.95 -2.46)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="horns-1" d="M224.34,21.16a17.44,17.44,0,0,1-.83,5.57A14.27,14.27,0,0,1,221,31.17a17.7,17.7,0,0,1-4.13,3.57,36.62,36.62,0,0,1-5.82,3c.34,1.47.61,3,.81,4.5a39.16,39.16,0,0,1,.28,4.79,35.56,35.56,0,0,1-1.84,11.76,26.54,26.54,0,0,1-5.22,9.09A23.07,23.07,0,0,1,197,73.7a26.6,26.6,0,0,1-10.73,2.08,27.25,27.25,0,0,1-10.93-2.08,23,23,0,0,1-8.19-5.85,25.8,25.8,0,0,1-5.16-9.09A36.65,36.65,0,0,1,160.15,47,35.67,35.67,0,0,1,162,35.2a26.87,26.87,0,0,1,5.22-9.14,22.8,22.8,0,0,1,8.18-5.88,27,27,0,0,1,10.76-2.08,25.61,25.61,0,0,1,14,3.67,24,24,0,0,1,8.91,10.12,11.75,11.75,0,0,0,4.7-4.41,12.45,12.45,0,0,0,1.3-5.86,19.56,19.56,0,0,0-.64-5.25,17.58,17.58,0,0,0-2-4.5h9.81a19.26,19.26,0,0,1,1.58,4.3A22.05,22.05,0,0,1,224.34,21.16ZM202.83,47a30.05,30.05,0,0,0-1.24-9,20.16,20.16,0,0,0-3.46-6.69,14.57,14.57,0,0,0-5.28-4.15,16.58,16.58,0,0,0-13.38,0,14.57,14.57,0,0,0-5.28,4.15A20.16,20.16,0,0,0,170.73,38a30.42,30.42,0,0,0-1.24,9,30.2,30.2,0,0,0,1.24,9,19.5,19.5,0,0,0,3.49,6.66,15,15,0,0,0,5.31,4.12,15.8,15.8,0,0,0,6.69,1.42,15.6,15.6,0,0,0,6.66-1.42,14.77,14.77,0,0,0,5.25-4.12A19.81,19.81,0,0,0,201.59,56,29.88,29.88,0,0,0,202.83,47Z" transform="translate(-0.95 -2.46)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="horns-1" d="M297.77,21.16a16.49,16.49,0,0,1-1.21,6.57,14.67,14.67,0,0,1-3.63,5.05,23.76,23.76,0,0,1-6.09,3.92,73.25,73.25,0,0,1-8.5,3.26V53.23A30.18,30.18,0,0,1,277,62.8a19.33,19.33,0,0,1-2.85,5.25,18.17,18.17,0,0,1-4.48,4.1,21.62,21.62,0,0,1-6.14,2.68,30.15,30.15,0,0,1-7.87,1,29.54,29.54,0,0,1-7.67-.92,20.82,20.82,0,0,1-6-2.6,17.42,17.42,0,0,1-4.36-4,19.86,19.86,0,0,1-2.82-5.1,20.16,20.16,0,0,1-1.15-4.56,39.39,39.39,0,0,1-.35-5.42V19.54h8.94V53.11a20.43,20.43,0,0,0,1.21,7.61,11.31,11.31,0,0,0,4.44,5.45,14.22,14.22,0,0,0,7.9,2A13.8,13.8,0,0,0,264,66a12,12,0,0,0,4.41-5.88,22,22,0,0,0,1-7V19.54h8.94V33.79a27.26,27.26,0,0,0,4.91-2.33,12.7,12.7,0,0,0,3.14-2.72A8.39,8.39,0,0,0,288,25.51a15.19,15.19,0,0,0,.47-3.89,20,20,0,0,0-.64-5.25,17.58,17.58,0,0,0-2-4.5h9.81a19.26,19.26,0,0,1,1.58,4.3A22.05,22.05,0,0,1,297.77,21.16Z" transform="translate(-0.95 -2.46)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+  </g>
+  <g id="marks" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <line class="horns-2" x1="44.57" y1="3.68" x2="145.47" y2="3.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="194.29" y1="9.71" x2="302.82" y2="9.71" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="195.87" y1="34.72" x2="304.39" y2="34.72" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="45.75" y1="26.12" x2="146.65" y2="26.12" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="67.49" y1="1.68" x2="67.49" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="52.33" y1="1.68" x2="52.33" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="123.49" y1="1.81" x2="123.49" y2="86.48" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="138.56" y1="1.68" x2="138.56" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="208.25" y1="1.68" x2="208.25" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="223.41" y1="1.68" x2="223.41" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="277.55" y1="1.68" x2="277.55" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="297.24" y1="1.88" x2="297.24" y2="86.16" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="horns-2" x1="297.23" y1="1.68" x2="297.23" y2="86.36" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+  </g>
+</svg>

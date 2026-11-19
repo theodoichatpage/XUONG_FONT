@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="harmony" viewBox="0 0 296.41 71.92" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+  <defs style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <style style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      .harmony-1 {
+        fill: #444;
+      }
+
+      .harmony-2, .harmony-3, .harmony-4 {
+        fill: none;
+        stroke-miterlimit: 10;
+        stroke-width: 0.5px;
+      }
+
+      .harmony-2 {
+        stroke: #f06351;
+      }
+
+      .harmony-3 {
+        stroke: #04b6be;
+      }
+
+      .harmony-4 {
+        stroke: #a9ce57;
+      }
+      
+     /*  @media (prefers-color-scheme: dark) {
+	  .harmony-1 {
+	    fill: #ebebee;
+	      }
+	   }*/
+    </style>
+  </defs>
+  <g id="hay_co_cho" data-name="hay co cho" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <path class="harmony-1" d="M48,11.43c-5.5.47-6,.8-6,6.37V44.86c0,5.63.53,6,6,6.37V53.1h-18V51.23c5.76-.4,6.3-.74,6.3-6.37V31.53H13.39V44.86c0,5.57.54,6,6,6.37V53.1H1.8V51.23c5.36-.4,5.9-.74,5.9-6.37V17.8c0-5.63-.54-6-6-6.37V9.56H19v1.87c-5.09.4-5.63.81-5.63,6.37V28.65H36.24V17.8c0-5.57-.54-5.9-5.76-6.37V9.56H48Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M72.11,53.91A5.14,5.14,0,0,1,69,52.57a6.44,6.44,0,0,1-1.61-3c-2.68,1.81-5.89,4.29-7.9,4.29a8.08,8.08,0,0,1-8-8.17c0-3.29,1.74-5.36,5.42-6.64,4-1.34,8.92-3.15,10.39-4.35V33.61c0-4.89-2.28-7.57-5.69-7.57a4,4,0,0,0-3,1.27,11.39,11.39,0,0,0-1.94,4.42,1.92,1.92,0,0,1-2,1.54,3.15,3.15,0,0,1-2.88-2.88c0-.94.81-1.74,2.08-2.68a30.72,30.72,0,0,1,10-4.69,8.75,8.75,0,0,1,5.49,1.81c2.35,2,3,4.69,3,8.24v12.4c0,3,1.2,4,2.34,4a5.12,5.12,0,0,0,2.42-.74l.67,1.74ZM54.29,17.13c1.47-4.56,3.62-6,5.43-6,1.07,0,1.94.33,3.88,1.34a8.28,8.28,0,0,0,3.55,1.27c1.14,0,2-1.14,2.88-3l1.68.87c-1.54,5-3.62,6-5.36,6A9.54,9.54,0,0,1,62,16.05,6.08,6.08,0,0,0,58.91,15c-1.14,0-2,1.07-2.95,3.22ZM67.22,37c-1.41.73-4.62,2.14-6,2.81-2.61,1.2-4.09,2.48-4.09,5a4.89,4.89,0,0,0,4.76,5.09,8.77,8.77,0,0,0,5.36-2.41Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M107.8,25.57c-3.55.53-4.08,1.07-5.89,4.82-1.75,3.55-3.82,9.11-8.45,20.17-4.48,10.72-6,14.54-6.9,18.09a2,2,0,0,1-2.14,1.68c-1.88,0-3.75-1.61-3.75-3.22,0-1.07.53-1.68,1.67-2.48,2.15-1.27,3.42-2.95,5-5.9a41.53,41.53,0,0,0,2.07-4.62,4.28,4.28,0,0,0-.13-3c-2.68-7.63-5.69-15.74-7.64-20.5-1.47-3.68-2.07-4.55-5.76-5V23.82H89.45l.06,1.75C86.36,26,86,26.71,87,29.25L93,46c1.87-4.55,4.82-12.46,6.16-16.68.8-2.48.4-3.28-3.48-3.75V23.82H107.8v1.75Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M149,47.08c-2.95,3.88-7.37,6.83-11.33,6.83-8.44,0-13.46-6.83-13.46-14A16,16,0,0,1,131,26.84,17.9,17.9,0,0,1,141,23H141a9.58,9.58,0,0,1,6,1.81,2.37,2.37,0,0,1,1.08,2c0,1.41-1.48,2.88-2.22,2.88-.4,0-.73-.2-1.27-.73a9.73,9.73,0,0,0-6.77-2.75c-4.42,0-8.24,3.68-8.24,10.72,0,9.31,6.3,12.39,10.12,12.39,2.88,0,5-.8,8.11-3.68Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M180.85,38c0,10.79-7.91,15.95-14.54,15.95-9.18,0-14.67-7.37-14.67-14.81,0-11,8.57-16.08,14.74-16.08C174.69,23,180.85,29.72,180.85,38Zm-23-1c0,8.44,3.62,14.74,9.18,14.74,4.15,0,7.57-3.08,7.57-12.26,0-7.78-3.15-14.21-9.11-14.21C161.49,25.23,157.87,29.39,157.87,37Zm14-16.48a52.8,52.8,0,0,1-5.76-6.5,65.8,65.8,0,0,1-5.83,6.5l-1.61-1.14a100.19,100.19,0,0,0,6.64-10.92h1.6a104,104,0,0,0,6.57,10.92ZM171,12.84c1.88-2.48,4-5.16,5.9-7.51a13.64,13.64,0,0,1,4.35.74l.14,1-8.91,6.83Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M225.81,47.08c-2.95,3.88-7.37,6.83-11.33,6.83-8.44,0-13.46-6.83-13.46-14a16,16,0,0,1,6.76-13.07,17.9,17.9,0,0,1,10-3.82h.06a9.58,9.58,0,0,1,6,1.81,2.37,2.37,0,0,1,1.08,2c0,1.41-1.48,2.88-2.22,2.88-.4,0-.73-.2-1.27-.73a9.73,9.73,0,0,0-6.77-2.75c-4.42,0-8.24,3.68-8.24,10.72,0,9.31,6.3,12.39,10.12,12.39,2.88,0,5-.8,8.11-3.68Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M245.93,53.1V51.36c3.88-.4,4.42-.8,4.42-5.16V35.08c0-5.49-2.08-8.24-6.57-8.24a9.45,9.45,0,0,0-7,3.42V46.2c0,4.29.34,4.76,4.36,5.16V53.1H226.9l.06-1.74c4-.33,4.56-.73,4.56-5.16v-32c0-4.22-.13-4.48-4.56-4.89V7.75a73.88,73.88,0,0,0,9.85-2.35V27.91c2.42-2.41,6-4.89,9.58-4.89,5.43,0,9.25,3.42,9.25,11.46V46.21c0,4.42.54,4.82,4.42,5.15v1.75H245.93Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    <path class="harmony-1" d="M284.83,25.5a8.14,8.14,0,0,0,2.61.54c2.48,0,3.42-1.08,3.42-1.88,0-1.07-.47-1.47-2.22-1.81a1.92,1.92,0,0,1-1.47-1.87,2.67,2.67,0,0,1,2.88-2.55c1.94,0,3.75,1.21,3.75,4.69,0,3.15-2.54,5.09-6,5.56A15.47,15.47,0,0,1,291.19,38c0,10.79-7.91,15.95-14.54,15.95-9.18,0-14.67-7.37-14.67-14.81,0-11,8.57-16.08,14.74-16.08A14.14,14.14,0,0,1,284.83,25.5ZM268.21,37c0,8.44,3.62,14.74,9.18,14.74,4.15,0,7.57-3.08,7.57-12.26,0-7.78-3.15-14.21-9.11-14.21C271.83,25.23,268.21,29.39,268.21,37Zm9.31-16.82c-2.88-4-6-8.31-7.84-10.72l.2-.53A15.17,15.17,0,0,1,275.11,8c1.21,3,2.88,7.84,4.22,11.26Z" transform="translate(-1.67 -1.34)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+  </g>
+  <g id="marks" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <circle class="harmony-2" cx="80.21" cy="63.71" r="7.96" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-2" cx="288.2" cy="18.94" r="7.96" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-3" cx="69.16" cy="11.97" r="5.09" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-3" cx="143.47" cy="45.14" r="5.09" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-3" cx="74.69" cy="48.9" r="3.98" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-3" cx="169.78" cy="17.5" r="3.54" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-3" cx="274.83" cy="17.28" r="3.76" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-4" cx="175.75" cy="4.89" r="4.64" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(169, 206, 87);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-4" cx="51.47" cy="29.22" r="5.09" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(169, 206, 87);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="harmony-4" cx="220.54" cy="25.12" r="4.64" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(169, 206, 87);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+  </g>
+</svg>

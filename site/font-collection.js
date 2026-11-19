@@ -144,7 +144,7 @@ function familyName(value) {
 
 const nameOrder = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
 
-export function setupFontCollection(getCurrentFont, vietnamize) {
+export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   const $ = id => document.getElementById(id);
   const dialog = $('font-collection');
   const files = $('collection-files');
@@ -423,6 +423,13 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     });
   });
 
+
+  for (const [id, wholeFamily] of [['collection-quality', false], ['collection-family-quality', true]]) $(id).addEventListener('click', () => {
+    const record = records.find(item => item.id === selectedId);
+    if (!record || working || familyRunning) return;
+    const group = groups.find(group => group.members.some(item => item.id === record.id));
+    run(async () => { selectTab('rules'); await assess(wholeFamily ? group.members : [record]); });
+  });
 
   $('collection-edit').addEventListener('click', () => {
     const record = records.find(item => item.id === selectedId);

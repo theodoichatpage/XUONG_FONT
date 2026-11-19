@@ -1,4 +1,4 @@
-const { copyFileSync, readFileSync, writeFileSync, cpSync } = require('node:fs');
+const { copyFileSync, readFileSync, writeFileSync, cpSync, readdirSync } = require('node:fs');
 
 for (const file of ['index.html', 'style.css']) copyFileSync('site/' + file, 'dist/' + file);
 
@@ -14,5 +14,9 @@ let standalone = html
 for (const file of ['design-challenges.png', 'diacritical-details.png']) {
   const data = 'data:image/png;base64,' + readFileSync('site/references/' + file).toString('base64');
   standalone = standalone.replaceAll('./references/' + file, data);
+}
+for (const file of readdirSync('site/references/vector').filter(file => file.endsWith('.svg'))) {
+  const data = 'data:image/svg+xml;base64,' + readFileSync('site/references/vector/' + file).toString('base64');
+  standalone = standalone.replaceAll('./references/vector/' + file, data);
 }
 writeFileSync('dist/xuong-font.html', standalone);

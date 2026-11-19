@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="dyet" viewBox="0 0 298.44 58.69" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+  <defs style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <style style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      .dyet-1 {
+        fill: #444;
+      }
+
+      .dyet-2, .dyet-3, .dyet-4 {
+        fill: none;
+        stroke-miterlimit: 10;
+      }
+
+      .dyet-2 {
+        stroke: #04b6be;
+      }
+
+      .dyet-2, .dyet-4 {
+        stroke-width: 0.5px;
+      }
+
+      .dyet-3, .dyet-4 {
+        stroke: #f06351;
+      }
+
+      .dyet-3 {
+        stroke-width: 0.25px;
+      }
+      
+       /*@media (prefers-color-scheme: dark) {
+	  .dyet-1 {
+	    fill: #ebebee;
+	      }
+	   }*/
+    </style>
+  </defs>
+  <g id="dyets" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="dyet-1" d="M260.25,20.13Q265,25.2,265,34.69q0,11-5.14,16.83t-14.75,5.85q-6.37,0-13.52-.39h-.07l.33-12.54-.33-29.12h.07l15-.26Q255.51,15.06,260.25,20.13ZM255.12,7.32h-18.4l-.39-.39.33-3h18.39l.39.33Zm1,41.37q3.54-4.32,3.54-12.9,0-16.38-13.46-16.38-4.1,0-9.42.26L236.53,44l.19,8.65c3,.26,6.11.39,9.23.39Q252.58,53,256.13,48.69Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="dyet-1" d="M293.63,43.92l.2,6.69a3.78,3.78,0,0,0,.45,1.92,1.56,1.56,0,0,0,1.37.55,7.57,7.57,0,0,0,2.27-.39l.52.46-.52,2.92a8.4,8.4,0,0,1-3.71,1.3q-4-.39-4.48-4.55h-.52a24.26,24.26,0,0,1-7,4.49q-6.44,0-9.88-3.94t-3.45-11.21q0-7.35,3.81-11.41t10.63-4.06a25.4,25.4,0,0,1,5.72.65l-.07-6.5h-8.06l-.39-.39.33-2.79H289l-.06-5.85,5.13-.46L294,17.66h4.61l.46.45-.33,2.73h-4.81ZM289,32a14.88,14.88,0,0,0-6.3-1.63,8.18,8.18,0,0,0-6.57,2.83q-2.4,2.82-2.4,8.16,0,5.52,2.17,8.58a7,7,0,0,0,6,3.05q3.7,0,7.15-4l.13-4.68Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="dyet-1" d="M11.7,56a50.2,50.2,0,0,0-7.48.78l.39-3c4.55-.85,5.07-1.76,5.07-8V36.21H1l-.46-.46L1,33.67H9.69l.06-12.81c0-2.79-.45-3.51-2.4-3.51-.78,0-2.21.13-2.21.13L5,17.22l.45-2.86s4.36.2,6.83.2c3,0,9.88-.26,9.88-.26,12.48,0,21.38,8.12,21.38,19.44,0,12.93-9.88,23-22.49,23C21.06,56.75,15,56,11.7,56Zm14.11-22.3.32.46-.39,2.08h-11l-.33,11.24c0,4.75,1.7,6,8.2,6,9.36,0,15.08-6.89,15.08-18.14,0-11.44-7.15-17.81-20-17.81-1.82,0-2.27.26-2.34,1.43l-.58,14.76Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="dyet-1" d="M79.9,51.55s-2.59,4.29-5.65,5.2c-3.44,0-5.33-1.56-5.79-4.62L68,51.94c-4.49,3.05-7.22,4.61-8.13,4.61-7.47,0-12.54-5.52-12.54-13.71,0-9.36,7.28-17,16.18-17a41.12,41.12,0,0,1,4.49.26V21.13l-7.41.06L60,20.61l.46-2.54,7.54.07V15.28c0-2.41-.78-3.51-2.4-3.51A7.2,7.2,0,0,0,64,12l.26-2.41a96.66,96.66,0,0,0,9.62-1.88l.39.84c-.39.59-.71,4.16-1,9.49l5.14-.26.84.85-.26,2.4-5.85.07c-.39,7.67-.65,18-.65,28,0,1.89,1,3,2.67,3A6.77,6.77,0,0,0,79,50.51ZM68,31.07a12.74,12.74,0,0,0-6.3-1.5c-5.79,0-9.36,4.23-9.36,11,0,6.57,3.77,11.71,8.58,11.71,3.12,0,7.08-3.45,7.08-3.45V31.07Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="dyet-1" d="M140.49,15C152.39,15,159,22,159,34.67c0,14.63-7.15,22.69-20,22.69-2.4,0-9.95-.2-13.52-.39h-.07l.39-12.55-.06-6.7H119l-.26-.45L119,34h6.69l-.26-18.72h.07Zm13.14,20.74c0-11.06-4.62-16.39-13.46-16.39-1.36,0-6.89.13-9.49.26L130.55,34H140l.26.45L140,37.72h-9.49L130.48,44l.13,8.64c3.12.26,7.87.39,9.23.39C148.62,53,153.63,47.41,153.63,35.78Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="dyet-1" d="M187.63,43.9l.13,6.7c.06,1.82.52,2.47,1.88,2.47a6.65,6.65,0,0,0,2.21-.39l.52.45-.45,2.93a9.41,9.41,0,0,1-3.71,1.3,4.8,4.8,0,0,1-4.55-4.55h-.45a21.67,21.67,0,0,1-7.09,4.48c-8.64,0-13.26-5.52-13.26-15.15,0-9.88,5.4-15.47,14.43-15.47a25.61,25.61,0,0,1,5.72.65l-.06-6.5h-8.06l-.39-.39.32-2.79H183l-.07-5.85,5.14-.46L188,17.64h4.62l.45.45-.32,2.73h-4.81Zm-4.62-12a15.15,15.15,0,0,0-6.37-1.63c-5.46,0-9.1,3.84-9,11.38.13,7.21,3.25,11.24,8.19,11.24,2.34,0,4.55-1,7.15-4l.13-4.68Z" transform="translate(-0.58 -2.31)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+  </g>
+  <g id="circles" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <ellipse class="dyet-2" cx="121.82" cy="33.67" rx="3.65" ry="3.61" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <ellipse class="dyet-2" cx="134.92" cy="33.76" rx="4.75" ry="4.7" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <path class="dyet-2" d="M183.42,19.07A4.42,4.42,0,1,1,179,14.7,4.39,4.39,0,0,1,183.42,19.07Z" transform="translate(-0.58 -2.31)" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <ellipse class="dyet-2" cx="190.08" cy="16.92" rx="2.58" ry="2.55" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+  </g>
+  <g id="marks" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <line class="dyet-3" x1="4.08" y1="3.36" x2="4.08" y2="58.69" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="dyet-3" x1="78.42" y1="3.36" x2="78.42" y2="58.69" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="dyet-4" x1="248.25" y1="0.18" x2="241.4" y2="7.02" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <line class="dyet-4" x1="241.4" y1="0.18" x2="248.25" y2="7.02" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+  </g>
+</svg>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="acute-grave" data-name="acute-grave" viewBox="0 0 299.53 125.98" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+  <defs style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <style style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      .acute-grave-1 {
+        fill: #444;
+      }
+
+      .acute-grave-2, .acute-grave-3, .acute-grave-4 {
+        fill: none;
+        stroke-miterlimit: 10;
+      }
+
+      .acute-grave-2 {
+        stroke: #f06351;
+      }
+
+      .acute-grave-2, .acute-grave-3 {
+        stroke-width: 0.25px;
+      }
+
+      .acute-grave-3 {
+        stroke: #e46f4e;
+      }
+
+      .acute-grave-4 {
+        stroke: #04b6be;
+        stroke-width: 0.5px;
+      }
+      
+     /* @media (prefers-color-scheme: dark) {
+	  .acute-grave-1 {
+	    fill: #ebebee;
+	      }
+	   }*/
+    </style>
+  </defs>
+  <g id="a-acute-a-grave" data-name="a-acute a-grave" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <g style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+      <path class="acute-grave-1" d="M.38,108c7.9-.84,10.77-1.44,13.4-8.26,6-15.2,16.52-42.37,23.22-60.08a13,13,0,0,0,.6-5.27h8.62a26.84,26.84,0,0,0,1,2.87c7.3,18.91,21.18,57.45,23.7,64.16,2,5.14,5,6,11.61,6.58v3.59H50.77V108a43,43,0,0,0,6.1-1c2.64-.6,3-1.91,2.16-4.31-1.2-3.59-4-11.73-6.94-19.39H25.27c-2.39,6.47-5.26,14.37-6.22,17.36-1.2,4.31,0,5.74,3.35,6.34,2.63.48,5,.84,6.34,1v3.59H.38ZM50.65,78.86,38.92,45.71c-2.63,6.94-9.1,24.3-12.21,33.15ZM35.33,26.92l16.75-15.8C53.88,11,60.58,13.75,62,15v1.8l-24.9,12.8Z" transform="translate(-0.38 -0.93)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="acute-grave-1" d="M95.92,108c7.9-.84,10.77-1.44,13.4-8.26,6-15.2,16.52-42.37,23.22-60.08a13,13,0,0,0,.6-5.27h8.62a26.84,26.84,0,0,0,1,2.87c7.3,18.91,21.19,57.45,23.7,64.16,2,5.14,5,6,11.61,6.58v3.59H146.31V108a43,43,0,0,0,6.1-1c2.64-.6,3-1.91,2.16-4.31-1.2-3.59-3.95-11.73-6.94-19.39H120.82c-2.4,6.47-5.27,14.37-6.23,17.36-1.2,4.31,0,5.74,3.35,6.34,2.64.48,5,.84,6.35,1v3.59H95.92Zm44.17-78.4-22.63-13,.36-1.92c2.28-1,8.86-3.11,10.66-2.87l13.88,15.44Zm6.1,49.31L134.46,45.71c-2.63,6.94-9.1,24.3-12.21,33.15Z" transform="translate(-0.38 -0.93)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="acute-grave-1" d="M238.27,107.59c-3.71,4.19-9,5.75-11.13,5.75-2.87,0-5.87-1.56-7.3-7.07-5.51,4.31-10.3,7.07-15.2,7.07-5.63,0-11.37-5.51-11.37-13,0-5.74,3.11-8.38,8.5-11.13s9.69-4.55,18.55-8.26c0-5.74.12-8.14-.12-9.81-.36-2.88-3.95-8.38-10.06-8.38-1.31,0-5,1.67-7.3,3.47-1.31,1-1.31,1.32-1.31,1.68a3.13,3.13,0,0,0,.36,1.31c1.31,2.16,1.67,3.23,1.67,4.55,0,2-2.87,5.51-6.22,5.51-2.64,0-5.39-2.52-5.39-6.11,0-1.31.6-3.71,5.27-7.06,9-6.58,15.68-9.1,17.95-9.1a14.18,14.18,0,0,1,12.45,7.42c2.15,3.36,2,7.06,2,10.54,0,5.14-.36,22.5-.36,29.32,0,1.44,1,2.27,2.88,2.27a12.74,12.74,0,0,0,6.1-2.15v3.23ZM208.11,90c-3,1.91-4.91,3.59-4.91,7.78a10.17,10.17,0,0,0,2.87,7.18,6.78,6.78,0,0,0,4.91,1.91,11,11,0,0,0,6.7-2.39c1.56-1.56,2-2.15,2.16-4.91.24-4.79.36-12.56.36-15.32C215.77,86.17,210.26,88.56,208.11,90Zm-1.8-42.13L218.4,28.36c1.08-.36,7.9,1.67,10.06,2.75v1.32L209,49.66Z" transform="translate(-0.38 -0.93)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+      <path class="acute-grave-1" d="M299.36,107.59c-3.71,4.19-9,5.75-11.13,5.75-2.87,0-5.86-1.56-7.3-7.07-5.51,4.31-10.29,7.07-15.2,7.07-5.62,0-11.37-5.51-11.37-13,0-5.74,3.11-8.38,8.5-11.13s9.69-4.55,18.55-8.26c0-5.74.12-8.14-.12-9.81-.36-2.88-4-8.38-10.05-8.38-1.32,0-5,1.67-7.3,3.47-1.32,1-1.32,1.32-1.32,1.68a3.13,3.13,0,0,0,.36,1.31c1.31,2.16,1.67,3.23,1.67,4.55,0,2-2.87,5.51-6.22,5.51-2.63,0-5.39-2.52-5.39-6.11,0-1.31.6-3.71,5.27-7.06,9-6.58,15.68-9.1,17.95-9.1a14.18,14.18,0,0,1,12.45,7.42c2.15,3.36,2,7.06,2,10.54,0,5.14-.36,22.5-.36,29.32,0,1.44.95,2.27,2.87,2.27a12.71,12.71,0,0,0,6.1-2.15Zm-22.5-57.93L258.55,31.47l.36-1.56c2-.84,9.93-2,11-1.67L279.5,48.1ZM269.2,90c-3,1.91-4.91,3.59-4.91,7.78a10.13,10.13,0,0,0,2.88,7.18,6.76,6.76,0,0,0,4.9,1.91,11,11,0,0,0,6.71-2.39c1.55-1.56,2-2.15,2.15-4.91.24-4.79.36-12.56.36-15.32C276.86,86.17,271.36,88.56,269.2,90Z" transform="translate(-0.38 -0.93)" style=";fill:rgb(68, 68, 68);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px" />
+    </g>
+  </g>
+  <g id="Layer_3" data-name="Layer 3" style=";fill:rgb(0, 0, 0);fill-opacity:1;opacity:1;stroke:none;stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:1px">
+    <line class="acute-grave-2" x1="61.91" x2="61.91" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="35.03" y1="0.15" x2="35.03" y2="125.83" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="228.28" x2="228.28" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="205.95" x2="205.95" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="141.8" x2="141.8" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="117.17" y1="0.3" x2="117.17" y2="125.98" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-3" x1="279.15" x2="279.15" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(228, 111, 78);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="258.02" x2="258.02" y2="125.68" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="191.31" y1="48.93" x2="299.53" y2="48.93" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="24.47" y1="28.73" x2="156.94" y2="28.73" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="190.78" y1="27.18" x2="298.99" y2="27.18" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <line class="acute-grave-2" x1="23.27" y1="10.38" x2="155.74" y2="10.38" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(240, 99, 81);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.25px" />
+    <circle class="acute-grave-4" cx="56.3" cy="13.76" r="5.99" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+    <circle class="acute-grave-4" cx="35.58" cy="27.31" r="2.32" style=";fill:none;fill-opacity:1;opacity:1;stroke:rgb(4, 182, 190);stroke-dasharray:none;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-width:0.5px" />
+  </g>
+</svg>

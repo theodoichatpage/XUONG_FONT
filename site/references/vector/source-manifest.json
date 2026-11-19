@@ -1,0 +1,136 @@
+{
+  "author": "Donny Trương / Vietnamese Typography",
+  "sources": [
+    "https://vietnamesetypography.com/design-challenges/",
+    "https://vietnamesetypography.com/diacritical-details/"
+  ],
+  "note": "Original SVG path geometry and viewBox retained; presentation styles resolved from source. Reference illustrations only, not a font-generation source or automated validator.",
+  "figures": [
+    {
+      "id": "directions",
+      "paths": 18,
+      "viewBox": "0 0 277.2 185.29",
+      "geometryPreserved": true,
+      "geometrySha256": "5bf68f534f2ce57e851589da77a722c69c67ce8d75105ecc473725f782ebcec4"
+    },
+    {
+      "id": "avoid-collisions",
+      "paths": 16,
+      "viewBox": "0 0 296.94 165.29",
+      "geometryPreserved": true,
+      "geometrySha256": "33de542a3303b2ffb51580f7e6cf67be8e76b7ab731063ec7d8d4e6fd3289e12"
+    },
+    {
+      "id": "kerning",
+      "paths": 12,
+      "viewBox": "0 0 297.91 129",
+      "geometryPreserved": true,
+      "geometrySha256": "f65ffbcb28b83585f1bfda55a0498da297ae549aa29ea52e083367eea5d8653f"
+    },
+    {
+      "id": "kerning_horns",
+      "paths": 12,
+      "viewBox": "0 0 298.63 137.65",
+      "geometryPreserved": true,
+      "geometrySha256": "ca494d4579ced299459b969f213712d215235f7ceff1ee9a9bf3076f409efa48"
+    },
+    {
+      "id": "pairing_horns",
+      "paths": 16,
+      "viewBox": "0 0 302.09 93.8",
+      "geometryPreserved": true,
+      "geometrySha256": "933d06ac825ce703affd6d1b29e82d40fce2e6ff339df0301d39d4b79cd1dde6"
+    },
+    {
+      "id": "size-weight",
+      "paths": 25,
+      "viewBox": "0 0 295.96 116.19",
+      "geometryPreserved": true,
+      "geometrySha256": "e968d25da16edb5312a78cdf736051378cfaa511acf6ee40e667d04b7070c5f5"
+    },
+    {
+      "id": "harmony",
+      "paths": 8,
+      "viewBox": "0 0 296.41 71.92",
+      "geometryPreserved": true,
+      "geometrySha256": "68c28bde3675e48a6398e122d703d0efd33c2b477becca8a5f14482ed1c017c8"
+    },
+    {
+      "id": "capitals",
+      "paths": 24,
+      "viewBox": "0 0 297.83 127.21",
+      "geometryPreserved": true,
+      "geometrySha256": "57078187c28159d7b4c593a90548445e5581cde8ac8ce9aa0f815cb16d3f371c"
+    },
+    {
+      "id": "dotted-i",
+      "paths": 17,
+      "viewBox": "0 0 298.34 152.53",
+      "geometryPreserved": true,
+      "geometrySha256": "335d0dd7615c01f7a589d01346542060c55bdaa5d647198e17f9f989a2dd0da6"
+    },
+    {
+      "id": "acute-grave",
+      "paths": 4,
+      "viewBox": "0 0 299.53 125.98",
+      "geometryPreserved": true,
+      "geometrySha256": "ae7a53bd31705539b5aaed2106994f8bb8cd0de21fd6f02b50e4981641ce536a"
+    },
+    {
+      "id": "circumflex",
+      "paths": 6,
+      "viewBox": "0 0 296.11 106.58",
+      "geometryPreserved": true,
+      "geometrySha256": "1888147b2f227fd5c57e9f1c5340845fb57f5f953be25b326bf1722b664e6d0a"
+    },
+    {
+      "id": "breve",
+      "paths": 6,
+      "viewBox": "0 0 297.27 97.7",
+      "geometryPreserved": true,
+      "geometrySha256": "e49b1ceb985289a610cab06844f28f56ecfbcbc3760719945b3adf2f6fddb6f8"
+    },
+    {
+      "id": "horns",
+      "paths": 4,
+      "viewBox": "0 0 304.39 86.48",
+      "geometryPreserved": true,
+      "geometrySha256": "74dbe5dbe73d46b0f6e1b6535440ca6c4772c91ce6e91a1bd4029b5472406aaa"
+    },
+    {
+      "id": "hook_above",
+      "paths": 6,
+      "viewBox": "0 0 296.83 108.76",
+      "geometryPreserved": true,
+      "geometrySha256": "090458127aafcc6e3ad1f5d2579d3aaa45cd121fed35ac3752ce6b3ce93b538c"
+    },
+    {
+      "id": "tilde",
+      "paths": 6,
+      "viewBox": "0 0 296.82 89.36",
+      "geometryPreserved": true,
+      "geometrySha256": "d6c6c15a469bae5d7ae63c3a8544b50531c33b8c3e1dce22a992ae93f11f008b"
+    },
+    {
+      "id": "underdot",
+      "paths": 6,
+      "viewBox": "0 0 296.89 112.28",
+      "geometryPreserved": true,
+      "geometrySha256": "3b8f707e5d5b1c280a0f4957067f29156571562285a708d5684031af13686920"
+    },
+    {
+      "id": "dyet",
+      "paths": 7,
+      "viewBox": "0 0 298.44 58.69",
+      "geometryPreserved": true,
+      "geometrySha256": "f6f775169341f268d0f14545f4159c96d5d5d255e63024891abb79ac4c9b0eb9"
+    },
+    {
+      "id": "dong",
+      "paths": 9,
+      "viewBox": "0 0 311 47.2",
+      "geometryPreserved": true,
+      "geometrySha256": "edb62364ff572cdf43004d4d7e61debb556abc8fe94eae856a9ec0c3eb54ad41"
+    }
+  ]
+}

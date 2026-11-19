@@ -1,3 +1,4 @@
+import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { adjustGlyphMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
@@ -1399,7 +1400,7 @@ setupFontCollection(() => currentFontExport, async (record, { editOnly = false }
   status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
     + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
   return true;
-});
+}, runFontQuality);
 
 // Accent changes are previewed from the current outlines, then committed once.
 
@@ -1484,3 +1485,57 @@ for (const link of document.querySelectorAll('.rules-index a')) link.addEventLis
   $('rule-search').value = ''; $('rule-search').dispatchEvent(new Event('input'));
   document.querySelector(link.getAttribute('href'))?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
+
+let qualityResults = [], qualityRunning = false;
+const qualityLabels = { fail: 'Lỗi', warning: 'Cần xem lại', pass: 'Đã kiểm', manual: 'Duyệt bằng mắt', info: 'Thông tin' };
+async function runFontQuality(records) {
+  if (qualityRunning) return;
+  const minGap = Number($('quality-min-gap').value), hornTolerance = Number($('quality-horn-tolerance').value);
+  if (![minGap,hornTolerance].every(value => Number.isFinite(value) && value >= 0 && value <= 100)) { $('quality-status').textContent = 'Ngưỡng cảnh báo phải từ 0 đến 100 đơn vị.'; return; }
+  qualityRunning = true; $('quality-current').disabled = true;
+  qualityResults = [];
+  $('quality-report').hidden = true;
+  for (const proof of document.querySelectorAll('.quality-vector-proof')) proof.remove();
+  const errors = [];
+  try {
+    for (const [index,record] of records.entries()) {
+      $('quality-status').textContent = `Đang kiểm ${index + 1} / ${records.length}: ${record.name}…`;
+      try { qualityResults.push(await assessFont(record, { minGap, hornTolerance })); }
+      catch (error) { errors.push(record.name + ': ' + error.message); }
+    }
+    const select = $('quality-font-select'); select.replaceChildren();
+    qualityResults.forEach((result,index) => { const option = document.createElement('option'); option.value = index; option.textContent = `${result.record.name} · ${result.counts.fail} lỗi · ${result.counts.warning} cảnh báo`; select.append(option); });
+    if (qualityResults.length) renderFontQuality();
+    $('quality-status').textContent = `Đã kiểm ${qualityResults.length} / ${records.length} font.`
+      + (errors.length ? ' Không đọc được: ' + errors.join('; ') : '')
+      + ' Kết quả ở thời điểm kiểm tra; sau khi sửa cần kiểm lại. Chưa thay thế duyệt thị giác và thử trong ứng dụng.';
+  } finally { qualityRunning = false; $('quality-current').disabled = false; }
+}
+function renderFontQuality() {
+  const result = qualityResults[Number($('quality-font-select').value)];
+  if (!result) return;
+  $('quality-report').hidden = false;
+  $('quality-summary').textContent = result.record.name + ': ' + result.counts.fail + ' lỗi, ' + result.counts.warning + ' cảnh báo, ' + result.counts.manual + ' mục cần duyệt bằng mắt.';
+  $('quality-measurement-note').textContent = `Đã đo dấu rời ở ${result.tested} chữ và giao outline ở ${result.checkedPairs} cặp. Khoảng hở là khoảng gần nhất trên outline xấp xỉ đường cong, chuẩn hóa về UPM 1000. Không chấm điểm tổng để suy ra font đã đủ chất lượng bán.`;
+  const body = $('quality-findings'); body.replaceChildren();
+  const order = { fail:0, warning:1, manual:2, pass:3, info:4 };
+  for (const finding of [...result.findings].sort((a,b)=>order[a.status]-order[b.status]).slice(0,250)) {
+    const row = document.createElement('tr'); row.dataset.status = finding.status;
+    for (const value of [qualityLabels[finding.status],finding.chars || '—',finding.message]) { const td = document.createElement('td'); td.textContent = value; row.append(td); }
+    body.append(row);
+  }
+  for (const proof of document.querySelectorAll('.quality-vector-proof')) proof.remove();
+  for (const [key,text] of Object.entries(qualityProofs)) {
+    const card = document.getElementById('rule-' + key); if (!card) continue;
+    const figure = document.createElement('figure'); figure.className = 'quality-vector-proof';
+    const title = document.createElement('strong'); title.textContent = 'Font đang kiểm: ' + result.record.name;
+    const {svg,missing} = makeQualitySVG(result.font,text);
+    const caption = document.createElement('figcaption'); caption.textContent = text + (missing.length ? ' · Thiếu: ' + missing.join(' ') : '') + ' · Đường đỏ: chân chữ; nét đứt: cao chữ hoa.';
+    figure.append(title,svg,caption); card.insertBefore(figure,card.querySelector('.rule-illustration'));
+  }
+}
+$('quality-current').addEventListener('click', async () => {
+  if (!currentFontExport) { $('quality-status').textContent = 'Chưa có file font để kiểm. Mở hoặc dựng font, đợi xuất xong rồi kiểm lại.'; return; }
+  await runFontQuality([currentFontExport]);
+});
+$('quality-font-select').addEventListener('change', renderFontQuality);

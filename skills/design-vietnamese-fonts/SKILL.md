@@ -57,3 +57,9 @@ Không tuyên bố đạt chuẩn thương mại, không lỗi va chạm toàn b
 ## Báo kết quả
 
 Trả ngắn gọn: ký tự/nhóm đã sửa, phép biến đổi, phần bị bỏ qua, kiểm tra đã chạy và cách lưu lại đúng style trong family. Với thông số tự chọn, gọi chúng là mức khởi đầu của Xưởng Font, không phải con số do tài liệu nguồn quy định.
+
+## Mẫu tham khảo và giới hạn kiểm định
+
+Giữ SVG gốc của tác giả làm minh họa chuẩn tham khảo. Không tự vẽ lại mẫu đúng/sai hoặc tự nhận đã có chuyên gia duyệt. Khi chưa đọc được mã gốc, báo người dùng thay vì phỏng dựng mẫu. Có thể hiển thị outline thực tế của font đang kiểm, nhưng gắn nhãn đối tượng kiểm tra, không coi đó là mẫu chuẩn.
+
+Dùng phép đo để báo thiếu mã, metadata, khoảng gần nhất và giao outline. Ghi rõ đường cong được xấp xỉ khi đo; ngưỡng tùy chọn chỉ là bộ lọc rà soát. Không dùng điểm tự chấm để xác nhận chất lượng thẩm mỹ hoặc khả năng bán font. Không dùng đường nét trong SVG tham khảo làm nguyên liệu sinh font đầu ra.

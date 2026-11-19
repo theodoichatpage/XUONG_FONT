@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),svg2ttf=require('svg2ttf'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'xuong-font-quality-'));
+const bundled=path.join(temp,'quality.cjs');
+require('esbuild').buildSync({entryPoints:[path.join(__dirname,'../site/font-quality.js')],bundle:true,platform:'node',format:'cjs',outfile:bundled});
+const {assessFont}=require(bundled);
+const vowels='aăâeêioôơuưyAĂÂEÊIOÔƠUƯY',marks=['','\u0300','\u0301','\u0309','\u0303','\u0323'];
+const chars=[...new Set([...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789đ ',...[...vowels].flatMap(v=>marks.map(m=>(v+m).normalize('NFC')))])];
+const body='M0 0H200V700H0Z';
+const xml=`<svg xmlns="http://www.w3.org/2000/svg"><defs><font id="QualityFixture" horiz-adv-x="260"><font-face font-family="Quality Fixture" units-per-em="1000" ascent="1000" descent="-250"/><missing-glyph/>${chars.map(ch=>{
+let d=body;const parts=[...ch.normalize('NFD')];if(parts.includes('\u0323'))d+=' M80 -80H120V-40H80Z';else if(parts.length>1&&parts[1]!=='\u031b')d+=ch==='Á'?' M80 702H120V730H80Z':' M80 730H120V770H80Z';
+if(ch==='ơ')d+=' M180 690H230V750H180Z';if(ch==='ư')d+=' M180 690H230V810H180Z';if(ch===' ')d='';
+return `<glyph unicode="&#${ch.codePointAt(0)};" horiz-adv-x="${ch==='B'?100:260}" d="${d}"/>`;}).join('')}</font></defs></svg>`;
+const bytes=svg2ttf(xml).buffer;
+(async()=>{const r=await assessFont({name:'Quality Fixture',style:'Bold',blob:new Blob([bytes])});
+assert(r.findings.some(f=>f.rule==='coverage'&&f.status==='fail'&&f.chars.includes('Đ')),'missing Đ not found');
+assert(r.findings.some(f=>f.rule==='metadata'&&f.status==='fail'),'metadata mismatch not found');
+assert(r.findings.some(f=>f.rule==='mark-gap'&&f.chars==='Á'&&f.value===2),'gap 2 not measured');
+assert(r.findings.some(f=>f.rule==='pair-collision'&&f.chars==='Bấ'),'outline overlap not found');
+assert(r.findings.some(f=>f.rule==='horn-pair'&&f.chars==='ơư'&&f.value===60),'horn height not measured');
+assert(r.findings.some(f=>f.rule==='nfd'&&f.status==='manual'),'NFD limit not reported');
+console.log('PASS: missing Đ, wrong style metadata, 2-unit mark gap, pair intersection, horn height and NFD limitations');console.log('Measured:',r.tested,'glyphs;',r.checkedPairs,'pairs');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>fs.rmSync(temp,{recursive:true,force:true}));

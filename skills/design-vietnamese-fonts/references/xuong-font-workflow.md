@@ -21,3 +21,9 @@ Dự án hiện tại: https://xuong-font.vercel.app/ ; mã nguồn theodoichatp
 - `src/assemble.js`: xuất TTF; giữ tên family/style/weight và advance đã kiểm tra.
 
 Bộ quy tắc không thay thế thuật toán kiểm va chạm. Chỉ nói tính năng tự động có thật khi mã đã thực hiện và kết quả đã được kiểm chứng. Không gọi AI chỉ để kiểm tra việc nối prompt; dùng kiểm tra tĩnh trước, chỉ dùng dịch vụ trả phí khi nằm trong tác vụ đã được cho phép.
+
+## Rà soát theo quy tắc
+
+Trong Bộ sưu tập, chọn Đánh giá font hoặc Đánh giá family; trong tab Quy tắc có Đánh giá font đang làm. `site/font-quality.js` đọc file font, rà cmap/metadata, lấy khoảng gần nhất contour dấu rời, giao outline của cặp thử và chỉ báo chênh đỉnh râu. Báo rõ mục cần duyệt bằng mắt, chưa đo được và chưa xác minh shaping NFD.
+
+Mỗi quy tắc có SVG nguyên bản trong `site/references/vector`, cùng thông tin nguồn và hash hình học. Phần SVG của font đang kiểm chỉ sao lại outline font đó. Không dịch, vẽ thêm dấu vào mẫu chuẩn để làm kết quả trông đạt.
