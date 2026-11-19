@@ -355,3 +355,8 @@ dialog::backdrop{background:#221a17bd}
 /* The only entry point is the existing name, image picker and Create button. */
 .family-image-workspace .fp-upload{display:none}.family-image-workspace.fp-guided [data-fp=images] section[data-confirmed=true]{display:none}.family-image-workspace [data-fp=continue]{margin-block:12px}.family-image-workspace [data-fp=advanced]>summary{cursor:pointer;font-weight:600;padding:12px 0}.family-image-workspace [data-fp=quick-status]{margin-top:12px}
 @media(min-width:1024px) and (min-height:520px){.workspace{grid-template-rows:minmax(0,1fr) auto}.workspace:has(>.family-image-workspace[open]){grid-template-rows:minmax(0,1fr)}}
+
+.image-style-confirmation {margin:12px 0;padding:12px;border:1px solid var(--border, #d9c8b8);border-radius:8px;}
+.image-style-confirmation .fp-images {display:grid;grid-template-columns:minmax(0,1fr);}
+.image-style-confirmation .fp-images section {min-width:0;max-width:100%;}
+.image-style-confirmation select {width:100%;}
