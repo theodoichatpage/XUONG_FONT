@@ -1127,7 +1127,7 @@ $('apply-tone-samples').addEventListener('click', () => {
 $('accents').addEventListener('click', () => {
   if (busy) return;
   // Chưa có dấu mẫu nào từ ảnh: dựng dấu từ nét chữ đã có thay vì báo lỗi.
-  const hasMarkSamples = [...toneSamples.keys()].some(mark => glyphs.get(mark)?.d);
+  const hasMarkSamples = [...toneSamples.keys()].some(mark => glyphs.get(mark)?.d && !glyphs.get(mark).nativeSize);
   if (!hasMarkSamples) { $('derive-marks').click(); return; }
   const generated = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   if (!generated.length) return status('Hãy thêm chữ nguyên âm gốc trước, ví dụ A, E hoặc O.');

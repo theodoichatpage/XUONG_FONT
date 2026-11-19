@@ -86,6 +86,18 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       if (sample) {
         const source = glyphBounds(sample);
         if (source.width > 0 && source.height > 0) {
+          if (mark === '\u031b' && sample.nativeSize) {
+            // Skill: r\u00e2u n\u1ed1i v\u00e0o th\u00e2n \u1edf v\u00f9ng tr\u00ean b\u00ean ph\u1ea3i o/u. T\u00ecm m\u00e9p ph\u1ea3i th\u1eadt c\u1ee7a n\u00e9t t\u1ea1i \u0111\u1ed9 cao n\u1ed1i
+            // (o cong v\u00e0o trong n\u00ean kh\u00f4ng d\u00f9ng khung ch\u1eef nh\u1eadt), c\u1eafm g\u1ed1c r\u00e2u v\u00e0o trong n\u00e9t \u0111\u1ec3 li\u1ec1n kh\u1ed1i.
+            const attachY = bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9);
+            const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
+            const inset = .45 * (sample.stem || bounds.width * .2);
+            const horn = sameDirection(sample.d, original.d);
+            paths.push(svgpath(horn).translate(edge - inset, attachY).round(1).toString());
+            const hornRight = edge - inset + source.x + source.width;
+            advance = Math.max(advance, Math.ceil(hornRight + 25));
+            continue;
+          }
           if (mark === '\u031b') {
             const scale = sample.nativeSize ? Math.min(1, bounds.width * .60 / source.width)
               : Math.min(130 / source.height, bounds.width * .60 / source.width);
@@ -221,7 +233,7 @@ export function deriveMarkSamples(glyphs) {
   const stem = measureStem(glyphs), t = Math.max(28, Math.min(130, stem * .82));
   const marks = new Map();
   const add = (mark, d) => marks.set(mark, { char: mark, d, advance: 0, source: 'Dựng từ nét chữ', origin: 'inferred',
-    nativeSize: true, approved: false, locked: false });
+    nativeSize: true, stem, approved: false, locked: false });
 
   // Sắc và huyền: nét xiên, đầu trên rộng hơn đầu dưới.
   const acuteH = Math.max(95, 1.9 * t), span = .55 * acuteH, slope = Math.sin(Math.atan2(acuteH, span));
@@ -268,12 +280,13 @@ export function deriveMarkSamples(glyphs) {
     add('̣', polygon(Array.from({ length: 16 }, (_, i) => [Math.cos(i * Math.PI / 8) * r, Math.sin(i * Math.PI / 8) * r])));
   }
 
-  // Râu: nét cong vươn lên bên phải, gốc nối vào thân.
-  const hornH = Math.max(110, 1.9 * t), hornW = 1.05 * t + 40;
-  add('̛', strokeAlong(Array.from({ length: 17 }, (_, i) => {
-    const s = i / 16;
-    return [hornW * Math.sin(s * Math.PI / 2), hornH * .9 * s * s];
-  }), t * .9));
+  // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ,
+  // thon nhẹ về đầu và cắt bằng theo kiểu đầu nét của bộ chữ.
+  const hornT = .95 * stem, hornH = Math.max(110, 1.55 * hornT), hornW = .9 * hornT + 45;
+  add('̛', strokeAlong(Array.from({ length: 25 }, (_, i) => {
+    const s = i / 24;
+    return [hornW * Math.sin(s * Math.PI / 2), hornH * Math.pow(s, 1.8)];
+  }), s => hornT * (1 - .18 * s)));
   return { marks, stem, thickness: t };
 }
 
@@ -320,4 +333,37 @@ export function deriveBarredD(glyphs, stem = measureStem(glyphs)) {
     result.push(addBar(lower, 'đ', (xHeight + b.y + b.height) / 2, right - stem - Math.min(b.width * .35, 1.4 * stem), right + .45 * stem, stem));
   }
   return result;
+}
+
+// Mép phải thật của các contour tại độ cao y (đơn vị font, trục y hướng lên).
+function rightEdgeAt(d, y) {
+  let best = null, x0 = 0, y0 = 0, sx = 0, sy = 0;
+  const cross = (ax, ay, bx, by) => {
+    if ((ay - y) * (by - y) > 0 || ay === by) return;
+    const x = ax + (bx - ax) * (y - ay) / (by - ay);
+    if (best === null || x > best) best = x;
+  };
+  for (const [command, ...v] of svgpath(d).abs().unarc().unshort().segments) {
+    if (command === 'M') { [x0, y0] = v; sx = x0; sy = y0; continue; }
+    const points = [];
+    if (command === 'L') points.push(v);
+    else if (command === 'H') points.push([v[0], y0]);
+    else if (command === 'V') points.push([x0, v[0]]);
+    else if (command === 'Z') points.push([sx, sy]);
+    else for (let i = 1; i <= 16; i++) {
+      const t = i / 16, u = 1 - t, [ex, ey] = v.slice(-2);
+      points.push(command === 'Q'
+        ? [u * u * x0 + 2 * u * t * v[0] + t * t * ex, u * u * y0 + 2 * u * t * v[1] + t * t * ey]
+        : [u ** 3 * x0 + 3 * u * u * t * v[0] + 3 * u * t * t * v[2] + t ** 3 * ex, u ** 3 * y0 + 3 * u * u * t * v[1] + 3 * u * t * t * v[3] + t ** 3 * ey]);
+    }
+    for (const [x, py] of points) { cross(x0, y0, x, py); x0 = x; y0 = py; }
+  }
+  return best;
+}
+
+// Đảo chiều đa giác dấu nếu ngược chiều contour ngoài của thân, để phần chồng lên thân được tô liền.
+function sameDirection(markD, bodyD) {
+  if (outerDirection(markD) === outerDirection(bodyD)) return markD;
+  const points = svgpath(markD).abs().segments.filter(([c]) => c === 'M' || c === 'L').map(([, x, y]) => [x, y]);
+  return polygon(points.reverse());
 }
