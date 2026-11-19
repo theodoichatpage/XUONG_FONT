@@ -4,6 +4,7 @@ import {charset,composeVietnamese} from './vietnamese.js';
 import {createFamilyProject,saveFamilyProject,listFamilyProjects,loadFamilyProject,replaceProjectGlyph,styleStatus,backupFamilyProject,restoreFamilyProject} from './family-project.js';
 import {redrawFontImage} from './ai-design.js';
 import {referenceCanvas,isCleanReference} from './reference-image.js';
+import {layoutFromText} from './local-layout.js';
 import {canApproveProof,proofMetricVersion} from './proof-approval.js';
 import {reuseReferenceComponents} from './reference-components.js';
 import {retraceSettings} from './reference-mask.js';
@@ -125,9 +126,20 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   for(const type of ['dragover','drop'])$('drop').addEventListener(type,e=>{e.preventDefault();e.stopPropagation();if(type==='drop')void run(()=>addImages(e.dataTransfer.files));});
 
   $('analyze').onclick=()=>run(async()=>{
-    const key=getKey();if(!key)throw Error('Nhập khóa Gemini ở thanh trên để phân tích ảnh.');
-    for(const [index,image]of project.images.filter(i=>(!i.analysis||i.analysisVersion!==2)&&!i.excluded).entries()){
+    const pendingImages=project.images.filter(i=>(!i.analysis||i.analysisVersion!==2||(i.layoutText&&i.analysisText!==i.layoutText))&&!i.excluded);
+    const key=getKey();if(!key&&pendingImages.some(i=>!i.layoutText))throw Error('Nhập khóa Gemini ở thanh trên, hoặc gõ nội dung chữ dưới ảnh để dựng không cần Gemini.');
+    for(const [index,image]of pendingImages.entries()){
       say('Đang phân tích ảnh '+(index+1)+': '+image.name);
+      if(image.layoutText){
+        // Người dùng đã gõ nội dung: tách dòng/từ ngay trên máy, không gửi ảnh cho AI.
+        const layout=layoutFromText(await sourceCanvas(image.blob),image.layoutText);
+        if(image.analysis)image.analysisHistory=[...(image.analysisHistory||[]),image.analysis].slice(-3);
+        image.analysis={style:image.layoutStyle||'',confidence:1,basis:'label',evidence:'Nội dung do người dùng nhập; vùng chữ tách trên máy, không dùng AI.',quality:'needs-review',profile:{},words:layout.words,lines:[],textLines:layout.lines,source:'local',needsConfirmation:!image.layoutStyle};
+        image.analysisVersion=2;image.analysisText=image.layoutText;
+        image.traceDiagnostics=layout.diagnostics.map(d=>({text:d.text,status:'too-few-words',expected:d.expected,parts:d.found}));
+        if(image.layoutStyle&&(!image.confirmed||image.styleChosenBy==='user')){image.styleId=image.layoutStyle;image.confirmed=true;image.styleChosenBy='user';}
+        await persist('Đã tách '+layout.words.length+' từ trong '+image.name+' (không dùng Gemini)');render();continue;
+      }
       const canvas=await sourceCanvas(image.blob),preview=document.createElement('canvas'),scale=Math.min(1,1200/Math.max(canvas.width,canvas.height));preview.width=Math.round(canvas.width*scale);preview.height=Math.round(canvas.height*scale);preview.getContext('2d').drawImage(canvas,0,0,preview.width,preview.height);
       const response=await fetch('/api/glyph-review',{method:'POST',headers:{'Content-Type':'application/json','x-gemini-key':key},body:JSON.stringify({mode:'family-analysis',image:preview.toDataURL('image/jpeg',.88).split(',')[1],preferredModel:getModel()}),signal:flowSignal?AbortSignal.any([flowSignal,AbortSignal.timeout(88000)]):AbortSignal.timeout(88000)});
       const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||'AI phân tích thất bại; những ảnh đã lưu được giữ lại.');if(image.analysis)image.analysisHistory=[...(image.analysisHistory||[]),image.analysis].slice(-3);image.analysis=validateFamilyAnalysis(data);image.analysisVersion=2;if(!image.confirmed)Object.assign(image,resolveNamedStyle(image.analysis,flowTarget));
@@ -192,7 +204,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   $('name').parentElement.hidden=true;$('new').hidden=true;
   $('show-images').onclick=()=>root.classList.toggle('fp-guided');
   $('continue').onclick=()=>{const input=getCurrentInput?.();if(input)void createFromCurrent(input);};
-  async function createFromCurrent({name,images,workspace,signal,composeMissing=false}){
+  async function createFromCurrent({name,images,layouts,workspace,signal,composeMissing=false}){
     if(flowRunning||busy)return {ok:false};
     flowRunning=true;await restoration;flowSignal=signal;root.classList.add('fp-guided');$('continue').hidden=true;
     try{
@@ -208,6 +220,12 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       const incoming=[],seen=new Set(project.images.map(i=>i.digest));
       for(const file of images){const digest=await digestReference(file);if(!seen.has(digest)){incoming.push({file,digest});seen.add(digest);}}
       if(incoming.length){if(!await run(()=>addImages(incoming.map(i=>i.file))))return {ok:false};for(const {file,digest}of incoming){const entry=project.images.findLast(i=>i.blob===file);if(entry)entry.digest=digest;}}
+      // Nội dung chữ và kiểu chữ người dùng gõ dưới mỗi ảnh đi theo ảnh đó (khớp bằng digest).
+      for(const [index,file]of images.entries()){
+        const layout=layouts?.[index],digest=await digestReference(file),entry=project.images.find(i=>i.digest===digest);
+        if(!entry)continue;
+        entry.layoutText=layout?.text?.trim()||undefined;entry.layoutStyle=entry.layoutText?layout.style||'Regular':undefined;
+      }
       await persist('Đã dùng tên và ảnh đang có; không cần nhập lại');
       if(!await $('analyze').onclick())return {ok:false};
       for(const image of project.images){if(image.analysis&&!image.confirmed&&!image.excluded)Object.assign(image,resolveNamedStyle(image.analysis,input.style));}
@@ -217,7 +235,8 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       if(pending.length){render();$('quick-status').textContent='Có '+pending.length+' ảnh cần xác nhận kiểu chữ ngay dưới ảnh mẫu. Chọn kiểu đúng rồi bấm lại Tạo bộ font.';say($('quick-status').textContent);confirmation?.scrollIntoView({block:'nearest'});return {ok:false,pending:true};}
       for(const image of project.images.filter(i=>i.confirmed&&!i.excluded&&!i.parentImageId&&!i.preparedImageId)){
         signal?.throwIfAborted();const canvas=await sourceCanvas(image.blob);
-        if(isCleanReference(canvas))continue;
+        // Ảnh dựng theo nội dung người dùng gõ không gửi Gemini vẽ lại nền.
+        if(isCleanReference(canvas)||image.layoutText)continue;
         say('Gemini đang dựng chữ đen trên nền trắng: '+image.name+'…');
         const prepared=await redrawFontImage([canvas],{mode:'clean'},getKey(),signal||new AbortController().signal);
         const blob=await new Promise(resolve=>prepared.toBlob(resolve,'image/png'));if(!blob)throw Error('Chưa lưu được ảnh Gemini trả về.');

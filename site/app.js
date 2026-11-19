@@ -1,6 +1,7 @@
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
-import { digestReference } from './family-inputs.js';
+import { digestReference, readableStyle } from './family-inputs.js';
+import { familyStyles } from './family-styles.js';
 import { setupFamilyWorkspace } from './family-workspace.js';
 import { createFontCheckPanel } from './font-check-panel.js';
 import { reviewMarkRepairs } from './ai-mark-repair.js';
@@ -180,13 +181,23 @@ function renderReferences() {
   const state = connectionRequest ? 'loading' : connectedGeminiModel ? 'ready' : 'idle';
   $('gemini-badge').dataset.state = state;
   $('gemini-badge-label').textContent = 'Gemini: ' + (state === 'ready' ? 'Đã kết nối' : state === 'loading' ? 'Đang kiểm tra' : 'Chưa kết nối');
-  $('ai-scan').disabled = busy || loading || !references.length || !connectedGeminiModel || !!connectionRequest;
+  const localReady = localLayoutReady();
+  $('ai-scan').disabled = busy || loading || !references.length || (!localReady && (!connectedGeminiModel || !!connectionRequest));
   $('auto-draw').disabled = busy || loading;
-  $('ai-scan-help').textContent = connectedGeminiModel
-    ? 'Thêm ảnh có các ký tự bạn muốn đưa vào bộ font.'
-    : 'Kiểm tra kết nối Gemini thành công để bật bước dựng chữ.';
+  $('layout-text').disabled = $('layout-style').disabled = busy || loading;
+  $('ai-scan-help').textContent = localReady
+    ? 'Mọi ảnh đã có nội dung chữ: Xưởng dựng trên máy, không cần Gemini.'
+    : connectedGeminiModel
+      ? 'Thêm ảnh có các ký tự bạn muốn đưa vào bộ font. Gõ nội dung chữ dưới ảnh để dựng không cần Gemini.'
+      : 'Gõ nội dung chữ dưới mỗi ảnh để dựng không cần Gemini, hoặc kết nối Gemini để AI đọc ảnh.';
   $('previous-reference').disabled = busy || loading || activeReference <= 0;
   $('next-reference').disabled = busy || loading || activeReference + 1 >= references.length;
+}
+
+// Ảnh đang mở đọc nội dung từ ô nhập; các ảnh khác dùng nội dung đã lưu.
+function localLayoutReady() {
+  return references.length > 0 && references.every((entry, index) =>
+    (index === activeReference ? $('layout-text').value : entry.settings?.layoutText || '').trim());
 }
 
 function rememberReference() {
@@ -195,7 +206,8 @@ function rememberReference() {
   entry.settings = {
     crop, chars: $('chars').value, polarity: $('polarity').value,
     threshold: $('threshold').value, used: entry.settings?.used ?? false,
-    detectedWords: entry.settings?.detectedWords
+    detectedWords: entry.settings?.detectedWords,
+    layoutText: $('layout-text').value, layoutStyle: $('layout-style').value
   };
 }
 
@@ -218,6 +230,8 @@ async function showReference(index) {
         $('threshold-value').value = settings.threshold;
       }
       $('chars').value = settings?.chars ?? '';
+      $('layout-text').value = settings?.layoutText ?? '';
+      $('layout-style').value = settings?.layoutStyle || 'Regular';
       activeReference = index;
       useImage(image, entry.file.name);
       crop = settings?.crop;
@@ -911,7 +925,7 @@ function detectedText(words) {
 $('ai-scan').addEventListener('click', async()=>{
   if(busy||loading)return;
   if(!references.length){status('Thêm ảnh mẫu rồi bấm Tạo bộ font.');return;}
-  if(!geminiKey.value.trim()){status('Nhập khóa Gemini ở thanh trên để tạo bộ font.');return;}
+  if(!localLayoutReady()&&!geminiKey.value.trim()){status('Gõ nội dung chữ dưới mỗi ảnh, hoặc nhập khóa Gemini ở thanh trên để tạo bộ font.');return;}
   const controller=new AbortController();designRun=controller;busy=true;$('name').disabled=true;renderReferences();
   $('stop-design').hidden=false;$('stop-design').disabled=false;
   try{await familyWorkspace.createFromCurrent({...currentFamilyInput(),signal:controller.signal});}
@@ -1514,9 +1528,19 @@ async function runFontQuality(records) { await editorFontCheck.run(records); }
 // Family projects use their own additive IndexedDB database. Existing fonts and references stay intact.
 let familyEditorToken;
 function currentFamilyInput(){
+  rememberReference();
   return {name:$('name').value,images:references.map(entry=>entry.file),
+    layouts:references.map(entry=>({text:entry.settings?.layoutText||'',style:entry.settings?.layoutStyle||'Regular'})),
     composeMissing:$('auto-draw').checked,workspace:{name:$('name').value,glyphs:[...glyphs.values()],importedMetrics,sample:$('sample').value,spacing:$('spacing').value}};
 }
+// Ô nội dung chữ dưới ảnh: dựng chữ trên máy, không cần Gemini.
+$('layout-style').replaceChildren(...familyStyles.map(s => new Option(readableStyle(s.style), s.style)));
+$('layout-style').value = 'Regular';
+let layoutSaveTimer;
+for (const id of ['layout-text', 'layout-style']) $(id).addEventListener('input', () => {
+  rememberReference(); renderReferences();
+  clearTimeout(layoutSaveTimer); layoutSaveTimer = setTimeout(() => persistReferences(), 600);
+});
 const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
   traceWords: (image,words,signal,settings) => traceDetectedWords(image,words,signal,undefined,settings),
   getCurrentInput:currentFamilyInput,
