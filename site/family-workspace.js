@@ -31,7 +31,10 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   const confirmation=document.getElementById('image-style-confirmation'),confirmationCards=document.getElementById('image-style-cards');
   const $=name=>root.querySelector('[data-fp="'+name+'"]');
   let project,styleId='Regular',selectedChar='i',busy=false,urls=[],proofRevision=0,lastProof,editorBinding;
-  let queue=Promise.resolve(),flowSignal,flowTarget,flowRunning=false;
+  let queue=Promise.resolve(),flowSignal,flowTarget,flowRunning=false,flowImages;
+  // Khi bấm Tạo bộ font chỉ xử lý ảnh đang có trong danh sách (và ảnh nền trắng dựng từ chúng),
+  // không phân tích lại ảnh cũ còn lưu trong dự án.
+  const inFlow=image=>!flowImages||flowImages.has(image.id)||flowImages.has(image.parentImageId);
   const say=text=>{$('status').textContent=text;onProgress?.(text);};
   const activeStyle=()=>project?.styles.find(s=>s.id===styleId);
   const activeGlyph=()=>activeStyle()?.glyphs.find(g=>g.char===selectedChar);
@@ -126,7 +129,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   for(const type of ['dragover','drop'])$('drop').addEventListener(type,e=>{e.preventDefault();e.stopPropagation();if(type==='drop')void run(()=>addImages(e.dataTransfer.files));});
 
   $('analyze').onclick=()=>run(async()=>{
-    const pendingImages=project.images.filter(i=>(!i.analysis||i.analysisVersion!==2||(i.layoutText&&i.analysisText!==i.layoutText))&&!i.excluded);
+    const pendingImages=project.images.filter(i=>(!i.analysis||i.analysisVersion!==2||(i.layoutText&&i.analysisText!==i.layoutText))&&!i.excluded&&inFlow(i));
     const key=getKey();if(!key&&pendingImages.some(i=>!i.layoutText))throw Error('Nhập khóa Gemini ở thanh trên, hoặc gõ nội dung chữ dưới ảnh để dựng không cần Gemini.');
     for(const [index,image]of pendingImages.entries()){
       say('Đang phân tích ảnh '+(index+1)+': '+image.name);
@@ -147,7 +150,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     }
   });
   $('trace').onclick=()=>run(async()=>{
-    const style=activeStyle(),images=project.images.filter(i=>i.styleId===styleId&&i.confirmed&&!i.excluded&&!i.preparedImageId);
+    const style=activeStyle(),images=project.images.filter(i=>i.styleId===styleId&&i.confirmed&&!i.excluded&&!i.preparedImageId&&inFlow(i));
     if(!images.length)throw Error('Style chưa có ảnh đã xác nhận. Phân tích và xác nhận ảnh trước.');
     let count=0;for(const image of images){if(!image.analysis?.words.length&&!image.analysis?.lines?.length)throw Error('Ảnh chưa có vùng ký tự được AI xác định. Hãy phân tích ảnh.');say('Đang truy vết trực tiếp: '+image.name);style.status='Đang dựng';const canvas=await sourceCanvas(image.blob),glyphs=await traceWords(canvas,image.analysis.words,flowSignal||new AbortController().signal,{lines:image.analysis.lines});
       image.traceDiagnostics=glyphs.diagnostics||[];
@@ -221,19 +224,22 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       for(const file of images){const digest=await digestReference(file);if(!seen.has(digest)){incoming.push({file,digest});seen.add(digest);}}
       if(incoming.length){if(!await run(()=>addImages(incoming.map(i=>i.file))))return {ok:false};for(const {file,digest}of incoming){const entry=project.images.findLast(i=>i.blob===file);if(entry)entry.digest=digest;}}
       // Nội dung chữ và kiểu chữ người dùng gõ dưới mỗi ảnh đi theo ảnh đó (khớp bằng digest).
+      const currentIds=new Set();
       for(const [index,file]of images.entries()){
         const layout=layouts?.[index],digest=await digestReference(file),entry=project.images.find(i=>i.digest===digest);
         if(!entry)continue;
         entry.layoutText=layout?.text?.trim()||undefined;entry.layoutStyle=entry.layoutText?layout.style||'Regular':undefined;
+        currentIds.add(entry.id);
       }
+      flowImages=currentIds;
       await persist('Đã dùng tên và ảnh đang có; không cần nhập lại');
       if(!await $('analyze').onclick())return {ok:false};
       for(const image of project.images){if(image.analysis&&!image.confirmed&&!image.excluded)Object.assign(image,resolveNamedStyle(image.analysis,input.style));}
       // An explicit style in the user's name is their choice, not an AI guess.
       if(input.style)for(const image of project.images.filter(i=>!i.confirmed&&!i.excluded)){image.styleId=input.style;image.confirmed=true;image.styleChosenBy='family-name';}
-      const pending=project.images.filter(i=>!i.confirmed&&!i.excluded);
+      const pending=project.images.filter(i=>!i.confirmed&&!i.excluded&&inFlow(i));
       if(pending.length){render();$('quick-status').textContent='Có '+pending.length+' ảnh cần xác nhận kiểu chữ ngay dưới ảnh mẫu. Chọn kiểu đúng rồi bấm lại Tạo bộ font.';say($('quick-status').textContent);confirmation?.scrollIntoView({block:'nearest'});return {ok:false,pending:true};}
-      for(const image of project.images.filter(i=>i.confirmed&&!i.excluded&&!i.parentImageId&&!i.preparedImageId)){
+      for(const image of project.images.filter(i=>i.confirmed&&!i.excluded&&!i.parentImageId&&!i.preparedImageId&&inFlow(i))){
         signal?.throwIfAborted();const canvas=await sourceCanvas(image.blob);
         // Ảnh dựng theo nội dung người dùng gõ không gửi Gemini vẽ lại nền.
         if(isCleanReference(canvas)||image.layoutText)continue;
@@ -245,7 +251,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
         image.preparedImageId=child.id;project.images.push(child);await persist('Đã lưu riêng ảnh gốc và ảnh Gemini nền trắng');
       }
       if(!await $('analyze').onclick())return {ok:false};
-      const styles=[...new Set(project.images.filter(i=>i.confirmed&&!i.excluded).map(i=>i.styleId))];
+      const styles=[...new Set(project.images.filter(i=>i.confirmed&&!i.excluded&&inFlow(i)).map(i=>i.styleId))];
       if(!styles.length)throw Error('Chưa có ảnh nào được chọn để dựng chữ.');
       let total=0;
       for(const id of styles){signal?.throwIfAborted();styleId=id;say('Đang dựng '+readableStyle(id)+' từ ảnh gốc…');if(!await $('trace').onclick())return {ok:false};if(!activeStyle().glyphs.length)continue;if(composeMissing&&!await $('compose').onclick())return {ok:false};if(!await $('proof-all').onclick())return {ok:false};total+=activeStyle().glyphs.length;}
@@ -256,7 +262,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       say('Bản nháp có '+style.glyphs.length+' chữ chưa duyệt cho '+readableStyle(styleId)+'. Bấm Đối chiếu chữ đã tách để kiểm đúng ký tự và đường nét. Chữ thiếu không được tự bịa.');
       return {ok:true,projectId:project.id};
     }catch(error){say(signal?.aborted?'Đã dừng. Ảnh và phần đã dựng vẫn được giữ.':error.message);return {ok:false};}
-    finally{flowRunning=false;flowSignal=undefined;flowTarget=undefined;}
+    finally{flowRunning=false;flowSignal=undefined;flowTarget=undefined;flowImages=undefined;}
   }
   const restoration=(async()=>{try{await renderProjects();const id=localStorage.getItem('xuong-font-active-family');if(id){project=await loadFamilyProject(id);if(project)render();}}catch(error){say('Không mở được dự án đã lưu: '+error.message);}})();
   return {createFromCurrent,async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;root.open=true;$('advanced').open=true;render();await showProof();$('proof-section').scrollIntoView({block:'start'});},open:()=>{root.open=true;root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
