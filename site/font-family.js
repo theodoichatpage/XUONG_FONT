@@ -1,5 +1,7 @@
 import opentype from 'opentype.js';
 import ClipperLib from 'clipper-lib';
+import svg2ttf from 'svg2ttf';
+const escapeXML = value => String(value).replace(/[&<>"']/g, ch => '&#' + ch.codePointAt(0) + ';');
 const { addKerning } = require('../src/kern-table');
 
 const styles = { 'Ultra Light': [200, -14], Light: [300, -7], Medium: [500, 0], SemiBold: [600, 12], Bold: [700, 20] };
@@ -62,7 +64,7 @@ export async function createFontFamily(record, chosen, text, onResult) {
   const original = await record.blob.arrayBuffer();
   const source = opentype.parse(original);
   if (source.tables.fvar) throw new Error('Chọn file Regular tĩnh để tạo family.');
-  const family = record.name.replace(/(?:[ -]+Regular)$/i, '').trim() + ' Family';
+  const family = record.family || source.getEnglishName('preferredFamily') || source.getEnglishName('fontFamily') || record.name.replace(/(?:[ -]+Regular)$/i, '').trim();
   const upm = source.unitsPerEm;
   const indexChars = new Map();
   for (let i = 0; i < source.glyphs.length; i++) {
@@ -92,15 +94,26 @@ export async function createFontFamily(record, chosen, text, onResult) {
       }
       if (i % 40 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     }
-    const font = new opentype.Font({ familyName: family, styleName: style,
-      unitsPerEm: upm, ascender: ascent, descender: descent, glyphs,
-      weightClass: weight, copyright: source.getEnglishName('copyright') || '',
-      license: source.getEnglishName('license') || '', licenseURL: source.getEnglishName('licenseURL') || '' });
-    font.tables.os2.usWeightClass = weight;
-    font.tables.os2.fsSelection = style === 'Regular' ? 64 : weight === 700 ? 32 : 0;
-    let bytes = new Uint8Array(font.toArrayBuffer());
+    // Use the same TrueType writer as the editor's download flow.
+    // This avoids a second CFF serialization path for imported outlines.
+    const parts = [`<svg xmlns="http://www.w3.org/2000/svg"><defs><font id="FamilyFont" horiz-adv-x="${upm / 2}">`,
+      `<font-face font-family="${escapeXML(family)}" font-weight="${weight}" units-per-em="${upm}" ascent="${ascent}" descent="${descent}"/>`];
+    for (const [index, glyph] of glyphs.entries()) {
+      const d = escapeXML(glyph.path.toPathData(3));
+      if (index === 0) parts.push(`<missing-glyph horiz-adv-x="${glyph.advanceWidth}" d="${d}"/>`);
+      for (const point of glyph.unicodes) {
+        if (!Number.isInteger(point) || point < 32 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) continue;
+        parts.push(`<glyph glyph-name="uni${point.toString(16)}" unicode="&#${point};" horiz-adv-x="${glyph.advanceWidth}" d="${d}"/>`);
+      }
+    }
+    parts.push('</font></defs></svg>');
+    const output = svg2ttf(parts.join(''), { familyname: family, subfamilyname: style,
+      fullname: family + ' ' + style, copyright: source.getEnglishName('copyright') || '', ts: 0 });
+    let bytes = new Uint8Array(output.buffer);
     if (kerning.length) bytes = addKerning(bytes, kerning);
-    await onResult({ name: family + ' ' + style, filename: family + '-' + style + '.otf',
-      blob: new Blob([bytes], { type: 'font/otf' }), style, text });
+    // Verify the exported bytes before handing them to storage or preview.
+    opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    await onResult({ name: family + ' ' + style, family, filename: family + '-' + style.replace(/ /g, '') + '.ttf',
+      blob: new Blob([bytes], { type: 'font/ttf' }), style, text });
   }
 }

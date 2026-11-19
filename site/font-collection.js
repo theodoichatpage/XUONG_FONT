@@ -86,7 +86,9 @@ async function addFont(record) {
       if (existing) {
         result = { id: existing.id, duplicate: true };
       } else {
-        const previous = isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
+        const previous = record.generatedFrom != null
+          ? request.result.find(item => item.generatedFrom === record.generatedFrom && item.style === record.style && item.family === record.family)
+          : isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
         const add = previous ? store.put({ ...record, digest, id: previous.id }) : store.add({ ...record, digest });
         add.onsuccess = () => { result = { id: add.result, duplicate: false }; };
       }
@@ -202,7 +204,7 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     selectedId = records.some(record => record.id === preferred) ? preferred : undefined;
     const grouped = new Map();
     for (const record of records) {
-      let family = familiesByDigest.get(record.digest);
+      let family = record.family || familiesByDigest.get(record.digest);
       if (!family) {
         const raw = fontFamilyFromBytes(await record.blob.arrayBuffer());
         family = familyName(raw || record.filename.replace(/\.(ttf|otf)$/i, '') || record.name);
@@ -363,6 +365,9 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     if (working) return;
     familyRecord = records.find(record => record.id === selectedId);
     if (!familyRecord) return;
+    const group = groups.find(group => group.members.some(record => record.id === familyRecord.id));
+    familyRecord = { ...familyRecord, family: group?.family || familyRecord.name };
+    $('family-status').textContent = '';
     $('family-source').textContent = 'Font gốc: ' + familyRecord.name;
     familyDialog.showModal();
   });
@@ -386,8 +391,9 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
     try {
       await createFontFamily(familyRecord, styles, $('family-text').value, async result => {
         const face = new FontFace('family-proof-' + crypto.randomUUID(), await result.blob.arrayBuffer());
-        await face.load();
-        document.fonts.add(face);
+        let previewLoaded = false;
+        try { await face.load(); document.fonts.add(face); previewLoaded = true; }
+        catch { /* Preview failure must not discard a validated exported font. */ }
         const url = URL.createObjectURL(result.blob);
         familyAssets.push({ face, url });
         const row = document.createElement('section');
@@ -396,26 +402,28 @@ export function setupFontCollection(getCurrentFont, vietnamize) {
         label.textContent = result.style;
         const proof = document.createElement('p');
         proof.style.cssText = 'font-size:32px;overflow-wrap:anywhere;white-space:pre-wrap';
-        proof.style.fontFamily = face.family;
+        if (previewLoaded) proof.style.fontFamily = face.family;
+        else proof.title = 'Trình duyệt chưa xem thử được kiểu này. Bạn vẫn có thể tải font để kiểm tra.';
         proof.textContent = result.text;
         const link = document.createElement('a');
         link.className = 'download'; link.href = url; link.download = result.filename; link.textContent = 'Tải ' + result.style;
-        const saveButton = document.createElement('button');
-        saveButton.type = 'button'; saveButton.textContent = 'Lưu bộ sưu tập';
-        saveButton.addEventListener('click', async () => {
-          saveButton.disabled = true;
-          try {
-            const added = await addFont(result);
-            saveButton.textContent = added.duplicate ? 'Đã có trong bộ sưu tập' : 'Đã lưu';
-            await refresh(added.id);
-          } catch (error) { saveButton.disabled = false; $('family-status').textContent = error.message; }
-        });
-        const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,saveButton);
+        // Regular already exists as the selected source. Save only new styles.
+        if (result.style !== 'Regular') {
+          const { text, ...saved } = result;
+          await addFont({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id });
+        }
+        const savedLabel = document.createElement('span');
+        savedLabel.textContent = result.style === 'Regular' ? 'Font gốc trong bộ sưu tập' : 'Đã tự lưu vào ' + result.family;
+        const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,savedLabel);
         row.append(label,proof,actions); $('family-results').append(row);
         $('family-status').textContent = 'Đã tạo ' + result.style + '.';
       });
-      $('family-status').textContent = 'Đã tạo family. So sánh các kiểu bên dưới rồi tải hoặc lưu.';
-    } catch (error) { $('family-status').textContent = 'Tạo family chưa hoàn tất: ' + error.message; }
+      await refresh(familyRecord.id);
+      $('family-status').textContent = 'Đã tạo và tự lưu các kiểu vào family ' + familyRecord.family + '. Mở rộng tên family trong bộ sưu tập để chọn.';
+    } catch (error) {
+      await refresh(familyRecord.id);
+      $('family-status').textContent = 'Tạo family chưa hoàn tất: ' + error.message + '. Các kiểu đã lưu vẫn có trong bộ sưu tập.';
+    }
     finally { familyRunning = false; $('family-create').disabled = $('family-close').disabled = false; }
   });
 
