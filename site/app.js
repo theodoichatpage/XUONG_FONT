@@ -1087,9 +1087,17 @@ $('derive-marks').addEventListener('click', () => {
   for (const glyph of generated) next.set(glyph.char, glyph);
   glyphs = new ProtectedGlyphMap(next);
   refresh();
+  // Tự kiểm quy tắc dấu của skill ngay sau khi ghép.
+  const fitted = generated.filter(glyph => glyph.markFit);
+  const squeezed = fitted.filter(glyph => glyph.markFit.factor < 1).map(glyph => glyph.char);
+  const overflow = fitted.filter(glyph => !glyph.markFit.fits).map(glyph => glyph.char);
+  const ruleReport = ` Đã áp quy tắc dấu trong skill: dấu chữ hoa 90% và sát thân hơn chữ thường; mũ, trăng không rộng quá nguyên âm; chồng dấu nằm trong chiều cao dòng`
+    + (squeezed.length ? ` (thu nhỏ thêm để vừa dòng: ${squeezed.join(' ')})` : '') + '.'
+    + (overflow.length ? ` CẦN XEM: ${overflow.join(' ')} vẫn vượt chiều cao dòng.` : '');
   const message = `Đã dựng ${madeMarks.length} dấu mẫu theo độ dày nét ${Math.round(stem)} đơn vị`
     + (barred.length ? `, ${barred.map(glyph => glyph.char).join(' ')}` : '')
-    + ` và ghép ${generated.length} chữ có dấu. Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.`;
+    + ` và ghép ${generated.length} chữ có dấu.` + ruleReport
+    + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.';
   status(message);
   reportDesign(message);
 });

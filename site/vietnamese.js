@@ -66,6 +66,11 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     let top = bodyTop + 28;
     let advance = original.advance;
     const paths = [original.d];
+    // Dấu dựng từ nét (nativeSize) được xếp theo quy tắc skill sau vòng lặp: chữ hoa dấu nhỏ và sát hơn,
+    // mũ/trăng không rộng quá nguyên âm, cả chồng dấu phải nằm trong chiều cao dòng.
+    const isCap = root !== root.toLowerCase();
+    const stack = [];
+    let fit;
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
       let x = bounds.x + bounds.width / 2;
       let y = top;
@@ -93,11 +98,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             advance += Math.max(0, Math.ceil(width - overlap));
             continue;
           }
+          if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
-          // Dấu dựng từ nét chữ đã có giữ nguyên cỡ để không làm mảnh nét.
-          // Mũ và trăng dựng từ nét không được rộng quá thân nguyên âm.
-          const widthLimit = sample.nativeSize && (mark === '̂' || mark === '̆') ? .85 : 1.2;
-          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * widthLimit / source.width);
+          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - 28 - height;
           else top += height + 28;
@@ -114,7 +117,35 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       } else top += 123;
       paths.push(svgpath(templates[mark]).unarc().translate(x, y).round(1).toString());
     }
+    if (stack.length) {
+      // Quy tắc skill mục 8 (chữ hoa) và "Các mức số": dấu hoa 90%, khoảng hở hoa chặt hơn thường.
+      const sizeRule = isCap ? .9 : 1, gapRule = isCap ? 22 : 28, minGap = 14;
+      const widthRule = isCap ? .7 : .8;   // mũ, trăng: kiểm độ rộng theo nguyên âm
+      const items = stack.map(({ mark, sample, source }) => {
+        const wide = mark === '̂' || mark === '̆';
+        const limit = bounds.width * (wide ? widthRule : 1.1) / source.width;
+        return { mark, sample, source, scale: Math.min(sizeRule, limit) };
+      });
+      // Cả chồng dấu phải vừa chiều cao dòng (ascender 1000, chừa 20).
+      const room = 980 - bodyTop;
+      const need = (factor, gap) => items.reduce((sum, item) => sum + gap + item.source.height * item.scale * factor, 0);
+      let factor = 1, gap = gapRule;
+      if (need(1, gapRule) > room) {
+        gap = Math.max(minGap, gapRule - (need(1, gapRule) - room) / items.length);
+        factor = Math.max(.7, Math.min(1, (room - gap * items.length) / need(1, 0)));
+      }
+      let y = bodyTop;
+      for (const item of items) {
+        const scale = item.scale * factor;
+        y += gap;
+        paths.push(svgpath(item.sample.d).translate(-item.source.x - item.source.width / 2, -item.source.y)
+          .scale(scale).translate(bounds.x + bounds.width / 2, y).round(1).toString());
+        y += item.source.height * scale;
+      }
+      fit = { factor: Math.round(factor * 100) / 100, gap: Math.round(gap), top: Math.round(y), fits: y <= 1000 };
+    }
     result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', origin:'inferred', approved:false, locked:false, base,
+      ...(fit ? { markFit: fit } : {}),
       ...(useCompactHorn && char === horned ? { hornStyle: 'compact' } : {}) });
   }
   return result;
@@ -163,11 +194,13 @@ const polygon = points => 'M' + points.map(([x, y]) => round1(x) + ' ' + round1(
 
 // Nét dày đều dọc theo một đường tâm, hai đầu bằng.
 function strokeAlong(points, width) {
+  // width: số, hoặc hàm (vị trí 0..1) → độ dày, để nét thon dần như quy tắc skill.
+  const at = typeof width === 'function' ? width : () => width;
   const left = [], right = [];
   points.forEach((point, i) => {
     const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1;
-    const nx = -dy / length * width / 2, ny = dx / length * width / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, w = at(i / (points.length - 1));
+    const nx = -dy / length * w / 2, ny = dx / length * w / 2;
     left.push([point[0] + nx, point[1] + ny]);
     right.push([point[0] - nx, point[1] - ny]);
   });
@@ -201,20 +234,23 @@ export function deriveMarkSamples(glyphs) {
   const leg = capT / Math.sin(angle), notch = capH - capT / Math.cos(angle), flat = .3 * capT;
   add('̂', polygon([[-half, 0], [-half + leg, 0], [0, notch], [half - leg, 0], [half, 0], [flat, capH], [-flat, capH]]));
 
-  // Trăng: cung tròn, hai đầu cắt ngang.
-  const breveH = Math.max(95, 1.7 * t), breveW = Math.max(110, 1.45 * breveH);
-  const arc = Array.from({ length: 25 }, (_, i) => {
-    const a = Math.PI * (1 + i / 24);
-    return [Math.cos(a) * (breveW - t / 2), breveH + Math.sin(a) * (breveH - t / 2)];
+  // Trăng: cung cong, trọng lượng dồn ở đáy, hai đầu thon và cắt ngang (không thành góc nhọn).
+  const breveT = .9 * t, breveH = Math.max(80, 1.45 * t), breveHalf = Math.max(100, 1.9 * t);
+  const arc = Array.from({ length: 33 }, (_, i) => {
+    const a = Math.PI * (1 + i / 32);
+    return [Math.cos(a) * (breveHalf - breveT / 2), breveH - breveT * .4 + Math.sin(a) * (breveH - breveT * .9)];
   });
-  add('̆', strokeAlong(arc, t * .92));
+  add('̆', strokeAlong(arc, s => breveT * (.72 + .28 * Math.sin(Math.PI * s))));
 
-  // Ngã: sóng một nhịp, đầu trái thấp, đầu phải cao.
-  const waveW = Math.max(200, 3.4 * t), amplitude = .4 * t + 12;
-  add('̃', strokeAlong(Array.from({ length: 33 }, (_, i) => {
-    const phase = Math.PI * (-.3 + 2.6 * i / 32);
-    return [-waveW / 2 + waveW * i / 32, amplitude * Math.sin(phase)];
-  }), t * .95));
+  // Ngã: sóng một nhịp mềm. Bán kính cong của đường tâm luôn lớn hơn nửa độ dày nét
+  // để mép không tự gập thành răng cưa (skill: giữ nhịp uốn và nét sạch).
+  const tildeT = .82 * t, waveW = Math.max(200, 3.9 * t), waveSpan = 2.5 * Math.PI;
+  const curvature = (waveSpan / waveW) ** 2;
+  const amplitude = Math.min(.32 * t + 10, 1 / (curvature * .62 * tildeT));
+  add('̃', strokeAlong(Array.from({ length: 49 }, (_, i) => {
+    const phase = -.25 * Math.PI + waveSpan * i / 48;
+    return [-waveW / 2 + waveW * i / 48, amplitude * Math.sin(phase)];
+  }), s => tildeT * (.86 + .14 * Math.sin(Math.PI * s))));
 
   // Hỏi: móc gọn và một chân ngắn.
   const hookT = .78 * t, radius = .9 * hookT, foot = .55 * hookT, center = foot + radius;
