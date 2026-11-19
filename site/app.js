@@ -81,7 +81,8 @@ try {
     $('name').value = saved.name;
     $('sample').value = saved.sample;
     if (saved.spacing != null) $('spacing').value = saved.spacing;
-    if (glyphs.size < saved.glyphs.length) save();
+    // Never overwrite the only saved project during restoration: keep its original payload for recovery.
+    if (glyphs.size < saved.glyphs.length) status('Một số glyph đã bị lọc khi khôi phục. Bản lưu gốc được giữ nguyên; hãy mở Bộ sưu tập Font hoặc nhập lại TTF đã xuất.');
   }
 } catch {
   // A project can still be used when local storage is unavailable.
@@ -1342,6 +1343,21 @@ $('spacing').addEventListener('input', () => { save(); renderPreview(); schedule
 renderGlyphs();
 renderPreview();
 scheduleFont();
+if (!glyphs.size) {
+  const recovery=document.createElement('div');
+  recovery.className='panel';
+  recovery.setAttribute('role','status');
+  recovery.style.marginBottom='12px';
+  const heading=document.createElement('h3');heading.textContent='Chưa tải bộ font đang làm';
+  const explanation=document.createElement('p');
+  explanation.textContent='Các ô chữ trống vì trình duyệt chưa có glyph trong dự án hiện tại. Chữ trong ô Thử tiêu đề có thể là font dự phòng. Đừng dựng lại từ đầu nếu bạn đã lưu font.';
+  const open=document.createElement('button');open.type='button';open.className='primary';
+  open.textContent='Mở Bộ sưu tập Font';open.addEventListener('click',()=>$('open-font-collection').click());
+  const note=document.createElement('p');note.className='help';
+  note.textContent='Trong Bộ sưu tập, chọn font đã lưu để mở lại; hoặc Nhập TTF / OTF đã xuất. Dữ liệu dự án được lưu riêng trong từng trình duyệt.';
+  recovery.append(heading,explanation,open,note);
+  $('editor-font-check').replaceChildren(recovery);
+}
 
 async function restoreReferenceProject() {
   try {
