@@ -410,3 +410,12 @@ dialog::backdrop{background:#221a17bd}
 #font-checker #standalone-font-check.checker-showcase>[data-role="report"]{display:none!important}
 #font-checker #standalone-font-check.checker-showcase .checker-showcase-grid{margin-bottom:0}
 #font-checker #standalone-font-check.checker-showcase .checker-hero{padding-bottom:30px}
+
+/* Checker behavior matching the verified reference: missing glyphs and active Google font */
+.checker-showcase .checker-paper-glyphs .checker-glyph-missing{color:#d93a2f!important}
+.checker-showcase .checker-paper-glyphs .checker-glyph-missing+small{color:#d93a2f;font-weight:700;letter-spacing:.12em}
+.checker-showcase .checker-google-options button.is-selected{background:var(--red);color:#fff}
+.checker-showcase .checker-paper-zone.is-dragover{outline:3px dashed var(--red);outline-offset:-8px}
+.checker-showcase .checker-live-status{font-size:13px;line-height:1.5;color:var(--red);min-height:1.4em;margin:10px 0 0}
+.checker-showcase .checker-paper-glyphs>div{border-right:1px solid var(--line)}
+.checker-showcase .checker-paper-glyphs>div:last-child{border-right:0}
