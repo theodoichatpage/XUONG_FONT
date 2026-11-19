@@ -18,7 +18,7 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     zone.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();picker.click();}});
     for(const type of ['dragenter','dragover'])zone.addEventListener(type,event=>{event.preventDefault();zone.classList.add('is-dragover');});
     zone.addEventListener('dragleave',event=>{event.preventDefault();zone.classList.remove('is-dragover');});
-    zone.addEventListener('drop',event=>{event.preventDefault();zone.classList.remove('is-dragover');loadFiles(event.dataTransfer.files);});
+    zone.addEventListener('drop',event=>{event.preventDefault();event.stopPropagation();zone.classList.remove('is-dragover');loadFiles(event.dataTransfer.files);});
     const popular=['Be Vietnam Pro','Montserrat','Inter','Playfair Display','Roboto','Lora','Oswald','Bebas Neue','Pacifico','Poppins'];
     const search=root.querySelector('[data-role=google-search]');
     const options=root.querySelector('[data-role=google-options]');
@@ -36,6 +36,8 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     search.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();checkGoogleFont(search.value.trim());}});
     root.querySelector('.checker-google-link').addEventListener('click',event=>{event.preventDefault();search.focus();search.scrollIntoView({block:'center',behavior:'smooth'});});
     updateOptions();
+    search.value='Be Vietnam Pro';updateOptions();
+    queueMicrotask(()=>checkGoogleFont('Be Vietnam Pro'));
   }
   let browserRequest=0;
   const browserChars=vietnameseCheckCharacters;
@@ -220,6 +222,6 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
   });
   function files(records){return [...records].map(file=>({name:file.name.replace(/\.(ttf|otf|woff2?)$/i,''),filename:file.name,blob:file}));}
   $('files')?.addEventListener('change',async event=>{const records=files(event.target.files);event.target.value='';if(records.length)await run(records);});
-  if(standalone){root.addEventListener('dragover',event=>{event.preventDefault();root.classList.add('drag-over');});root.addEventListener('dragleave',()=>root.classList.remove('drag-over'));root.addEventListener('drop',async event=>{event.preventDefault();event.stopPropagation();root.classList.remove('drag-over');if(event.dataTransfer.files.length)await run(files(event.dataTransfer.files));});}
+  if(standalone){root.addEventListener('dragover',event=>{event.preventDefault();root.classList.add('drag-over');});root.addEventListener('dragleave',()=>root.classList.remove('drag-over'));root.addEventListener('drop',event=>{event.preventDefault();event.stopPropagation();root.classList.remove('drag-over');if(event.target.closest('[data-role=dropzone]'))return;if(event.dataTransfer.files.length)checkUploadedFont(event.dataTransfer.files[0]);});}
   return {run,setResults(value){results=value;$('font').replaceChildren();results.forEach((r,i)=>{const o=document.createElement('option');o.value=i;o.textContent=r.record.name;$('font').append(o);});render();},getResult:selected};
 }
