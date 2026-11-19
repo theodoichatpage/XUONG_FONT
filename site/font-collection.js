@@ -298,13 +298,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   function renderFamilies(revealSelected = false, focusKey) {
     const rows = groups.flatMap(group => expandedFamilies.has(group.key)
       ? [{ group }, ...group.members.map(record => ({ group, record }))] : [{ group }]);
-    const pageSize = 12;
-    const pages = Math.max(1, Math.ceil(rows.length / pageSize));
-    const selectedRow = rows.findIndex(row => row.record?.id === selectedId && row.record);
-    if (revealSelected && selectedRow >= 0) page = Math.floor(selectedRow / pageSize);
-    page = Math.min(page, pages - 1);
+    // All families and styles live in one vertically scrollable list.
+    // No pagination: newly expanded families remain in the same scroll area.
     fonts.replaceChildren();
-    for (const { group, record } of rows.slice(page * pageSize, (page + 1) * pageSize)) {
+    for (const { group, record } of rows) {
       const button = document.createElement('button');
       button.type = 'button';
       if (record) {
@@ -332,9 +329,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       fonts.append(button);
       if (!record && focusKey === group.key) button.focus();
     }
-    $('collection-page').textContent = (page + 1) + ' / ' + pages;
-    previousPage.disabled = page === 0;
-    nextPage.disabled = page + 1 >= pages;
+    // Legacy paging controls are no longer needed.
+    previousPage.hidden = true;
+    nextPage.hidden = true;
+    $('collection-page').hidden = true;
   }
 
   previousPage.addEventListener('click', () => { page--; renderFamilies(); });
