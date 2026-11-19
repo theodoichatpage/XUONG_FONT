@@ -1531,7 +1531,7 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
       status('Hãy mở font vào trình chỉnh sửa rồi đánh giá lại trước khi sửa.');
       return;
     }
-    const threshold = Number(document.querySelector('#editor-font-check [data-role="gap"]')?.value) || 16;
+    const threshold = 16; // Fixed conservative review threshold; automatic proposals never edit outlines until approval.
     const proposals = [];
     const skipped = [];
     for (const finding of candidates) {
