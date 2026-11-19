@@ -1,5 +1,5 @@
 export const repairDecisionSchema = {
-  type: 'OBJECT', properties: { decisions: { type: 'ARRAY', maxItems: 12, items: {
+  type: 'OBJECT', properties: { decisions: { type: 'ARRAY', items: {
     type: 'OBJECT', properties: { char: { type: 'STRING' }, action: { type: 'STRING', enum: ['approve', 'skip'] }, reason: { type: 'STRING' } }, required: ['char', 'action', 'reason']
   } } }, required: ['decisions']
 };

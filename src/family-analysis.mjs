@@ -1,11 +1,16 @@
+// Schema giữ thật gọn: Gemini từ chối schema có giới hạn độ dài mảng lồng nhau hoặc mô tả dài
+// ("too many states for serving"). Giới hạn số lượng và hướng dẫn chi tiết nằm trong lời nhắc
+// hệ thống; validateFamilyAnalysis cắt và kiểm lại kết quả.
+const region={type:'ARRAY',items:{type:'OBJECT',properties:{text:{type:'STRING'},box:{type:'ARRAY',items:{type:'INTEGER'}}},required:['text','box']}};
 export const analysisSchema={type:'OBJECT',properties:{
-  style:{type:'STRING',description:'One of ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold, Black; append Italic when supported. Empty string if uncertain.'},
+  style:{type:'STRING'},
   confidence:{type:'NUMBER'},basis:{type:'STRING',enum:['label','visual','uncertain']},evidence:{type:'STRING'},
   quality:{type:'STRING',enum:['clear','needs-review','needs-better-image']},
-  profile:{type:'OBJECT',properties:Object.fromEntries(['serif','contrast','terminals','stress','proportion','capHeight','xHeight','ascender','descender','slant','spacing','diacritics'].map(k=>[k,{type:'STRING',description:'Observed evidence only; empty string when not measurable.'}]))},
-  words:{type:'ARRAY',maxItems:70,items:{type:'OBJECT',properties:{text:{type:'STRING'},box:{type:'ARRAY',minItems:4,maxItems:4,items:{type:'INTEGER'}}},required:['text','box']}}
+  profile:{type:'OBJECT',properties:Object.fromEntries(['serif','contrast','terminals','stress','proportion','capHeight','xHeight','ascender','descender','slant','spacing','diacritics'].map(k=>[k,{type:'STRING'}]))},
+  words:region,
+  lines:region
 },required:['style','confidence','basis','evidence','profile','words']};
-analysisSchema.properties.lines={...analysisSchema.properties.words,maxItems:30,description:'Every visible text line in reading order, exact transcription and full line bounding box [top,left,bottom,right], including all accents and descenders.'};
+export const analysisSchemaGuide='Output fields: style is one of ExtraLight, Light, Regular, Medium, SemiBold, Bold, ExtraBold, Black, optionally followed by " Italic", or an empty string if uncertain. confidence is 0..1. Each profile field holds observed evidence only, empty string when not measurable. words: at most 70 regions; lines: at most 30, every visible text line in reading order with exact transcription including all accents and descenders. Every box is exactly four integers [top,left,bottom,right] normalized 0..1000.';
 const names=['ExtraLight','Light','Regular','Medium','SemiBold','Bold','ExtraBold','Black'];
 export function validateFamilyAnalysis(value){
   if(!value||typeof value.style!=='string'||!['',...names,...names.map(n=>n+' Italic')].includes(value.style)||!Number.isFinite(value.confidence)||value.confidence<0||value.confidence>1||!['label','visual','uncertain'].includes(value.basis)||typeof value.evidence!=='string'||value.evidence.length>1000||!Array.isArray(value.words)||!value.profile)throw Error('AI phân loại không hợp lệ.');
