@@ -241,7 +241,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
         const layout=layouts?.[index],digest=await digestReference(file),entry=project.images.find(i=>i.digest===digest);
         if(!entry)continue;
         // Ô nội dung để trống (ví dụ sau khi tải lại trang) thì giữ nội dung đã gõ trước đó cho đúng ảnh này.
-        const text=layout?.text?.trim();if(text){entry.layoutText=text;entry.layoutStyle=layout.style||'Regular';}
+        const text=layout?.text?.trim();if(text){entry.layoutText=text;entry.layoutStyle=input.style||layout.style||'Regular';}   // kiểu ghi trong tên bộ font (vd. ...Medium) thắng ô kiểu mặc định
         currentIds.add(entry.id);
       }
       flowImages=currentIds;

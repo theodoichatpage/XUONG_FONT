@@ -1680,12 +1680,28 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
   getCurrentInput:currentFamilyInput,
   onProgress:message=>{status(message);reportDesign(message);},
   onResult:async(project,style)=>{
-    $('name').value=project.name+(style.id==='Regular'?'':' '+style.id);
     const indices=new Map();for(const [index,entry]of references.entries())indices.set(await digestReference(entry.file),index);
-    glyphs=new ProtectedGlyphMap(style.glyphs.map(g=>{
-      const image=project.images.find(i=>i.id===g.sourceImageId),index=image?indices.get(image.digest):undefined;
-      return [g.char,{...g,...(index!=null?{reference:{index,crop:g.pixelCrop}}:{})}];
-    }));
+    const withReference=g=>{const image=project.images.find(i=>i.id===g.sourceImageId),index=image?indices.get(image.digest):undefined;
+      return {...g,...(index!=null?{reference:{index,crop:g.pixelCrop}}:{})};};
+    // Đang sửa một kiểu của cùng bộ font: chỉ bổ sung chữ từ ảnh vào kiểu đang mở, giữ nguyên tên, độ đậm
+    // và mọi chữ đã có (kể cả chữ mượn, chữ có dấu, ký hiệu đã dựng). Chữ suy luận được thay bằng chữ lấy từ ảnh.
+    const sameFamily=glyphs.size&&importedMetrics?.familyName&&importedMetrics.familyName.trim().toLocaleLowerCase()===project.name.trim().toLocaleLowerCase();
+    if(sameFamily){
+      const added=[],replaced=[];
+      for(const g of style.glyphs){
+        const existing=glyphs.get(g.char),fromImage=g.origin==='direct'||g.source==='Ảnh mẫu';
+        if(!existing){glyphs.set(g.char,withReference(g));added.push(g.char);}
+        else if(fromImage&&existing.origin==='inferred'&&!existing.locked&&!existing.approved){glyphs.set(g.char,withReference(g));replaced.push(g.char);}
+      }
+      selected=added[0]??replaced[0]??selected;auditRepairPending=false;markCandidates=[];refresh();
+      const message='Đã thêm '+added.length+' chữ từ ảnh vào '+($('name').value.trim()||project.name)+(added.length?': '+added.join(' '):'')
+        +(replaced.length?'. Thay '+replaced.length+' chữ dựng tạm bằng chữ từ ảnh: '+replaced.join(' '):'')
+        +'. Giữ nguyên các chữ đã có; nhớ bấm Lưu font đang làm trong Bộ sưu tập để cập nhật.';
+      setTimeout(()=>{status(message);reportDesign(message);},0);
+      return;
+    }
+    $('name').value=project.name+(style.id==='Regular'?'':' '+style.id);
+    glyphs=new ProtectedGlyphMap(style.glyphs.map(g=>[g.char,withReference(g)]));
     importedMetrics={familyName:project.name,styleName:style.name,weight:style.weight,italic:style.italic,angle:style.metrics?.angle??0,
       ascent:ASCENT,descent:DESCENT,kerning:style.metrics?.kerning??[],wordSpace:style.metrics?.wordSpace??300,sourceProjectId:project.id};
     loadedSourceBlob=undefined;selected=glyphs.has('i')?'i':style.glyphs[0]?.char;
