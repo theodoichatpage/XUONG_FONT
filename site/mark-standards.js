@@ -18,6 +18,9 @@ export const MARK_STANDARDS = {
   // Râu: độ vươn phải / độ rộng chữ gốc; độ cao đầu râu trên đỉnh thân / x-height.
   horn: { reach: { o: .09, u: .27, O: .11, U: .25 }, tip: { o: .18, u: .18, O: .12, U: .25 } },
   // Chồng dấu (ấ, Ẩ...): đỉnh cả cụm / em. Font chuyên nghiệp cho dấu hoa chồng chạm gần 1000.
+  // Độ tương phản nét (o: nét ngang mảnh / nét đứng dày) và độ thon sắc/huyền (đầu mảnh / đầu dày) theo nhóm.
+  contrast: { monoline: [.9, 1], sans: [.67, .87], highContrast: [.2, .35] },
+  acuteTaper: { monoline: [.99, 1], sans: [.71, .90], highContrast: [.32, .44] },
   stackTop: { lower: [.85, .81, .89], cap: [.98, .96, 1] },
 };
 // Tỷ lệ giữa độ dày bút (tham số strokeAlong/polygon) và bề dày đo 2A/P của dấu ngắn hai đầu bằng.

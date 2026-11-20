@@ -69,6 +69,33 @@ Font đậm có dấu nhẹ hơn thân, font mảnh có dấu gần bằng thân
 
 Không dùng một tỷ lệ cố định với nét thân (ví dụ 0,82): như vậy dấu font Black sẽ quá nặng và dấu font Thin quá mảnh hoặc bị chặn sàn quá dày.
 
+## Nét đều hay nét thanh-đậm
+
+Phân tích trước khi dựng dấu. **Độ tương phản** = nét ngang mảnh nhất ở đỉnh/đáy chữ o (đo dọc ở giữa) chia nét đứng dày nhất hai bên (đo ngang ở giữa).
+
+| Nhóm | Độ tương phản | Ví dụ |
+| --- | --- | --- |
+| Nét đều (monoline) | 0.9–1.0 | Courier New 0.98, Poppins |
+| Sans thường | 0.67–0.87 | Segoe UI 0.82, Arial 0.80, Verdana 0.83 |
+| Thanh-đậm (serif có tương phản) | 0.2–0.35 | Times 0.33, Times Bold 0.23, Palatino 0.32 |
+
+Dấu đi theo nét chữ:
+
+| Đặc điểm dấu | Nét đều | Sans thường | Thanh-đậm |
+| --- | --- | --- | --- |
+| Sắc/huyền: bề ngang đầu mảnh / đầu dày (đo ở 15% và 85% chiều cao) | 0.99–1.0 | 0.71–0.90 | 0.32–0.44 |
+| Mũ: chân trái / chân phải | 1.0 | 0.94–1.04 | 0.78 (Times), 1.0 (Palatino) |
+| Ngã: hai đầu so với giữa (đo dọc) | 1.05–1.1 | 1.1–1.7 (đầu xiên nên đo dọc dày) | 0.54–0.74 (đầu mảnh) |
+
+Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0.1 (giới hạn 0.2–1); tương phản dưới 0.5 thì chân trái mũ 0.78, hai đầu ngã 0.5 bề dày giữa, đầu móc hỏi thon. Nét đều thì dấu gần như không thon. Không áp một độ thon cố định cho mọi font: font nét đều sẽ có dấu nhọn lạc kiểu, font thanh-đậm có dấu cứng và nặng.
+
+## Nguồn hình cho dấu
+
+- **Dấu font đã có:** dùng trước. Chữ hoa dùng dấu hoa tách từ Á, À, Ã... của chính font, không đặt dấu chữ thường lên chữ hoa.
+- **Chữ hai dấu (Ộ, Ấ, ặ...):** nếu font đã có Ô, Â, Ê, Ă, Ơ, Ư do nhà thiết kế vẽ, dùng làm gốc và chỉ thêm dấu thanh. Không vẽ lại mũ/trăng/râu.
+- **Dấu nặng:** dấu chấm thật của font → chấm chữ i → dấu chấm do Xưởng tự dựng → chấm tròn. Dấu chấm tự dựng có thể chỉ là hình thay thế (ví dụ ô vuông), nên không dùng làm mẫu khi font đã có chấm i.
+- **Dấu font chưa có:** dựng theo các số trong trang này, từ nét của chính font.
+
 ## Chồng hai dấu
 
 Ở ấ, ầ, ẩ, nhiều font đặt dấu thanh lệch sang cạnh mũ (sắc lệch phải, huyền lệch trái, hỏi lệch phải ít hơn), còn ngã nằm thẳng trên mũ. Ở ắ, ằ, ẳ, ẵ, dấu thanh nằm giữa trên trăng. Xưởng hiện chồng thẳng mọi dấu và thu nhỏ khi vượt chiều cao; skill cho phép cả hai cách (xem quy tắc thiết kế, mục 1), nhưng cách lệch cạnh thấp hơn và giống các font chuyên nghiệp hơn.

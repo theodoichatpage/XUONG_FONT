@@ -19,11 +19,18 @@ const upper = { '́': 'ó', '̀': 'ò', '̉': 'ỏ', '̃': 'õ', '̂': 'ô', '̆
 const upperCap = { '́': 'Ó', '̀': 'Ò', '̉': 'Ỏ', '̃': 'Õ', '̂': 'Ô', '̆': 'Ă', '̣': 'Ọ' };
 const names = { '́': 'sac', '̀': 'huyen', '̉': 'hoi', '̃': 'nga', '̂': 'mu', '̆': 'trang', '̣': 'nang' };
 
+// Độ tương phản nét của o: nét ngang mảnh nhất (đo dọc ở giữa) / nét đứng dày nhất (đo ngang ở giữa).
+function contrastOf(o) {
+  const b = M.boxOf(o), v = x => { const ys = []; for (const c of o) for (let i = 0; i < c.length; i++) { const [ax, ay] = c[i], [bx, by] = c[(i + 1) % c.length]; if ((ax <= x) !== (bx <= x)) ys.push(ay + (x - ax) / (bx - ax) * (by - ay)); } ys.sort((p, q) => p - q); const s = []; for (let i = 0; i + 1 < ys.length; i += 2) s.push(ys[i + 1] - ys[i]); return s; };
+  let thin = Infinity, thick = 0;
+  for (let k = -3; k <= 3; k++) { const s = v((b.x0 + b.x1) / 2 + k * b.w * .02); if (s.length >= 2) thin = Math.min(thin, ...s); const h = M.spans(o, b.y0 + b.h / 2 + k * b.h * .02).map(([a, c]) => c - a); if (h.length >= 2) thick = Math.max(thick, ...h); }
+  return thin / thick;
+}
 function measureFont(font) {
   const l = font.get('l'), x = font.get('x'), H = font.get('H'), dot = font.get('.');
   if (!l || !x || !H) return null;
   const stem = M.stemWidth(l), xH = M.boxOf(x).y1, capH = M.boxOf(H).y1, period = M.boxOf(dot);
-  const out = { font: font.name, weight: font.weight, stem: +stem.toFixed(1), xH: Math.round(xH), capH: Math.round(capH),
+  const out = { font: font.name, contrast: +contrastOf(font.get('o')).toFixed(2), weight: font.weight, stem: +stem.toFixed(1), xH: Math.round(xH), capH: Math.round(capH),
     periodSize: +(Math.max(period.w, period.h) / stem).toFixed(2) };
   for (const [table, tag] of [[upper, ''], [upperCap, 'Cap']]) {
     for (const [mark, ch] of Object.entries(table)) {
@@ -39,6 +46,10 @@ function measureFont(font) {
         gap: (mark === '̣' ? bb.y0 - mb.y1 : mb.y0 - bb.y1) / xH,   // khoảng hở / x-height
         dx: ((mb.x0 + mb.x1) / 2 - (bb.x0 + bb.x1) / 2) / bb.w,      // lệch tâm ngang / độ rộng nguyên âm
       };
+      if (mark === '́' || mark === '̀') {                              // độ thon: bề ngang ở 15% / ở 85% chiều cao
+        const at = f => { const s = M.spans(extra, mb.y0 + mb.h * f).map(([a, c]) => c - a); return s.length ? Math.max(...s) : NaN; };
+        r.taper = mark === '́' ? at(.15) / at(.85) : at(.15) / at(.85);
+      }
       if (mark === '̣') r.size = Math.max(mb.w, mb.h) / stem;        // cỡ dấu nặng / nét thân
       if (mark === '̣') r.vsPeriod = Math.max(mb.w, mb.h) / Math.max(period.w, period.h);
       out[names[mark] + tag] = Object.fromEntries(Object.entries(r).map(([k, v]) => [k, +v.toFixed(3)]));

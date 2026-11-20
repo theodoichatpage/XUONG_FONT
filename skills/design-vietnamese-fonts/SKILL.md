@@ -5,7 +5,7 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 
 # Thiết kế font Việt cho Xưởng Font
 
-Đọc [quy tắc thiết kế](references/design-rules.md) trước khi sửa hình chữ. Dùng [chuẩn đo dấu](references/mark-standards.md) khi cần số cụ thể: cỡ, độ dày, khoảng hở, nặng, râu theo từng loại font. Đọc [luồng Xưởng Font](references/xuong-font-workflow.md) để nối thao tác với ứng dụng. Dùng [bộ thử](references/proof-corpus.md) khi kiểm tra kết quả. Đọc [kiểm tra bộ chữ](references/checking-coverage.md) khi phân tích font mới hoặc font thành phẩm.
+Đọc [quy tắc thiết kế](references/design-rules.md) trước khi sửa hình chữ. Dùng [chuẩn đo dấu](references/mark-standards.md) khi cần số cụ thể: cỡ, độ dày, khoảng hở, nặng, râu theo từng loại font. Trước khi dựng dấu, phân loại font nét đều, sans thường hay thanh-đậm bằng độ tương phản nét; dấu phải theo đúng loại đó. Đọc [luồng Xưởng Font](references/xuong-font-workflow.md) để nối thao tác với ứng dụng. Dùng [bộ thử](references/proof-corpus.md) khi kiểm tra kết quả. Đọc [kiểm tra bộ chữ](references/checking-coverage.md) khi phân tích font mới hoặc font thành phẩm.
 
 ## Xác định đầu vào
 

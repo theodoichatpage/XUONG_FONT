@@ -10,7 +10,7 @@ const rows = compare(files);
 assert(rows.length >= 6, 'không đo được đủ font');
 const med = v => { v = [...v].sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
 // Trung vị dựng/gốc của từng chỉ số phải nằm trong 0.85–1.15; từng font không lệch quá giới hạn riêng.
-const limits = { h: [.6, 1.6], w: [.55, 1.6], t: [.6, 1.8], size: [.6, 1.6] };
+const limits = { h: [.6, 1.6], w: [.55, 1.6], t: [.6, 1.8], size: [.6, 1.6], taper: [.6, 1.6] };
 const marks = ['sac', 'huyen', 'hoi', 'nga', 'mu', 'trang', 'nang'];
 const fails = [];
 for (const mark of marks) for (const tag of ['', 'Cap']) for (const metric of [...Object.keys(limits), 'gap']) {

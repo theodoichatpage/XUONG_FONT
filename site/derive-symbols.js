@@ -37,7 +37,8 @@ function measure(glyphs) {
     if (parts.length >= 2 && parts[0].box.height < (glyphBounds(i).height) * .35) dot = parts[0].d;
   }
   if (!dot && glyphs.get('.')?.d) dot = glyphs.get('.').d;
-  if (!dot) dot = rect(0, 0, stem * 1.1, stem * 1.1);
+  // Không có chấm i hay dấu chấm: chấm tròn cỡ 1,4 nét thân (trung vị dấu chấm của 20 font đã Việt hóa).
+  if (!dot) { const r = .7 * stem; dot = polygon(Array.from({ length: 32 }, (_, k) => [r + r * Math.cos(k * Math.PI / 16), r + r * Math.sin(k * Math.PI / 16)])); }
   const dotBox = glyphBounds({ d: dot });
   return { stem, capTop, xTop, direction, dot, dotBox, bar: .82 * stem, sb: Math.max(40, Math.round(.45 * stem)) };
 }
