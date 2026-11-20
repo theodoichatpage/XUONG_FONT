@@ -5,11 +5,12 @@ import { familyStyles } from './family-styles.js';
 import { setupFamilyWorkspace } from './family-workspace.js';
 import { createFontCheckPanel } from './font-check-panel.js';
 import { reviewMarkRepairs } from './ai-mark-repair.js';
-import { adjustGlyphMarks } from './mark-spacing.js';
+import { adjustGlyphMarks, autoFixMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { borrowMissing } from './borrow-glyphs.js';
+import { deriveSymbols } from './derive-symbols.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -1098,6 +1099,9 @@ $('derive-marks').addEventListener('click', () => {
   for (const glyph of barred) next.set(glyph.char, glyph);
   const generated = composeVietnamese(next);
   for (const glyph of generated) next.set(glyph.char, glyph);
+  // Dấu câu, ký hiệu còn trống: dựng từ nét chữ (chỉ điền ô trống).
+  const symbols = deriveSymbols(next);
+  for (const glyph of symbols) next.set(glyph.char, glyph);
   glyphs = new ProtectedGlyphMap(next);
   refresh();
   // Tự kiểm quy tắc dấu của skill ngay sau khi ghép.
@@ -1110,6 +1114,7 @@ $('derive-marks').addEventListener('click', () => {
   const message = `Đã dựng ${madeMarks.length} dấu mẫu theo độ dày nét ${Math.round(stem)} đơn vị`
     + (barred.length ? `, ${barred.map(glyph => glyph.char).join(' ')}` : '')
     + ` và ghép ${generated.length} chữ có dấu.` + ruleReport
+    + (symbols.length ? ` Dựng thêm ${symbols.length} dấu câu, ký hiệu còn thiếu: ${symbols.map(g => g.char).join(' ')}.` : '')
     + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.';
   status(message);
   reportDesign(message);
@@ -1344,11 +1349,41 @@ function previewMarkSpacing() {
     + (!markCandidates.length ? ' Hãy chọn chữ có dấu hoặc đổi phạm vi.' : ' Xem trước tối đa 6 chữ; chỉ thay đổi khi bấm Áp dụng.');
   $('apply-mark-spacing').disabled = !markCandidates.length || (gap === 0 && scale === 1);
 }
+// Bấm Chỉnh dấu: tự chỉnh theo quy tắc dấu trong skill trước, thanh trượt chỉ để tinh chỉnh thêm nếu muốn.
+// Chỉ chỉnh chữ ghép/suy luận; chữ lấy từ ảnh giữ nguyên nét gốc.
+function autoFixAllMarks() {
+  const changed = [], counts = { gap: 0, fit: 0, side: 0 };
+  let kept = 0, real = 0;
+  for (const [char, glyph] of glyphs) {
+    const parts = [...char.normalize('NFD')];
+    if (parts.length < 2 || !parts.slice(1).some(mark => mark !== '̛')) continue;
+    if (glyph.locked || glyph.origin === 'direct' || ['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyph.source)) { real++; continue; }
+    const baseChar = parts.includes('̛') ? (parts[0] + '̛').normalize('NFC') : parts[0];
+    const result = autoFixMarks(glyph, glyphs.get(baseChar));
+    if (!result) continue;
+    if (!result.changes.length) { kept++; continue; }
+    for (const change of result.changes) counts[change]++;
+    changed.push({ char, before: glyph, after: result.glyph });
+  }
+  for (const { char, after } of changed) glyphs.set(char, after);
+  if (changed.length) { lastMarkChange = changed; $('undo-mark-spacing').disabled = false; repairRecheckPending = true; refresh(); }
+  const message = 'Đã tự chỉnh dấu theo quy tắc trong skill: ' + changed.length + ' chữ được chỉnh'
+    + (counts.gap ? ', ' + counts.gap + ' chữ đưa khoảng hở dấu về chuẩn (chữ thường 28, chữ hoa 22, dấu nặng 28)' : '')
+    + (counts.fit ? ', ' + counts.fit + ' chữ thu dấu cho vừa chiều cao dòng' : '')
+    + (counts.side ? ', ' + counts.side + ' chữ nới lề vì dấu tràn sang chữ bên cạnh' : '')
+    + '. ' + kept + ' chữ đã đạt sẵn.' + (real ? ' Giữ nguyên ' + real + ' chữ lấy từ ảnh.' : '')
+    + (changed.length ? ' Bấm Hoàn tác chỉnh dấu nếu muốn quay lại. Thanh trượt bên dưới chỉ dùng khi bạn muốn chỉnh thêm.' : '');
+  status(message); reportDesign(message);
+  return message;
+}
+
 $('open-mark-spacing').addEventListener('click', () => {
   auditRepairPending=false;
+  const autoMessage = autoFixAllMarks();
   $('mark-spacing-tools').hidden = false;
   $('mark-spacing-scope').value = selected && [...selected.normalize('NFD')].length > 1 ? 'selected' : 'all';
   previewMarkSpacing();
+  $('mark-spacing-report').textContent = autoMessage;
   $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
 });
 $('close-mark-spacing').addEventListener('click', () => { auditRepairPending=false; markCandidates=[]; $('mark-spacing-tools').hidden = true; });

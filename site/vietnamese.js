@@ -202,10 +202,10 @@ export function applyCompactLowercaseHorns(glyphs) {
 // Độ dày lấy từ thân chữ l/I của chính bộ font. Kết quả luôn là "suy luận" và cần duyệt.
 
 const round1 = value => Math.round(value * 10) / 10;
-const polygon = points => 'M' + points.map(([x, y]) => round1(x) + ' ' + round1(y)).join(' L') + ' Z';
+export const polygon = points => 'M' + points.map(([x, y]) => round1(x) + ' ' + round1(y)).join(' L') + ' Z';
 
 // Nét dày đều dọc theo một đường tâm, hai đầu bằng.
-function strokeAlong(points, width) {
+export function strokeAlong(points, width) {
   // width: số, hoặc hàm (vị trí 0..1) → độ dày, để nét thon dần như quy tắc skill.
   const at = typeof width === 'function' ? width : () => width;
   const left = [], right = [];
@@ -291,7 +291,7 @@ export function deriveMarkSamples(glyphs) {
 }
 
 // Chiều của contour lớn nhất trong glyph: gạch phải cùng chiều để chỗ chồng lên thân được tô, không bị khoét.
-function outerDirection(d) {
+export function outerDirection(d) {
   let best = 0, contour = [];
   const close = () => {
     let area = 0;
@@ -362,7 +362,7 @@ function rightEdgeAt(d, y) {
 }
 
 // Đảo chiều đa giác dấu nếu ngược chiều contour ngoài của thân, để phần chồng lên thân được tô liền.
-function sameDirection(markD, bodyD) {
+export function sameDirection(markD, bodyD) {
   if (outerDirection(markD) === outerDirection(bodyD)) return markD;
   const points = svgpath(markD).abs().segments.filter(([c]) => c === 'M' || c === 'L').map(([, x, y]) => [x, y]);
   return polygon(points.reverse());

@@ -1,6 +1,7 @@
 import {parseFamilyInput,resolveNamedStyle,readableStyle,digestReference} from './family-inputs.js';
 import {familyStyles} from './family-styles.js';
-import {charset,composeVietnamese} from './vietnamese.js';
+import {charset,composeVietnamese,deriveMarkSamples,deriveBarredD,toneSamples} from './vietnamese.js';
+import {deriveSymbols} from './derive-symbols.js';
 import {createFamilyProject,saveFamilyProject,listFamilyProjects,loadFamilyProject,replaceProjectGlyph,styleStatus,backupFamilyProject,restoreFamilyProject} from './family-project.js';
 import {redrawFontImage} from './ai-design.js';
 import {referenceCanvas,isCleanReference} from './reference-image.js';
@@ -198,7 +199,16 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     if(g.placement){replacement.placement={...g.placement,sourceY:replacement.pixelCrop.y};const {placeReferenceAt}=await import('./reference-placement.js');Object.assign(replacement,placeReferenceAt(replacement,g.placement));}
     replaceProjectGlyph(style,replacement);await persist('Đã vector hóa lại '+g.char);render();await showProof();
   });
-  $('compose').onclick=()=>run(async()=>{const style=activeStyle(),map=new Map(style.glyphs.map(g=>[g.char,g]));let count=0;for(const g of [...reuseReferenceComponents(map),...composeVietnamese(map,()=>false,{requireReferenceMarks:true})])if(!map.has(g.char)){replaceProjectGlyph(style,{...g,origin:'inferred',source:'Ghép dấu suy luận',styleId,weight:style.weight});count++;}await persist('Đã ghép '+count+' glyph từ contour có mẫu; đánh dấu suy luận. Còn thiếu thành phần thì giữ trống, không thay glyph đã có');render();});
+  $('compose').onclick=()=>run(async()=>{const style=activeStyle(),map=new Map(style.glyphs.map(g=>[g.char,g]));let count=0;const fromImage=[...reuseReferenceComponents(map),...composeVietnamese(map,()=>false,{requireReferenceMarks:true})];
+    for(const g of fromImage)if(!map.has(g.char)){replaceProjectGlyph(style,{...g,origin:'inferred',source:'Ghép dấu suy luận',styleId,weight:style.weight});map.set(g.char,g);count++;}
+    // Chưa có dấu mẫu từ ảnh: dựng dấu, Đ/đ và dấu câu/ký hiệu từ nét chữ đã có theo quy tắc skill (chỉ điền ô trống).
+    if(![...toneSamples.keys()].some(mark=>map.get(mark)?.d)&&['A','E','O','a','e','o'].some(c=>map.get(c)?.d)){
+      const {marks,stem}=deriveMarkSamples(map),work=new Map([...map,...marks]);
+      for(const g of deriveBarredD(work,stem))if(!work.has(g.char))work.set(g.char,g);
+      for(const g of composeVietnamese(work))if(!map.has(g.char))work.set(g.char,g);
+      for(const g of deriveSymbols(work))work.set(g.char,g);
+      for(const [char,g]of work)if(!map.has(char)&&!marks.has(char)){replaceProjectGlyph(style,{...g,origin:'inferred',source:g.source||'Dựng từ nét chữ',styleId,weight:style.weight});map.set(char,g);count++;}
+    }await persist('Đã bổ sung '+count+' glyph còn thiếu (chữ có dấu, Đ/đ, dấu câu và ký hiệu dựng từ nét chữ theo quy tắc skill); đánh dấu suy luận, không thay glyph lấy từ ảnh');render();});
   $('export').onclick=()=>run(async()=>{const style=activeStyle(),{blob,report}=await makeFont(style);download(blob,project.name+'-'+style.name+'-DRAFT.ttf');say('Đã xuất bản nháp '+style.name+' · '+report.coverage.counts.present+'/146 chữ Việt. Chưa đánh dấu hoàn thiện.');});
   $('collection').onclick=()=>run(async()=>{const style=activeStyle(),{blob}=await makeFont(style);await saveCollection({name:project.name+' '+style.name,family:project.name,style:style.id,weight:style.weight,italic:style.italic,filename:fileName(project.name+'-'+style.name+'.ttf'),blob,draft:styleStatus(style)!=='Hoàn thiện',projectId:project.id});say('Đã lưu file Style vào Bộ sưu tập; dự án Family vẫn giữ đầy đủ ảnh và glyph.');});
   $('export-family').onclick=()=>run(async()=>{const styles=project.styles.filter(s=>styleStatus(s)==='Hoàn thiện');if(!styles.length)throw Error('Chưa có Style hoàn thiện. Có thể xuất riêng TTF bản nháp để thử.');for(const style of styles){const {blob}=await makeFont(style);download(blob,project.name+'-'+style.name+'.ttf');}say('Đã xuất '+styles.length+' Style hoàn thiện; các vị trí khác giữ bản nháp.');});
