@@ -268,13 +268,23 @@ export function deriveMarkSamples(glyphs) {
     return [-waveW / 2 + waveW * i / 48, amplitude * Math.sin(phase)];
   }), s => tildeT * (.86 + .14 * Math.sin(Math.PI * s))));
 
-  // Hỏi: móc gọn và một chân ngắn.
-  const hookT = .78 * t, radius = .9 * hookT, foot = .55 * hookT, center = foot + radius;
-  const hook = Array.from({ length: 21 }, (_, i) => {
-    const a = Math.PI * (1.05 - 1.55 * i / 20);
-    return [Math.cos(a) * radius, center + Math.sin(a) * radius];
+  // Hỏi: móc gọn, lòng mở, khác dấu chấm hỏi (skill). Đầu móc thon, cung tròn đều, cuối cung uốn mềm về giữa
+  // rồi thành chân ngắn thẳng đứng, đầu chân cắt ngang. Nét nhẹ hơn thân chữ.
+  const hookT = .55 * t, hookR = .55 * t, hookTail = .38 * t, hookBendDrop = .25 * hookR;
+  const hookC = 1.16 * hookR + hookBendDrop + hookTail;
+  const hookArc = Array.from({ length: 25 }, (_, i) => {
+    const a = Math.PI * (160 - 220 * i / 24) / 180;
+    return [Math.cos(a) * hookR, hookC + Math.sin(a) * hookR];
   });
-  add('̉', strokeAlong([...hook, [0, 0]], hookT));
+  // Từ cuối cung (đang đi xuống trái) uốn bằng Bézier bậc hai: điểm điều khiển trên trục giữa, kết thúc ngay dưới nó
+  // nên tiếp tuyến liền ở cả hai đầu; sau đó là chân thẳng đứng.
+  const [ex, ey] = hookArc.at(-1), control = [0, hookC - 1.16 * hookR], foot = [0, hookTail];
+  const hookBend = Array.from({ length: 8 }, (_, i) => {
+    const s = (i + 1) / 8, q = 1 - s;
+    return [q * q * ex + 2 * q * s * control[0] + s * s * foot[0], q * q * ey + 2 * q * s * control[1] + s * s * foot[1]];
+  });
+  const hookPath = [...hookArc, ...hookBend, [0, 0]];
+  add('̉', strokeAlong(hookPath, s => hookT * (.72 + .28 * Math.min(1, s * 3))));
 
   // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
   const period = glyphs.get('.');

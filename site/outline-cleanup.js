@@ -127,7 +127,9 @@ function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRou
   // Nét sạch: mọi điểm gãy hướng > 15° là góc thật (như hai đầu cắt của dấu trăng), giữ nguyên.
   const kinkList=P.filter((q,i)=>{const a=unit(sub(q,P[(i-1+n)%n])),b=unit(sub(P[(i+1)%n],q));return dot(a,b)<Math.cos(.26);});
   // Răng cưa thưa (bước vài chục đơn vị) không lộ trên cửa sổ hẹp nhưng tạo rất nhiều điểm gãy: vẫn là nét dò ảnh.
-  const noisy=noisyFine||kinkList.length>Math.max(12,arcLength(P)/80),kinks=noisy?[]:kinkList;
+  const noisy=noisyFine||kinkList.length>Math.max(12,arcLength(P)/80),kinks=noisy||sharpenRounded?[]:kinkList;   // chữ dò ảnh: điểm gãy là đoạn nối của bước dò, không khóa
+  // Nét sạch không phải dò từ ảnh (dấu, ký hiệu Xưởng dựng; font vẽ sẵn): không có gì để nắn, giữ nguyên đường gốc.
+  if(!noisy&&!sharpenRounded&&!givenRuns)return {keep:true,lines:0,corners:0};
   const minPts=Math.ceil(36/step),longPts=Math.ceil(110/step),cornerPts=Math.ceil(2*cornerRadius/step);
   const edgeTol=noisy?straightTol:Math.min(straightTol,.75);   // nét sạch không có nhiễu: cạnh thẳng phải thẳng thật
   const straight=(i,j)=>{const line=lineFit(P.slice(i,j+1));return line.max<=edgeTol&&bow((noisy?S:P).slice(i,j+1),line)<=(line.max>1.5?Math.max(1,.15*straightTol):Math.max(.3,.5*line.max));};   // nét sạch: cung nhẹ không bị coi là cạnh thẳng
@@ -147,14 +149,17 @@ function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRou
     const [i0,j0]=runs[k],[i1,j1]=runs[k+1],a=lineFit(P.slice(i0,j0+1)),b=lineFit(P.slice(i1,j1+1));
     if(dot(a.d,b.d)>Math.cos(.25)&&arcLength(P.slice(j0,i1+1))<60&&straight(i0,j1)){runs.splice(k,2,[i0,j1]);}else k++;
   }
-  const curveK=Math.max(1,Math.round((6*level+6)/step)),Sm=smoothClosed(P,curveK);
+  // Nét dò ảnh gồm nhiều đoạn gãy dài: làm mịn phần cong theo độ dài đoạn gãy thật, không theo cửa sổ cố định.
+  const kinkAt=P.map((q,i)=>i).filter(i=>{const a=unit(sub(P[i],P[(i-1+n)%n])),b=unit(sub(P[(i+1)%n],P[i]));return dot(a,b)<Math.cos(.12);});
+  const spans=kinkAt.map((i,k)=>((kinkAt[(k+1)%kinkAt.length]-i+n)%n||n)*step).sort((a,b)=>a-b),facet=spans.length>3?spans[Math.floor(spans.length/2)]:0;
+  const curveK=Math.max(1,Math.round(Math.max(6*level+6,noisy||sharpenRounded?Math.min(.6*facet,45):0)/step)),Sm=smoothClosed(P,curveK);
   // Góc gốc chỉ được khóa khi outline sạch; trên nét dò ảnh còn răng cưa, các "góc" đó chỉ là nhiễu.
-  if(!runs.length)return {segments:smoothCurveOnly(noisy?Sm:P,level,curveTol,noisy?[]:[...protectedPoints,...kinks]),lines:0,corners:0};
+  if(!runs.length)return {segments:smoothCurveOnly(noisy||sharpenRounded?Sm:P,level,curveTol,noisy||sharpenRounded?[]:[...protectedPoints,...kinks]),lines:0,corners:0};
   const lines=runs.map(([i,j])=>{const trim=Math.floor((j-i)*.15),line=lineFit(P.slice(i+trim,j-trim+1));return {i,j,line,a:projectOn(line,P[i]),b:projectOn(line,P[j])};});
   const gaps=lines.map((A,k)=>{const B=lines[(k+1)%lines.length],end=k+1<lines.length?B.i:B.i+n;const pts=[];for(let i=A.j;i<=end;i++)pts.push(P[i%n]);return {A,B,pts,corner:false};});
   for(const g of gaps){
     const angle=Math.acos(Math.max(-1,Math.min(1,dot(g.A.line.d,g.B.line.d))));
-    if(angle<.21||arcLength(g.pts)>2.5*cornerRadius)continue;
+    if(angle<.5||arcLength(g.pts)>2.5*cornerRadius)continue;   // chỗ nối các đoạn gãy trên đường cong (dưới ~29°) không phải góc thật
     // Outline sạch (cạnh thẳng tuyệt đối, như font vẽ sẵn): góc bo ở đó là cố ý, giữ nguyên; chỉ nối góc khi nét gốc đã nhọn.
     // Cạnh còn răng cưa (dò từ ảnh): chỗ bo là do dò ảnh, dựng lại góc nhọn.
     g.clean=!sharpenRounded&&g.A.line.max<.5&&g.B.line.max<.5;
@@ -211,7 +216,17 @@ export function cleanOutline(glyph,{tolerance=1.5}={}){
   // Chữ dò từ ảnh (và chữ mượn, ghép dấu dựa trên chữ dò ảnh): góc bo là do dò ảnh, dựng lại góc nhọn.
   // Font vẽ sẵn và dấu/ký hiệu Xưởng tự dựng: góc bo là cố ý, giữ nguyên.
   const sharpenRounded=fromImage(glyph);
-  for(const [index,p] of original.entries()){const r=straightenContour(p,tolerance,undefined,undefined,protectedPoints[index]||[],sharpenRounded);result.push(r.segments);lines+=r.lines;corners+=r.corners;}
+  // Đường gốc của từng contour (tọa độ tuyệt đối) để giữ nguyên phần không cần nắn.
+  const originalParts=[];for(const seg of svgpath(glyph.d).abs().unshort().unarc().segments){if(seg[0]==='M')originalParts.push([]);originalParts.at(-1)?.push(seg[0]==='z'?['Z']:seg);}
+  const allY=original.flat().map(q=>q[1]),glyphHeight=Math.max(...allY)-Math.min(...allY);
+  const boxes=original.map(p=>{const xs=p.map(q=>q[0]),ys=p.map(q=>q[1]);return {x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)};});
+  const main=boxes.reduce((m,b)=>(b.x1-b.x0)*(b.y1-b.y0)>(m.x1-m.x0)*(m.y1-m.y0)?b:m,boxes[0]);
+  for(const [index,p] of original.entries()){
+    // Phần nhỏ (dấu, chấm, móc) trong chữ ghép dấu là nét Xưởng dựng: không áp cách nắn của chữ dò ảnh.
+    const b=boxes[index],apart=b.y0>=main.y1||b.y1<=main.y0;   // dấu trên/dưới, chấm chữ i: tách hẳn khỏi thân chính
+    const small=original.length>1&&b!==main&&(apart||Math.max(b.x1-b.x0,b.y1-b.y0)<.4*glyphHeight);
+    const r=straightenContour(p,tolerance,undefined,undefined,protectedPoints[index]||[],sharpenRounded&&!small);
+    if(r.keep){result.push(originalParts[index]);continue;}result.push(r.segments);lines+=r.lines;corners+=r.corners;}
   const d=serialize(result),after=sampleOutline(d,.12);let maxDeviation=0,areaBefore=0,areaAfter=0;
   // Giới hạn: cạnh lệch tối đa bằng độ gồ ghề cho phép cộng bán kính bo được làm nhọn lại.
   const limit=2.5*tolerance+2+3*(10*tolerance+10)+2;

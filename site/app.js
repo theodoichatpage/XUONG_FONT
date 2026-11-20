@@ -336,7 +336,8 @@ const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,prepareGlyph:
   const state={glyphs:[...glyphs.values()].map(g=>g===previous?next:g),name:$('name').value,sample:$('sample').value,spacing:$('spacing').value,importedMetrics};
   const priorState=localStorage.getItem(storageKey);
   localStorage.setItem(storageKey,JSON.stringify(state));
-  try{await familyWorkspace.saveOutlineEdit(previous,next,importedMetrics);}catch(error){if(priorState==null)localStorage.removeItem(storageKey);else localStorage.setItem(storageKey,priorState);throw error;}
+  // Bản trong dự án Family khác bản đang mở (ví dụ vừa Tạo dấu tiếng Việt): không ghi đè Family, nhưng vẫn lưu chữ đã nắn trong bộ chữ đang mở.
+  try{await familyWorkspace.saveOutlineEdit(previous,next,importedMetrics);}catch{/* giữ thay đổi trong bộ chữ đang mở */}
   glyphs.set(next.char,next);reviewGlyph=next;refresh();
   const width=Math.max(1,next.advance),svg=`<svg xmlns="http://www.w3.org/2000/svg" width="270" height="320" viewBox="-30 -1025 ${width+60} 1290"><rect x="-30" y="-1025" width="${width+60}" height="1290" fill="#fffaf1"/><path transform="scale(1 -1)" d="${next.d}" fill="#592f29"/></svg>`;
   viewerImage.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
@@ -1729,17 +1730,20 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
 // Nắn thẳng hàng loạt: mọi chữ chưa khóa, chưa duyệt. Mỗi chữ giữ bản trước để Hoàn tác riêng trong khung xem chữ,
 // hoặc Hoàn tác cả lượt bằng một nút.
 let lastStraighten;
+let familyNotSynced = 0;
 async function saveStraightened(previous, next) {
+  if (glyphs.get(previous.char) !== previous || previous.locked) return false;
   glyphs.set(next.char, next);
-  try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); return true; }
-  catch { glyphs.set(previous.char, previous); return false; }
+  // Family có bản khác bản đang mở: không ghi đè Family, chữ trong bộ chữ đang mở vẫn được nắn.
+  try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { familyNotSynced++; }
+  return true;
 }
 $('straighten-all').addEventListener('click', async () => {
   if (busy || loading) return;
   const button = $('straighten-all'); button.disabled = true;
   const level = Number($('outline-cleanup-level').value) || 1.5, time = new Date().toISOString();
   const done = [], held = [], failed = [], changes = [];
-  let already = 0;
+  let already = 0; familyNotSynced = 0;
   let styles = [];
   try { styles = await familyWorkspace.projectStyles({ ...importedMetrics, requireMatch: true }); } catch { /* không có Family: chỉ nắn trên outline */ }
   try {
@@ -1766,6 +1770,7 @@ $('straighten-all').addEventListener('click', async () => {
   status('Đã nắn thẳng ' + done.length + ' chữ (mức ' + $('outline-cleanup-level').selectedOptions[0].textContent.split(' —')[0] + ').'
     + (already ? ' Bỏ qua ' + already + ' chữ đã nắn trước đó.' : '')
     + (held.length ? ' Giữ nguyên ' + held.length + ' chữ đã khóa hoặc đã duyệt.' : '')
+    + (familyNotSynced ? ' ' + familyNotSynced + ' chữ khác bản trong dự án Family nên chỉ lưu trong bộ chữ đang mở (Family giữ nguyên).' : '')
     + (failed.length ? ' Không nắn được ' + failed.length + ' chữ vì lệch quá giới hạn an toàn: ' + failed.join(' ') + '.' : '')
     + ' Chữ nào chưa ưng: mở chữ đó, bấm Nắn thẳng và làm mượt outline rồi Hoàn tác nắn outline. Hoặc bấm Hoàn tác nắn hàng loạt để trả lại tất cả.');
 });
