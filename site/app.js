@@ -93,7 +93,8 @@ try {
     }
     importedMetrics = saved.importedMetrics;
     $('name').value = saved.name;
-    $('sample').value = saved.sample;
+    const previousDefaults=['Đường về quê hương đẹp tựa bức tranh thủy mặc, gió thổi nhẹ qua hàng tre xanh.','HÀO KHÍ LAM SƠN','Sử Việt Kiêu Hùng · Tiếng Việt 123','Tiếng Việt · Trường học · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ'];
+    $('sample').value = typeof saved.sample==='string'&&!previousDefaults.includes(saved.sample.trim())?saved.sample:$('sample').defaultValue;
     if (saved.spacing != null) $('spacing').value = saved.spacing;
     // Never overwrite the only saved project during restoration: keep its original payload for recovery.
     if (glyphs.size < saved.glyphs.length) status('Một số glyph đã bị lọc khi khôi phục. Bản lưu gốc được giữ nguyên; hãy mở Bộ sưu tập Font hoặc nhập lại TTF đã xuất.');
@@ -1326,7 +1327,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}) };
   loadedSourceBlob = record.blob;
   $('name').value = (record.name + (editOnly ? '' : ' Việt hóa')).slice(0, 40);
-  $('sample').value = 'Tiếng Việt · Trường học · Nguyễn Hữu Đạt · ă â ê ô ơ ư đ';
+  $('sample').value = $('sample').defaultValue;
   $('spacing').value = 0;
   refresh();
   const added = missingBefore.filter(char => glyphs.has(char));
