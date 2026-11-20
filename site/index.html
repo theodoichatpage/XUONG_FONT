@@ -98,7 +98,7 @@
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="glyph-toolbar">
         <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
-        <div class="tool-row"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
+        <div class="tool-row"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
         <div class="selection-row">
           <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
           <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
@@ -193,6 +193,7 @@
           <button id="collection-family-quality" type="button">Đánh giá family</button>
           <button id="collection-edit" type="button">Mở để chỉnh sửa</button>
           <button id="collection-vietnamize" type="button">Việt hóa</button>
+          <button id="collection-dedupe" type="button" hidden>Giữ mục này, xóa mục trùng tên</button>
           <button id="collection-remove" type="button" class="quiet">Xóa font</button>
         </div>
       </form>

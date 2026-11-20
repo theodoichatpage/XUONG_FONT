@@ -1,4 +1,5 @@
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
+import {cleanOutline} from './outline-cleanup.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { digestReference, readableStyle } from './family-inputs.js';
@@ -1724,6 +1725,59 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
     familyEditorToken=crypto.randomUUID();importedMetrics.familyEditorToken=familyEditorToken;refresh();
   },
   saveCollection: record=>fontCollection.storeProjectStyle(record)
+});
+// Nắn thẳng hàng loạt: mọi chữ chưa khóa, chưa duyệt. Mỗi chữ giữ bản trước để Hoàn tác riêng trong khung xem chữ,
+// hoặc Hoàn tác cả lượt bằng một nút.
+let lastStraighten;
+async function saveStraightened(previous, next) {
+  glyphs.set(next.char, next);
+  try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); return true; }
+  catch { glyphs.set(previous.char, previous); return false; }
+}
+$('straighten-all').addEventListener('click', async () => {
+  if (busy || loading) return;
+  const button = $('straighten-all'); button.disabled = true;
+  const level = Number($('outline-cleanup-level').value) || 1.5, time = new Date().toISOString();
+  const done = [], held = [], failed = [], changes = [];
+  let already = 0;
+  let styles = [];
+  try { styles = await familyWorkspace.projectStyles({ ...importedMetrics, requireMatch: true }); } catch { /* không có Family: chỉ nắn trên outline */ }
+  try {
+    const list = [...glyphs.values()].filter(g => g?.d && !toneSamples.has(g.char));
+    for (const [index, glyph] of list.entries()) {
+      if (index % 8 === 0) { status('Đang nắn ' + (index + 1) + '/' + list.length + '…'); await new Promise(r => setTimeout(r, 0)); }
+      if (glyph.locked || glyph.approved) { held.push(glyph.char); continue; }
+      if (glyph.outlineCleanup) { already++; continue; }   // đã nắn: không nắn chồng để Hoàn tác vẫn về nét gốc
+      try {
+        const source = glyph.borrowedFrom && glyph.borrowedJoin !== 'miter-v1'
+          ? restoreBorrowedCorners(glyph, glyph.borrowedOriginal ? [] : styles) || glyph : glyph;
+        const result = cleanOutline(source, { tolerance: level });
+        if (result.d === glyph.d) continue;
+        const { outlineUndo, ...snapshot } = glyph;
+        const next = { ...glyph, ...source, d: result.d, outlineUndo: snapshot, outlineCleanup: { ...result.stats, time, batch: true },
+          version: (glyph.version || 0) + 1, approved: false, proof: undefined, identityVersion: undefined, pixelOutline: undefined };
+        if (await saveStraightened(glyph, next)) { done.push(glyph.char); changes.push([glyph, next]); } else failed.push(glyph.char);
+      } catch { failed.push(glyph.char); }
+    }
+  } finally { button.disabled = false; }
+  if (changes.length) lastStraighten = changes;   // lượt không đổi gì thì vẫn giữ được Hoàn tác lượt trước
+  $('straighten-undo').hidden = !lastStraighten?.length;
+  save(); refresh();
+  status('Đã nắn thẳng ' + done.length + ' chữ (mức ' + $('outline-cleanup-level').selectedOptions[0].textContent.split(' —')[0] + ').'
+    + (already ? ' Bỏ qua ' + already + ' chữ đã nắn trước đó.' : '')
+    + (held.length ? ' Giữ nguyên ' + held.length + ' chữ đã khóa hoặc đã duyệt.' : '')
+    + (failed.length ? ' Không nắn được ' + failed.length + ' chữ vì lệch quá giới hạn an toàn: ' + failed.join(' ') + '.' : '')
+    + ' Chữ nào chưa ưng: mở chữ đó, bấm Nắn thẳng và làm mượt outline rồi Hoàn tác nắn outline. Hoặc bấm Hoàn tác nắn hàng loạt để trả lại tất cả.');
+});
+$('straighten-undo').addEventListener('click', async () => {
+  if (busy || loading || !lastStraighten?.length) return;
+  let restored = 0, changed = 0;
+  for (const [previous, next] of lastStraighten) {
+    if (glyphs.get(next.char) !== next) { changed++; continue; }   // chữ đã sửa tiếp sau lượt nắn: không ghi đè
+    if (await saveStraightened(next, { ...previous, version: (next.version || 0) + 1 })) restored++; else changed++;
+  }
+  lastStraighten = undefined; $('straighten-undo').hidden = true; save(); refresh();
+  status('Đã hoàn tác nắn thẳng cho ' + restored + ' chữ.' + (changed ? ' ' + changed + ' chữ đã được sửa tiếp sau đó nên giữ nguyên.' : ''));
 });
 $('review-source-glyph').addEventListener('click',()=>void familyWorkspace.reviewGlyph(selected,importedMetrics));
 $('open-image-family').addEventListener('click',()=>{$('open-font-workspace').click();familyWorkspace.open();});
