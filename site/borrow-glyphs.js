@@ -36,14 +36,14 @@ function toPolygons(d) {
 
 const holes = polygons => polygons.filter(p => !ClipperLib.Clipper.Orientation(p)).length;
 
-// Làm dày (amount > 0) hoặc mỏng nét đều mọi phía, giữ góc tròn. Trả null nếu lòng chữ bị bít hoặc nét đứt.
+// Làm dày (amount > 0) hoặc mỏng nét đều mọi phía, giữ mối nối góc (không bo góc sắc). Trả null nếu lòng chữ bị bít hoặc nét đứt.
 export function adjustWeight(glyph, amount) {
   if (!amount) return { ...glyph };
   const polygons = toPolygons(glyph.d);
   const largest = polygons.reduce((best, p) => Math.abs(ClipperLib.Clipper.Area(p)) > Math.abs(ClipperLib.Clipper.Area(best)) ? p : best, []);
   if (largest.length && !ClipperLib.Clipper.Orientation(largest)) polygons.forEach(p => p.reverse());
-  const offset = new ClipperLib.ClipperOffset(2, .5);
-  offset.AddPaths(polygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+  const offset = new ClipperLib.ClipperOffset(16, .5);
+  offset.AddPaths(polygons, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
   const result = new ClipperLib.Paths();
   offset.Execute(result, amount * SCALE);
   if (!result.length || result.length !== polygons.length || holes(result) !== holes(polygons)) return null;
@@ -76,10 +76,21 @@ export function borrowMissing({ styles, target, weight, italic, chars }) {
       const adjusted = adjustWeight(source, shift);
       if (!adjusted) { rejected.push(char); break; }
       added.push({ ...adjusted, char, origin: 'inferred', source: 'Mượn từ ' + style.name, borrowedFrom: style.name,
-        weightShift: Math.round(shift * 10) / 10, approved: false, locked: false, proof: undefined, sourceImageId: undefined,
+        weightShift: Math.round(shift * 10) / 10, borrowedJoin:'miter-v1', borrowedOriginal:{d:source.d,advance:source.advance}, approved: false, locked: false, proof: undefined, sourceImageId: undefined,
         pixelCrop: undefined, pixelOutline: undefined, reference: undefined, version: undefined, history: [] });
       break;
     }
   }
   return { added, rejected, donors: donors.map(style => style.name) };
+}
+
+// Reconstruct a legacy round-offset draft from its actual donor; never sharpen
+// a deliberately rounded glyph by inventing a corner from a screenshot.
+export function restoreBorrowedCorners(glyph,styles=[]){
+  if(!glyph?.borrowedFrom||glyph.borrowedJoin==='miter-v1')return null;
+  if(glyph.locked)throw Error('Chữ đã khóa; chưa khôi phục góc.');
+  const source=glyph.borrowedOriginal||styles.find(s=>s.name===glyph.borrowedFrom)?.glyphs.find(g=>g.char===glyph.char);
+  if(!source?.d||!Number.isFinite(glyph.weightShift))return null;
+  const fixed=adjustWeight(source,glyph.weightShift);if(!fixed)throw Error('Không khôi phục được góc mà vẫn giữ lòng chữ; chưa thay nét cũ.');
+  return {...glyph,d:fixed.d,advance:glyph.advance,borrowedJoin:'miter-v1',borrowedOriginal:{d:source.d,advance:source.advance}};
 }

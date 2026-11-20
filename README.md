@@ -72,3 +72,9 @@ Bấm một glyph có nét để mở cửa sổ ký tự, chọn **Nắn thẳn
 Công cụ chạy cục bộ, không dùng Gemini. Nó khớp đoạn thẳng/đường Bézier theo biên hiện có, giữ contour và chiều advance, có chặn lệch biên/diện tích và giao nhau mới. Ngưỡng là heuristic của Xưởng, không phải tiêu chuẩn thiết kế font. Không thay O bằng ellipse hoặc tự nắn font đã duyệt hàng loạt. Sau sửa, trạng thái duyệt và kết quả đối chiếu cũ bị xóa để kiểm lại.
 
 Kiểm tra: `npm run check:outline`. Xem `reports/outline-cleanup-2026-11-20.md` về kiểm hình học, TTF và giới hạn kiểm giao diện.
+
+#### Bảo vệ góc và sửa glyph mượn cũ
+
+`adjustWeight` ở bước mượn glyph dùng miter join thay round join; outline gốc được lưu cùng nguồn. Khi mở Nắn thẳng, glyph mượn cũ chưa được gắn miter-v1 có thể được phục hồi từ donor còn có trong Family, rồi mới khớp đường. Bản sửa vẫn cần Áp dụng và có Hoàn tác. Không có donor thì chỉ giữ góc hiện tại, không tự đoán góc từ ảnh chụp.
+
+Các điểm góc thật của contour được thêm làm điểm khóa trước khớp Bézier. Truy vết ảnh không còn dùng turdsize 2 / alphamax 1 ở chế độ mượt; dùng ngưỡng góc bảo thủ và không bỏ nét nhỏ. Kiểm thử: `npm run check:corners`, gồm ảnh BEBAS người dùng gửi và ca hồi quy round-offset → miter-offset. Xem `reports/sharp-corners-2026-11-20.md`.

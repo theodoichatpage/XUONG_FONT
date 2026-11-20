@@ -10,7 +10,7 @@ import { adjustGlyphMarks, autoFixMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
 import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
-import { borrowMissing } from './borrow-glyphs.js';
+import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
@@ -330,7 +330,7 @@ let reviewRequest;
 let reviewVersion = 0;
 let retraceSource;
 let retraceCandidate;
-const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,commit:async(previous,next)=>{
+const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,prepareGlyph:async glyph=>glyph.borrowedFrom&&glyph.borrowedJoin!=='miter-v1'?(restoreBorrowedCorners(glyph,glyph.borrowedOriginal?[]:await familyWorkspace.projectStyles({...importedMetrics,requireMatch:true}))||glyph):glyph,commit:async(previous,next)=>{
   if(previous.locked||glyphs.get(previous.char)!==previous)throw Error('Chữ đã khóa hoặc đã đổi. Đóng rồi mở lại ký tự để chỉnh.');
   const state={glyphs:[...glyphs.values()].map(g=>g===previous?next:g),name:$('name').value,sample:$('sample').value,spacing:$('spacing').value,importedMetrics};
   const priorState=localStorage.getItem(storageKey);

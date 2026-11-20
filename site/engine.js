@@ -172,7 +172,7 @@ async function traceCrop(img, scale, photograph, preserveOutline, smooth = false
   await traceReady;
   // smooth: tham số chuẩn của Potrace. Góc thật vẫn giữ là góc, đường cong được gộp cho trơn.
   const svg = await potrace(img, smooth ? {
-    turdsize: 2, alphamax: 1, opticurve: 1, opttolerance: 0.2 * scale, extractcolors: false,
+    turdsize: 0, alphamax: .35, opticurve: 1, opttolerance: 0.05 * scale, extractcolors: false,
   } : {
     turdsize: 0,
     alphamax: preserveOutline ? .35 : photograph ? 0.88 : 0.86,

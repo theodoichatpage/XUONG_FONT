@@ -40,11 +40,24 @@ export function sampleOutline(d,error=.15){
 const area=p=>p.reduce((a,b,i)=>{const c=p[(i+1)%p.length];return a+b[0]*c[1]-b[1]*c[0];},0)/2;
 function walk(p,i,direction,length){let j=i,travel=0;do{const k=(j+direction+p.length)%p.length;travel+=dist(p[j],p[k]);j=k;}while(travel<length&&j!==i);return j;}
 function tangent(p,i,window){return unit(sub(p[walk(p,i,1,window)],p[walk(p,i,-1,window)]));}
-function anchors(p,window){
+function hardCorners(d){
+  const parts=[];let edges,start,current;
+  const end=s=>s.slice(-2),nonzero=(list)=>list.find(v=>Math.hypot(...v)>1e-6)||[0,0];
+  for(const s of svgpath(d).abs().unshort().unarc().segments){
+    if(s[0]==='M'){edges=[];parts.push(edges);start=current=end(s);continue;}
+    const to=s[0]==='Z'?start:s[0]==='H'?[s[1],current[1]]:s[0]==='V'?[current[0],s[1]]:end(s);
+    if(dist(to,current)<1e-8&&s[0]==='Z')continue;
+    const controls=s[0]==='C'?[s.slice(1,3),s.slice(3,5)]:s[0]==='Q'?[s.slice(1,3)]:[];
+    edges.push({point:current,begin:nonzero([...controls,to].map(p=>sub(p,current))),end:nonzero([...controls.slice().reverse(),current].map(p=>sub(to,p)))});current=to;
+  }
+  return parts.map(edges=>edges.filter((e,i)=>{const before=edges[(i+edges.length-1)%edges.length];return Math.hypot(...before.end)>=4&&Math.hypot(...e.begin)>=4&&dot(unit(before.end),unit(e.begin))<Math.cos(Math.PI/6);}).map(e=>e.point));
+}
+function anchors(p,window,protectedPoints=[]){
   const candidates=[];
   for(let i=0;i<p.length;i++){const a=p[walk(p,i,-1,window)],b=p[i],c=p[walk(p,i,1,window)];const score=1-dot(unit(sub(b,a)),unit(sub(c,b)));if(score>.24)candidates.push({i,score});}
+  for(const point of protectedPoints){let i=0;for(let j=1;j<p.length;j++)if(dist(p[j],point)<dist(p[i],point))i=j;candidates.push({i,score:Infinity,protected:true});}
   candidates.sort((a,b)=>b.score-a.score);const chosen=[];
-  for(const c of candidates)if(!chosen.some(x=>{let d=0,j=x.i;while(j!==c.i&&d<window){const k=(j+1)%p.length;d+=dist(p[j],p[k]);j=k;}let e=0;j=c.i;while(j!==x.i&&e<window){const k=(j+1)%p.length;e+=dist(p[j],p[k]);j=k;}return Math.min(d,e)<window;}))chosen.push({...c,corner:true});
+  for(const c of candidates)if(c.protected?!chosen.some(x=>x.i===c.i):!chosen.some(x=>{let d=0,j=x.i;while(j!==c.i&&d<window){const k=(j+1)%p.length;d+=dist(p[j],p[k]);j=k;}let e=0;j=c.i;while(j!==x.i&&e<window){const k=(j+1)%p.length;e+=dist(p[j],p[k]);j=k;}return Math.min(d,e)<window;}))chosen.push({...c,corner:true});
   // Extrema bound closed smooth loops without replacing them by ellipses.
   if(chosen.length<2){for(const [axis,sign]of [[0,1],[0,-1],[1,1],[1,-1]]){let i=0;for(let j=1;j<p.length;j++)if(sign*p[j][axis]>sign*p[i][axis])i=j;if(!chosen.some(c=>c.i===i))chosen.push({i,corner:false});}}
   return chosen.sort((a,b)=>a.i-b.i);
@@ -73,9 +86,9 @@ function intersections(a,b,same){let count=0;for(let i=0;i<a.length;i++)for(let 
 export function cleanOutline(glyph,{tolerance=1.5}={}){
   if(glyph?.locked)throw Error('Chữ đã khóa. Hãy chủ động mở khóa trước khi chỉnh outline.');
   if(!glyph?.d||!Number.isFinite(tolerance)||tolerance<.25||tolerance>3)throw Error('Mức chỉnh outline không hợp lệ.');
-  const original=sampleOutline(glyph.d,Math.min(.15,tolerance/8)),result=[];
-  for(const p of original){
-    const nodes=anchors(p,Math.max(8,tolerance*6)),segments=[['M',...p[nodes[0].i]]];
+  const original=sampleOutline(glyph.d,Math.min(.15,tolerance/8)),protectedPoints=hardCorners(glyph.d),result=[];let cornerCount=0;
+  for(const [index,p] of original.entries()){
+    const nodes=anchors(p,Math.max(8,tolerance*6),protectedPoints[index]);cornerCount+=nodes.filter(n=>n.corner).length;const segments=[['M',...p[nodes[0].i]]];
     for(let k=0;k<nodes.length;k++){
       const a=nodes[k],b=nodes[(k+1)%nodes.length],points=[p[a.i]];let i=a.i;do{i=(i+1)%p.length;points.push(p[i]);}while(i!==b.i);
       const reach=Math.min(Math.max(12,tolerance*8),points.reduce((n,x,j)=>n+(j?dist(x,points[j-1]):0),0)/3);
@@ -93,5 +106,5 @@ export function cleanOutline(glyph,{tolerance=1.5}={}){
     for(let j=0;j<i;j++)if(intersections(b,after[j],false)>intersections(a,original[j],false))throw Error('Outline mới làm các contour giao nhau; giữ nguyên nét gốc.');
   }
   if(maxDeviation>tolerance+.2||Math.abs(areaAfter-areaBefore)>Math.max(1,Math.abs(areaBefore)*.02))throw Error('Mức chỉnh làm lệch nét quá giới hạn; hãy giảm mức chỉnh. Chưa thay nét gốc.');
-  return {d,stats:{tolerance,maxDeviation,areaChange:areaBefore?(areaAfter-areaBefore)/areaBefore:0,contours:original.length,before:svgpath(glyph.d).segments.length,after:svgpath(d).segments.length}};
+  return {d,stats:{tolerance,protectedCorners:cornerCount,exactSourceCorners:protectedPoints.reduce((n,p)=>n+p.length,0),maxDeviation,areaChange:areaBefore?(areaAfter-areaBefore)/areaBefore:0,contours:original.length,before:svgpath(glyph.d).segments.length,after:svgpath(d).segments.length}};
 }
