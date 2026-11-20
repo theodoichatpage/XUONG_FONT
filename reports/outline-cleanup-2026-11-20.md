@@ -32,3 +32,15 @@ Build, check:family và check:quality đã qua. Không có thay đổi schema In
 Không chứng nhận giữ tuyệt đối mọi chi tiết hay chữa mọi outline. Chỗ quá sát, ký tự nhỏ hoặc biên phức tạp có thể bị từ chối; cần chọn Nhẹ hoặc giữ nguyên. Nét trên ảnh chụp chưa có file SVG/TTF để kiểm lại chính hai chữ đó.
 
 Không thực hiện kiểm thử giao diện bằng trình duyệt trong môi trường này: Chromium không khởi chạy vì socket bị từ chối. DOM adapter không thay thế kiểm bố cục và tương tác trình duyệt thực. Không gọi Gemini hay thay đổi kết nối API ở bản này.
+
+## Cập nhật: nắn thẳng và dựng lại góc nhọn
+
+Bản đầu chỉ cho dịch nét 0.75–3 đơn vị nên không xóa được gồ ghề do dò ảnh và không sửa được góc đã bị bo. Bản này:
+
+- Tìm các đoạn gần thẳng (lệch ≤ 2.5×mức+2 đơn vị, không võng có hệ thống) và thay bằng một đường thẳng khớp phần giữa đoạn.
+- Hai cạnh thẳng gặp nhau qua một đoạn bo ngắn (≤ 2.5×(10×mức+10)) được nối tại giao điểm: góc nhọn như chữ in, kể cả đỉnh hẹp của A.
+- Đoạn thẳng ngắn không chạm góc được coi là một phần đường cong; phần cong làm mịn rồi khớp Bézier, nối liền tiếp tuyến với cạnh thẳng kề.
+- Giữ kiểm tra chiều contour, tự cắt, giao nhau, đổi diện tích (≤8% mỗi contour, ≤4% tổng). Lệch lớn nhất cho phép tăng theo bán kính góc được làm nhọn.
+
+`npm run check:outline` thêm mẫu A có góc bo bán kính 16 và gồ ghề ±3 đơn vị: ở cả ba mức đều ra 11 cạnh thẳng, 11 góc nhọn đúng vị trí gốc; O giữ hoàn toàn là đường cong.
+- Outline sạch (cạnh thẳng tuyệt đối, như font vẽ sẵn hoặc glyph mượn đã sửa nối góc miter) giữ nguyên góc bo cố ý và mọi đỉnh gốc; chỉ nét còn răng cưa do dò ảnh mới được dựng lại góc nhọn. Góc gốc khóa theo `hardCorners` chỉ áp dụng khi outline không có răng cưa. `check:corners` và `check:outline` cùng qua.

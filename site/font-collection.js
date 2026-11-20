@@ -90,8 +90,11 @@ async function addFont(record) {
         if (record.generatedFrom != null) store.put({ ...existing, ...record, id: existing.id, digest });
         result = { id: existing.id, duplicate: true };
       } else {
+        const sameName = request.result.find(item => item.name === record.name);
+        // Một tên chỉ có một mục: kiểu do Tạo family sinh ra không chèn thêm mục trùng tên với font bạn đã lưu.
+        if (record.generatedFrom != null && sameName && sameName.generatedFrom == null) { result = { id: sameName.id, duplicate: true, kept: true }; return; }
         const previous = record.generatedFrom != null
-          ? request.result.find(item => item.generatedFrom != null && item.family === record.family && identifyFamilyStyle(item) === identifyFamilyStyle(record))
+          ? sameName || request.result.find(item => item.generatedFrom != null && item.family === record.family && identifyFamilyStyle(item) === identifyFamilyStyle(record))
           : isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
         const add = previous ? store.put({ ...record, digest, id: previous.id }) : store.add({ ...record, digest });
         add.onsuccess = () => { result = { id: add.result, duplicate: false }; };
@@ -221,6 +224,9 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     $('collection-empty').hidden = !!record;
     if (!record) return;
     name.value = record.name;
+    const twins = records.filter(item => item.id !== record.id && item.name === record.name);
+    $('collection-dedupe').hidden = !twins.length;
+    $('collection-dedupe').textContent = 'Giữ mục này, xóa ' + twins.length + ' mục trùng tên';
     renderFamilyMatrix(record);
     preview.textContent = sample.value;
     objectURL = URL.createObjectURL(record.blob);
@@ -308,7 +314,9 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       button.type = 'button';
       if (record) {
         button.className = 'collection-variant';
-        button.textContent = record.name;
+        const twins = group.members.filter(item => item.name === record.name);
+        // Mục trùng tên (lưu từ trước bản sửa): ghi rõ bản nào lưu sau để dễ chọn giữ.
+        button.textContent = record.name + (twins.length > 1 ? (Math.max(...twins.map(item => Number(item.id))) === Number(record.id) ? ' · bản lưu sau' : ' · bản lưu trước') : '');
         button.setAttribute('aria-pressed', String(record.id === selectedId));
         button.addEventListener('click', () => {
           if (working || familyRunning) return;
@@ -386,7 +394,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
           invalid.push(file.name);
           continue;
         }
-        const record = { name: file.name.replace(/\.(ttf|otf)$/i, '').slice(0, 100), filename: file.name, blob: file };
+        let base = file.name.replace(/\.(ttf|otf)$/i, '').slice(0, 94), next = base;
+        const used = new Set((await accessFonts('readonly', store => store.getAll())).map(item => item.name));
+        for (let n = 2; used.has(next); n++) next = base + ' (' + n + ')';   // không tạo hai mục cùng tên
+        const record = { name: next, filename: file.name, blob: file };
         const result = await addFont(record);
         last = result.id;
         if (result.duplicate) duplicates.push(file.name);
@@ -424,6 +435,17 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     status.textContent = duplicate ? 'Trùng font: ' + record.name + ' đã có trong bộ sưu tập.'
       : replaced ? 'Đã cập nhật ' + record.name + ' (lưu đè bản cùng tên, không tạo mục mới).' : 'Đã lưu ' + record.name + '.';
   }));
+
+  $('collection-dedupe').addEventListener('click', () => {
+    const record = records.find(item => item.id === selectedId);
+    const twins = record ? records.filter(item => item.id !== record.id && item.name === record.name) : [];
+    if (working || !twins.length || !window.confirm('Giữ mục đang chọn và xóa ' + twins.length + ' mục khác cùng tên “' + record.name + '” khỏi bộ sưu tập? Không hoàn tác được.')) return;
+    run(async () => {
+      await accessFonts('readwrite', store => twins.map(item => store.delete(item.id)).at(-1));
+      await refresh(record.id);
+      status.textContent = 'Đã xóa ' + twins.length + ' mục trùng tên, giữ mục đang chọn.';
+    });
+  });
 
   $('collection-rename').addEventListener('submit', event => {
     event.preventDefault();
@@ -602,7 +624,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   return {
     async storeProjectStyle(record) {
       const all=await accessFonts('readonly',store=>store.getAll());
-      const existing=all.find(item=>item.projectId===record.projectId&&item.style===record.style);
+      const existing=all.find(item=>item.projectId===record.projectId&&item.style===record.style)||all.filter(item=>item.name===record.name).sort((a,b)=>Number(b.id)-Number(a.id))[0];
       const digest=await fontDigest(record.blob);
       if(existing)await accessFonts('readwrite',store=>store.put({...record,id:existing.id,digest}));
       else await accessFonts('readwrite',store=>store.add({...record,digest}));
