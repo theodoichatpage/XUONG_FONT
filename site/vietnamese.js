@@ -246,13 +246,17 @@ export function deriveMarkSamples(glyphs) {
   const leg = capT / Math.sin(angle), notch = capH - capT / Math.cos(angle), flat = .3 * capT;
   add('̂', polygon([[-half, 0], [-half + leg, 0], [0, notch], [half - leg, 0], [half, 0], [flat, capH], [-flat, capH]]));
 
-  // Trăng: cung cong, trọng lượng dồn ở đáy, hai đầu thon và cắt ngang (không thành góc nhọn).
-  const breveT = .9 * t, breveH = Math.max(80, 1.45 * t), breveHalf = Math.max(100, 1.9 * t);
-  const arc = Array.from({ length: 33 }, (_, i) => {
-    const a = Math.PI * (1 + i / 32);
-    return [Math.cos(a) * (breveHalf - breveT / 2), breveH - breveT * .4 + Math.sin(a) * (breveH - breveT * .9)];
-  });
-  add('̆', strokeAlong(arc, s => breveT * (.72 + .28 * Math.sin(Math.PI * s))));
+  // Trăng: lưỡi liềm giữa hai cung tròn, đáy đậm nhất, hai đầu thon và cắt ngang bằng nhau, đối xứng.
+  // Dùng cung tròn (không phải nửa elip) để mép trong không tự gập thành khấc ở hai đầu.
+  const breveT = .78 * t, breveHalf = Math.max(100, 1.9 * t), breveH = .62 * breveHalf, breveEnd = .45 * breveT;
+  const outerR = (breveHalf ** 2 + breveH ** 2) / (2 * breveH);
+  const innerHalf = breveHalf - breveEnd, innerH = breveH - breveT, innerR = (innerHalf ** 2 + innerH ** 2) / (2 * innerH);
+  const arcPoints = (r, cy, half, steps, reverse) => {
+    const end = Math.asin(Math.min(1, half / r)), list = [];
+    for (let i = 0; i <= steps; i++) { const a = -end + 2 * end * i / steps; list.push([r * Math.sin(a), cy - r * Math.cos(a)]); }
+    return reverse ? list.reverse() : list;
+  };
+  add('̆', polygon([...arcPoints(outerR, outerR, breveHalf, 40, false), ...arcPoints(innerR, breveT + innerR, innerHalf, 40, true)]));
 
   // Ngã: sóng một nhịp mềm. Bán kính cong của đường tâm luôn lớn hơn nửa độ dày nét
   // để mép không tự gập thành răng cưa (skill: giữ nhịp uốn và nét sạch).
