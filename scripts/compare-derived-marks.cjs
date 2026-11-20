@@ -20,7 +20,7 @@ function derivedFont(font) {
   return { name: font.name + ' (dựng)', weight: font.weight, get: ch => next.get(ch)?.d ? M.flatten(next.get(ch).d) : null };
 }
 
-const metrics = ['h', 'w', 't', 'gap', 'size', 'reach', 'tip', 'taper'];
+const metrics = ['h', 'w', 't', 'gap', 'size', 'reach', 'tip', 'taper', 'side', 'bottom', 'top'];
 function compare(files = winFonts.filter(f => fs.existsSync(f))) {
   const rows = [];
   for (const file of files) {

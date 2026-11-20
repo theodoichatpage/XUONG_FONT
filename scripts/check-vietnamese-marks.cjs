@@ -33,5 +33,15 @@ for (const key of ['rau_o.reach', 'rau_u.reach', 'rau_O.reach', 'rau_U.reach', '
   const m = med(rows.map(r => r[key]?.ratio).filter(Number.isFinite));
   if (!(m >= .8 && m <= 1.25)) fails.push(`${key}: trung vị dựng/gốc ${m?.toFixed(2)}`);
 }
+// Hai tầng dấu: vị trí ngang (chênh trung vị ≤ 0.15 bề rộng mũ), đáy dấu thanh (≤ 0.2 chiều cao mũ), đỉnh cụm (trung vị 0.95–1.05).
+for (const ch of ['ấ', 'ầ', 'ẩ', 'ẫ', 'ắ', 'ẳ', 'Ấ', 'Ầ', 'Ẩ', 'Ẫ', 'Ắ', 'Ẳ']) {
+  const pick = m => rows.map(r => r['tier_' + ch + '.' + m]).filter(Boolean);
+  const diff = m => med(pick(m).map(x => x.made - x.pro));
+  if (pick('top').length < 6) { fails.push(`tier_${ch}: không đo được`); continue; }
+  if (Math.abs(diff('side')) > .15) fails.push(`tier_${ch}.side: lệch ${diff('side').toFixed(2)}`);
+  if (Math.abs(diff('bottom')) > .2) fails.push(`tier_${ch}.bottom: lệch ${diff('bottom').toFixed(2)}`);
+  const top = med(pick('top').map(x => x.ratio));
+  if (top < .95 || top > 1.05) fails.push(`tier_${ch}.top: trung vị dựng/gốc ${top.toFixed(2)}`);
+}
 assert.deepEqual(fails, [], 'Dấu dựng lệch chuẩn:\n' + fails.join('\n'));
 console.log(`PASS: dấu dựng khớp dấu gốc của ${rows.length} font (trung vị mọi chỉ số trong 0.85–1.15; từng font trong giới hạn).`);

@@ -96,9 +96,20 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 - **Dấu nặng:** dấu chấm thật của font → chấm chữ i → dấu chấm do Xưởng tự dựng → chấm tròn. Dấu chấm tự dựng có thể chỉ là hình thay thế (ví dụ ô vuông), nên không dùng làm mẫu khi font đã có chấm i.
 - **Dấu font chưa có:** dựng theo các số trong trang này, từ nét của chính font.
 
-## Chồng hai dấu
+## Hai tầng dấu
 
-Ở ấ, ầ, ẩ, nhiều font đặt dấu thanh lệch sang cạnh mũ (sắc lệch phải, huyền lệch trái, hỏi lệch phải ít hơn), còn ngã nằm thẳng trên mũ. Ở ắ, ằ, ẳ, ẵ, dấu thanh nằm giữa trên trăng. Xưởng hiện chồng thẳng mọi dấu và thu nhỏ khi vượt chiều cao; skill cho phép cả hai cách (xem quy tắc thiết kế, mục 1), nhưng cách lệch cạnh thấp hơn và giống các font chuyên nghiệp hơn.
+Đo ở ấ ầ ẩ ẫ ắ ằ ẳ ẵ và chữ hoa trong 20 font. Mũ và trăng **giữ nguyên** vị trí và cỡ như ở â, ă (cả 20 font: không dịch, không thu). Dấu thanh đặt như sau, tính theo bề rộng (cw) và chiều cao (ch) của mũ/trăng:
+
+| Chữ | Vị trí ngang dấu thanh | Đáy dấu thanh | Cỡ so với dấu đứng riêng |
+| --- | --- | --- | --- |
+| ấ, Ấ | mép trái ở tâm mũ + 0.38 cw (lệch phải, tâm +0.68 cw) | 0.62 ch: thấp hơn đỉnh mũ, nằm cạnh mũ | ~0.8 (Ấ 0.75) |
+| ầ, Ầ | đối xứng: mép phải ở tâm − 0.38 cw | 0.62 ch | ~0.8 |
+| ẩ, Ẩ | mép trái ở tâm + 0.32 cw (tâm +0.53 cw) | 0.61 ch | ~1.0 |
+| ẫ, Ẫ | giữa | trên đỉnh mũ, hở 0.06 x-height | ~0.9 |
+| ắ ằ ẵ, Ắ | giữa (sắc lệch phải 0.15 cw) | ngang hai đầu trăng (hở 0–0.03 x-height) | ~0.8 |
+| ẳ, Ẳ | giữa | ngang đầu trăng; Ẳ thấp hơn một chút (0.92 ch) | ~1.0 |
+
+Đỉnh cả cụm: chữ thường 0.81–0.89 em, chữ hoa 0.96–1.0 em. Chồng thẳng dấu thanh lên trên mũ làm cụm hoa cao quá 1 em; đó là lý do các font này đặt dấu thanh lệch cạnh mũ. Khi vẫn vượt, thu dấu thanh (tối đa còn 65%) rồi hạ sát mũ/trăng, không thu mũ.
 
 ## Kiểm bằng máy
 

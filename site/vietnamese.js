@@ -30,6 +30,49 @@ const templates = {
 // Short curved neck and round terminal from the approved uppercase design.
 const compactHorn = 'M0 5 C17 10 31 20 39 34 C25 40 20 49 20 62 C20 80 34 94 52 94 C70 94 84 80 84 62 C84 40 69 26 47 15 L4 0 Z';
 
+// Vị trí dấu thanh ở tầng hai, đo từ 20 font đã Việt hóa (trung vị). Theo bề rộng (cw) và chiều cao (ch) của mũ/trăng:
+// left = mép trái dấu thanh tính từ tâm mũ (mép phải với huyền), bottom = đáy dấu thanh theo chiều cao mũ
+// (1 = ngang đỉnh mũ), lift = hở thêm trên đỉnh theo x-height, scale = cỡ so với dấu đứng một mình.
+const TWO_TIER = {
+  '́': { circumflex: { name: 'sắc bên phải mũ', left: .38, bottom: .62, scale: .8 }, breve: { name: 'sắc trên trăng', center: .15, bottom: 1, lift: .02, scale: .8 } },
+  '̀': { circumflex: { name: 'huyền bên trái mũ', right: -.38, bottom: .62, scale: .8 }, breve: { name: 'huyền trên trăng', center: -.1, bottom: 1, lift: .02, scale: .8 } },
+  '̉': { circumflex: { name: 'hỏi bên phải mũ', left: .32, bottom: .61, scale: 1 }, breve: { name: 'hỏi trên trăng', center: .02, bottom: .95, lift: 0, scale: 1 } },
+  '̃': { circumflex: { name: 'ngã trên mũ', center: 0, bottom: 1, lift: .06, scale: .9 }, breve: { name: 'ngã trên trăng', center: 0, bottom: 1, lift: .04, scale: .9 } },
+};
+
+function contourList(d) {
+  const parts = [];
+  for (const segment of svgpath(d).abs().unshort().unarc().segments) { if (segment[0] === 'M') parts.push([]); parts.at(-1)?.push(segment.join(' ')); }
+  return parts.map(part => part.join(' '));
+}
+// Đặt dấu thanh cạnh/trên mũ hoặc trăng đã có trong chữ (tier = â, Â, ă... đã dựng hoặc của font gốc).
+function placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, body) {
+  const rootBox = glyphBounds(plainRoot), rootTop = rootBox.y + rootBox.height;
+  const markParts = contourList(tier.d).filter(d => { const b = glyphBounds({ d }); return b.y >= rootTop - 8 && b.height < rootBox.height * .6; });
+  if (!markParts.length) return null;
+  const mark = glyphBounds({ d: markParts.join(' ') }), cx = mark.x + mark.width / 2;
+  const rule = TWO_TIER[tone][structural === '̂' ? 'circumflex' : 'breve'];
+  const source = glyphBounds(sample);
+  if (!(source.width > 0 && source.height > 0)) return null;
+  const key = { '́': 'acute', '̀': 'grave', '̉': 'hook', '̃': 'tilde' }[tone];
+  const ownSize = sample.nativeSize || sample.source === 'Font gốc';
+  const standalone = ownSize ? source.height : STD.height[key][0] * body.xHeight * (isCapital ? STD.capHeightRatio : 1);
+  // Đỉnh cả cụm không vượt mức font chuyên nghiệp dùng: chữ hoa 1.0 em, chữ thường 0.9 em.
+  // Vượt thì thu dấu thanh (tối đa còn 65%), rồi hạ dấu sát mũ/trăng hơn (tối đa 25% chiều cao mũ).
+  const limit = 1000 * (isCapital ? STD.stackTop.cap[2] : .9);
+  let y = mark.y + rule.bottom * mark.height + (rule.lift || 0) * body.xHeight;
+  let k = standalone * rule.scale / source.height;
+  if (y + source.height * k > limit) k = Math.max(k * .65, (limit - y) / source.height);
+  if (y + source.height * k > limit) y = Math.max(y - .25 * mark.height, limit - source.height * k);
+  const w = source.width * k;
+  const x = rule.left !== undefined ? cx + rule.left * mark.width
+    : rule.right !== undefined ? cx + rule.right * mark.width - w
+    : cx + rule.center * mark.width - w / 2;
+  const top = Math.max(mark.y + mark.height, y + source.height * k);
+  return { d: tier.d + ' ' + svgpath(sample.d).translate(-source.x, -source.y).scale(k).translate(x, y).round(1).toString(),
+    factor: Math.round(k / (standalone * rule.scale / source.height) * 100) / 100, top: Math.round(top), fits: top <= 1000 };
+}
+
 const isReal = glyph => !!glyph?.d && (glyph.locked || glyph.origin === 'direct' || ['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyph.source));
 
 // Dấu hoa của chính font: tách từ một chữ hoa chỉ mang dấu đó (Á, À, Ã, Ả, Ạ...) có trong font gốc.
@@ -73,7 +116,8 @@ function undotI(glyph) {
 
 export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false, requireReferenceMarks = false } = {}) {
   const result = [];
-  const body = measureBody(glyphs), capMarks = new Map();
+  const body = measureBody(glyphs), capMarks = new Map(), made = new Map();
+  let derivedTwoTier;
   for (const char of accented) {
     if (['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
     const [root, ...marks] = char.normalize('NFD');
@@ -90,6 +134,24 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     if (useHornedSample) marks.splice(marks.indexOf(horn), 1);
     if (useStructured) marks.splice(marks.indexOf(structural), 1);
     if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||sample.source==='Ảnh mẫu'||sample.source==='Font gốc');})) continue;
+    // Hai tầng dấu (ấ ầ ẩ ẫ, ắ ằ ẳ ẵ và chữ hoa): xếp theo cách đo được ở 20 font đã Việt hóa,
+    // giữ nguyên mũ/trăng như ở â/ă, dấu thanh lệch cạnh mũ thay vì chồng thẳng lên trên.
+    const tone = marks.find(mark => TWO_TIER[mark]);
+    if (structural && tone && marks.filter(mark => mark !== structural).length === 1) {
+      const tier = glyphs.get(structuredChar)?.d && (useStructured || !made.has(structuredChar)) ? glyphs.get(structuredChar) : made.get(structuredChar);
+      const plainRoot = glyphs.get(root);
+      const isCapital = root !== root.toLowerCase();
+      const own = glyphs.get(tone)?.d ? glyphs.get(tone) : undefined;
+      const capOwn = isCapital && own?.source === 'Font gốc' ? capitalMark(glyphs, tone, capMarks) : undefined;
+      const sample = capOwn || own || (derivedTwoTier ??= deriveMarkSamples(glyphs).marks).get(tone);
+      const placed = tier?.d && plainRoot?.d && sample?.d ? placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, body) : null;
+      if (placed) {
+        const entry = { char, d: placed.d, advance: tier.advance, source: 'Ghép dấu', origin: 'inferred', approved: false, locked: false, base: structuredChar,
+          markFit: { layout: TWO_TIER[tone][structural === '̂' ? 'circumflex' : 'breve'].name, factor: placed.factor, top: placed.top, fits: placed.fits } };
+        result.push(entry); made.set(char, entry);
+        continue;
+      }
+    }
     let original = glyphs.get(base);
     if (original && base === 'i' && !marks.includes('\u0323')) original = undotI(original);
     if (!original) continue;
@@ -204,9 +266,10 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       }
       fit = { factor: Math.round(factor * 100) / 100, gap: Math.round(gap), top: Math.round(y), fits: y <= 1000 };
     }
-    result.push({ char, d: paths.join(' '), advance, source: 'Ghép dấu', origin:'inferred', approved:false, locked:false, base,
+    const entry = { char, d: paths.join(' '), advance, source: 'Ghép dấu', origin:'inferred', approved:false, locked:false, base,
       ...(fit ? { markFit: fit } : {}),
-      ...(useCompactHorn && char === horned ? { hornStyle: 'compact' } : {}) });
+      ...(useCompactHorn && char === horned ? { hornStyle: 'compact' } : {}) };
+    result.push(entry); made.set(char, entry);
   }
   return result;
 }

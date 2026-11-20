@@ -64,6 +64,15 @@ function measureFont(font) {
     out['rau_' + baseCh] = { reach: +((ab.x1 - bb.x1) / bb.w).toFixed(3), tip: +((ab.y1 - bb.y1) / xH).toFixed(3),
       t: extra.length && M.boxOf(extra).h < .6 * bb.h ? +(M.strokeThickness(extra) / stem).toFixed(3) : null };
   }
+  // Hai tầng dấu: tâm dấu thanh so với tâm mũ/trăng (theo bề rộng mũ), đáy dấu thanh theo chiều cao mũ, đỉnh cả cụm / em.
+  for (const [ch, vowel] of [['ấ', 'a'], ['ầ', 'a'], ['ẩ', 'a'], ['ẫ', 'a'], ['ắ', 'a'], ['ẳ', 'a'], ['Ấ', 'A'], ['Ầ', 'A'], ['Ẩ', 'A'], ['Ẫ', 'A'], ['Ắ', 'A'], ['Ẳ', 'A']]) {
+    const g = font.get(ch), v = font.get(vowel);
+    if (!g || !v) continue;
+    const items = M.extraContours(g, v).map(k => ({ k, b: M.box(k) })).sort((p, q) => p.b.y0 - q.b.y0);
+    if (items.length < 2) continue;
+    const cb = items[0].b, tb = M.boxOf(items.slice(1).map(t => t.k));
+    out['tier_' + ch] = { side: +(((tb.x0 + tb.x1) / 2 - (cb.x0 + cb.x1) / 2) / cb.w).toFixed(3), bottom: +((tb.y0 - cb.y0) / cb.h).toFixed(3), top: +(Math.max(tb.y1, cb.y1) / 1000).toFixed(3) };
+  }
   // Chồng dấu: hỏi trên mũ (ẩ), khoảng hở giữa hai tầng.
   const acirc = font.get('â'), ahoi = font.get('ẩ');
   if (acirc && ahoi) {
