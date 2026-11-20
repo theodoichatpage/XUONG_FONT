@@ -9,3 +9,4 @@ export function deriveAll(glyphs) {
   return { glyphs: next, stem };
 }
 export { toneSamples, measureStem };
+export { importAccentSamples } from '../../site/font-import.js';

@@ -38,10 +38,15 @@ export async function importFontFile(record) {
 export function importAccentSamples(glyphs) {
   for (const mark of toneSamples.keys()) {
     if (glyphs.has(mark)) continue;
-    const donor = [...glyphs.values()].find(glyph => {
+    // Mẫu dấu lấy từ chữ thường Latin do nhà thiết kế vẽ (ã õ ñ ũ...), theo thứ tự cố định; bỏ khối chữ tiếng Việt
+    // U+1EA0–1EF9 vì trong font đã Việt hóa rồi lưu lại, các chữ đó có thể do Xưởng ghép.
+    const rank = glyph => { const root = glyph.char.normalize('NFD')[0], i = 'aoeuiynAOEUIYN'.indexOf(root); return i < 0 ? 99 : i; };
+    const donor = [...glyphs.values()].filter(glyph => {
+      const code = glyph.char.codePointAt(0);
+      if (code >= 0x1EA0 && code <= 0x1EF9) return false;
       const [root, ...marks] = glyph.char.normalize('NFD');
       return marks.length === 1 && marks[0] === mark && glyphs.has(root);
-    });
+    }).sort((a, b) => rank(a) - rank(b) || a.char.codePointAt(0) - b.char.codePointAt(0))[0];
     if (!donor) continue;
     const root = glyphs.get(donor.char.normalize('NFD')[0]);
     const rootBox = glyphBounds(root);

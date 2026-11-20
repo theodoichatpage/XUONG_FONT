@@ -91,7 +91,7 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 ## Nguồn hình cho dấu
 
-- **Dấu font đã có:** dùng trước. Chữ hoa dùng dấu hoa tách từ Á, À, Ã... của chính font, không đặt dấu chữ thường lên chữ hoa.
+- **Dấu font đã có:** dùng trước, lấy từ chữ Latin do nhà thiết kế vẽ theo thứ tự cố định (ã õ ñ ũ..., chữ hoa Ã Õ Ñ Ũ...). Không lấy mẫu từ khối chữ tiếng Việt U+1EA0–1EF9 hay ơ ư: trong font đã Việt hóa rồi mở lại, các chữ đó có thể do công cụ ghép, và lấy chúng làm mẫu làm dấu cùng loại khác nhau giữa các chữ (ễ khác Ữ). Chữ hoa dùng dấu hoa tách từ Á, À, Ã... của chính font, không đặt dấu chữ thường lên chữ hoa.
 - **Chữ hai dấu (Ộ, Ấ, ặ...):** nếu font đã có Ô, Â, Ê, Ă, Ơ, Ư do nhà thiết kế vẽ, dùng làm gốc và chỉ thêm dấu thanh. Không vẽ lại mũ/trăng/râu.
 - **Dấu nặng:** dấu chấm thật của font → chấm chữ i → dấu chấm do Xưởng tự dựng → chấm tròn. Dấu chấm tự dựng có thể chỉ là hình thay thế (ví dụ ô vuông), nên không dùng làm mẫu khi font đã có chấm i.
 - **Dấu font chưa có:** dựng theo các số trong trang này, từ nét của chính font.
