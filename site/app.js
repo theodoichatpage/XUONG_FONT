@@ -214,6 +214,19 @@ function localLayoutReady() {
     (index === activeReference ? $('layout-text').value : entry.settings?.layoutText || '').trim());
 }
 
+// Lỗi khi dựng mà còn ảnh chưa gõ nội dung chữ: mở ảnh đó và tô đỏ ô cần gõ (cách dựng không cần Gemini).
+function markMissingLayoutText() {
+  const index = references.findIndex((entry, i) =>
+    !(i === activeReference ? $('layout-text').value : entry.settings?.layoutText || '').trim());
+  if (index < 0) return;
+  if (index !== activeReference) showReference(index);
+  const box = $('layout-text');
+  box.classList.add('needs-text');
+  box.placeholder = 'Gõ đúng các ký tự trong ảnh "' + references[index].file.name + '", ví dụ: !@#$%^&*?{}';
+  box.scrollIntoView({ block: 'center' });
+  box.focus();
+}
+
 function rememberReference() {
   const entry = references[activeReference];
   if (!entry) return;
@@ -943,8 +956,10 @@ $('ai-scan').addEventListener('click', async()=>{
   if(!localLayoutReady()&&!geminiKey.value.trim()){status('Gõ nội dung chữ dưới mỗi ảnh, hoặc nhập khóa Gemini ở thanh trên để tạo bộ font.');return;}
   const controller=new AbortController();designRun=controller;busy=true;$('name').disabled=true;renderReferences();
   $('stop-design').hidden=false;$('stop-design').disabled=false;
-  try{await familyWorkspace.createFromCurrent({...currentFamilyInput(),signal:controller.signal});}
+  let result;
+  try{result=await familyWorkspace.createFromCurrent({...currentFamilyInput(),signal:controller.signal});}
   finally{busy=false;$('name').disabled=false;designRun=undefined;$('stop-design').hidden=true;renderReferences();}
+  if(!result?.ok&&!controller.signal.aborted)markMissingLayoutText();
 });
 $('stop-design').addEventListener('click', () => {
   if (!designRun) return;
@@ -1639,6 +1654,7 @@ function currentFamilyInput(){
 $('layout-style').replaceChildren(...familyStyles.map(s => new Option(readableStyle(s.style), s.style)));
 $('layout-style').value = 'Regular';
 let layoutSaveTimer;
+$('layout-text').addEventListener('input', () => { if ($('layout-text').value.trim()) { $('layout-text').classList.remove('needs-text'); $('layout-text').placeholder = 'Gõ đúng chữ có trong ảnh, mỗi dòng ảnh một dòng, đủ dấu'; } });
 for (const id of ['layout-text', 'layout-style']) $(id).addEventListener('input', () => {
   rememberReference(); renderReferences();
   clearTimeout(layoutSaveTimer); layoutSaveTimer = setTimeout(() => persistReferences(), 600);

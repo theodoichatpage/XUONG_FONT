@@ -372,3 +372,6 @@ dialog::backdrop{background:#221a17bd}
 }
 .image-style-confirmation{min-width:0;overflow-wrap:anywhere}
 .image-style-confirmation button{margin-top:4px;max-width:100%;white-space:normal}
+
+/* Ô nội dung chữ cần gõ trước khi dựng (không có Gemini). */
+#layout-text.needs-text { outline: 3px solid #b3261e; outline-offset: 2px; background: #fff4f2; }

@@ -259,7 +259,8 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
         say('Gemini đang dựng chữ đen trên nền trắng: '+image.name+'…');
         let prepared;
         try{prepared=await redrawFontImage([canvas],{mode:'clean'},getKey(),signal||new AbortController().signal);}
-        catch(error){if(signal?.aborted)throw error;throw Error('Ảnh "'+image.name+'" chưa có nội dung chữ nên Xưởng phải nhờ Gemini vẽ lại, và Gemini báo lỗi: '+error.message+' Cách không cần Gemini: gõ nội dung chữ dưới ảnh, mỗi dòng ảnh một dòng, rồi bấm lại Tạo bộ font.');}
+        catch(error){if(signal?.aborted)throw error;
+          throw Error('Ảnh "'+image.name+'" chưa có nội dung chữ. Gõ các ký tự trong ảnh vào ô "Nội dung chữ trong ảnh" (đang tô đỏ), mỗi dòng ảnh một dòng, rồi bấm lại Tạo bộ font. Xưởng sẽ tự tách trên máy, không cần Gemini. (Gemini báo: '+error.message+')');}
         const blob=await new Promise(resolve=>prepared.toBlob(resolve,'image/png'));if(!blob)throw Error('Chưa lưu được ảnh Gemini trả về.');
         if(blob.size>15*1024*1024||project.images.length>=100||project.images.reduce((sum,i)=>sum+i.blob.size,0)+blob.size>80*1024*1024)throw Error('Ảnh Gemini vượt giới hạn lưu dự án; ảnh gốc vẫn được giữ.');
         const child={id:crypto.randomUUID(),name:'Nền trắng — '+image.name,blob,digest:await digestReference(blob),parentImageId:image.id,styleId:image.styleId,confirmed:true,role:'ai-redrawn'};
