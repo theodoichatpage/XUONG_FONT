@@ -1,6 +1,6 @@
 const { copyFileSync, readFileSync, writeFileSync, cpSync, readdirSync } = require('node:fs');
 
-for (const file of ['index.html', 'style.css']) copyFileSync('site/' + file, 'dist/' + file);
+for (const file of ['index.html', 'style.css', 'favicon.svg']) copyFileSync('site/' + file, 'dist/' + file);
 
 cpSync('site/references', 'dist/references', { recursive: true });
 
@@ -11,7 +11,7 @@ cpSync('site/js/vendor/google-fonts-list-2026.10', 'dist/js/vendor/google-fonts-
 const html = readFileSync('site/index.html', 'utf8');
 const css = readFileSync('dist/style.css', 'utf8');
 const js = readFileSync('dist/app.js', 'utf8').replace(/<\/script/gi, '<\\/script');
-let standalone = html
+let standalone = html.replaceAll('./favicon.svg?v=2', 'data:image/svg+xml;base64,' + readFileSync('site/favicon.svg').toString('base64'))
   .replace('<link rel="stylesheet" href="./style.css">', () => `<style>\n${css}\n</style>`)
   .replace('<script defer src="./app.js"></script>', '')
   .replace('</body>', () => `<script>\n${js}\n</script>\n</body>`);
