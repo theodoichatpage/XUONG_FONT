@@ -168,6 +168,12 @@
       <button id="collection-save-current" type="button">Lưu font đang làm</button>
     </div>
     <p class="help">Font được lưu trong trình duyệt này. Xóa dữ liệu trang sẽ xóa bộ sưu tập.</p>
+    <details id="collection-bulk">
+      <summary>Đổi tên hàng loạt</summary>
+      <p class="help">Thêm tiền tố vào tên trong bộ sưu tập và tên bên trong file font (tên hiện khi cài), cho các font làm trên Xưởng: đã lưu từ Tạo font mới, Việt hóa hoặc family tự sinh. Font nhập nguyên bản không đổi. Tên kiểu (Thin Italic, Bold...) giữ nguyên.</p>
+      <label>Tiền tố <input id="collection-prefix" value="XFVN - " maxlength="30"></label>
+      <div class="tool-row"><button id="collection-prefix-apply" type="button">Thêm tiền tố</button><button id="collection-prefix-undo" type="button" class="quiet" hidden>Hoàn tác đổi tên</button></div>
+    </details>
     <p id="collection-status" class="help" role="status"></p>
     <section id="collection-fonts" aria-labelledby="collection-list-title" hidden>
       <h3 id="collection-list-title">Font đã lưu <span id="collection-count" class="help"></span></h3>

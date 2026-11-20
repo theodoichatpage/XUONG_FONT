@@ -1,3 +1,4 @@
+import svgpath from 'svgpath';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline} from './outline-cleanup.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -299,7 +300,6 @@ async function removeActiveReference() {
   }
   save();
   renderReferences();
-  refreshReviewVisibility();
   persistReferences(true);
   if (references.length) await showReference(Math.min(index, references.length - 1));
   status('Đã bỏ ảnh “' + removed.file.name + '” khỏi danh sách.');
@@ -815,11 +815,20 @@ for (const char of [...toneSamples.keys(), ...charset]) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'glyph';
-  button.addEventListener('click', () => {
+  // Bấm một lần: chọn ký tự. Nháy đúp (hoặc Enter khi đang chọn bằng bàn phím): mở xem chi tiết phóng to.
+  const choose = () => {
+    if (selected === char) return;
     selected = char;
     $('chars').value = char;
     persistReferences();
     renderGlyphs();
+  };
+  button.addEventListener('click', choose);
+  button.addEventListener('dblclick', () => { choose(); zoomGlyph(char); });
+  button.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    choose();
     zoomGlyph(char);
   });
   const grid = toneSamples.has(char) ? 'tone-samples' : lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
@@ -834,7 +843,7 @@ function renderGlyphs() {
     tile.setAttribute('aria-pressed', String(char === selected));
     const name = toneSamples.get(char) ?? char;
     tile.setAttribute('aria-label', name + ' · ' + (glyph?.source ?? 'Còn thiếu'));
-    tile.title = tile.getAttribute('aria-label');
+    tile.title = tile.getAttribute('aria-label') + ' · nháy đúp để xem chi tiết';
     tile.replaceChildren();
     if (!glyph) { tile.textContent = name; continue; }
     const ns = 'http://www.w3.org/2000/svg';
@@ -907,7 +916,12 @@ function scheduleFont() {
         ascent = Math.max(ascent, Math.ceil(y + height + 24));
         descent = Math.min(descent, Math.floor(y - 24));
       }
-      const balanced = importedMetrics ? active : balanceGlyphSpacing(active, Number($('spacing').value));
+      // Font mở từ bộ sưu tập giữ nguyên khoảng cách gốc; thanh "Khoảng cách chữ" cộng đều vào mỗi chữ
+      // (nửa bên trái, nửa bên phải), không đụng dấu rời có advance 0.
+      const tracking = Number($('spacing').value);
+      const balanced = importedMetrics ? active.map(glyph => !tracking || !(glyph.advance > 0) ? glyph
+        : { ...glyph, d: svgpath(glyph.d).translate(tracking / 2, 0).round(1).toString(), advance: Math.max(1, glyph.advance + tracking) })
+        : balanceGlyphSpacing(active, tracking);
       const ttf = exportFont(name, balanced, 0, { italic: importedMetrics?.italic, angle: importedMetrics?.angle, familyName: importedMetrics?.familyName, styleName: importedMetrics?.styleName, weight: importedMetrics?.weight, ascent, descent, kerning: importedMetrics?.kerning ?? fontKerning(balanced), wordSpace: importedMetrics?.wordSpace });
       const face = new FontFace('xuong-preview-' + turn, ttf);
       await face.load();

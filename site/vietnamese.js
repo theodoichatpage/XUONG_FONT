@@ -68,8 +68,10 @@ function placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, b
   const x = rule.left !== undefined ? cx + rule.left * mark.width
     : rule.right !== undefined ? cx + rule.right * mark.width - w
     : cx + rule.center * mark.width - w / 2;
-  const top = Math.max(mark.y + mark.height, y + source.height * k);
-  return { d: tier.d + ' ' + svgpath(sample.d).translate(-source.x, -source.y).scale(k).translate(x, y).round(1).toString(),
+  const top = Math.max(mark.y + mark.height, y + source.height * k), h = source.height * k;
+  const shift = body.slant * (y + h / 2 - (mark.y + mark.height / 2));
+  const local = leanMark(svgpath(sample.d).translate(-source.x, -source.y).scale(k).toString(), sample, body.slant, h);
+  return { d: tier.d + ' ' + svgpath(local).translate(x + shift, y).round(1).toString(),
     factor: Math.round(k / (standalone * rule.scale / source.height) * 100) / 100, top: Math.round(top), fits: top <= 1000 };
 }
 
@@ -215,7 +217,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
             const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem);
-            const horn = sameDirection(shape, original.d);
+            const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
             paths.push(svgpath(horn).translate(edge - inset, attachY).round(1).toString());
             const hornRight = bounds.x + bounds.width + reach;
             advance = Math.max(advance, Math.ceil(hornRight + 25));
@@ -240,8 +242,10 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - gapBelow - height;
           else top += height + gapUpper;
-          paths.push(svgpath(sample.d).translate(-source.x - source.width / 2, -source.y)
-            .scale(scale).translate(x, y).round(1).toString());
+          const shift = body.slant * (y + height / 2 - (bounds.y + bounds.height / 2));   // theo trục nghiêng
+          const local = svgpath(sample.d).translate(-source.x - source.width / 2, -source.y).scale(scale).toString();
+          // Nặng lấy từ dấu chấm/chấm i của font (đã nghiêng sẵn) nên không nghiêng thêm.
+          paths.push(svgpath(mark === DOT_BELOW ? local : leanMark(local, sample, body.slant, height)).translate(x + shift, y).round(1).toString());
           continue;
         }
       }
@@ -276,8 +280,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       for (const item of items) {
         const scale = item.scale * factor;
         y += gap;
-        paths.push(svgpath(item.sample.d).translate(-item.source.x - item.source.width / 2, -item.source.y)
-          .scale(scale).translate(bounds.x + bounds.width / 2, y).round(1).toString());
+        const height = item.source.height * scale, shift = body.slant * (y + height / 2 - (bounds.y + bounds.height / 2));
+        const local = svgpath(item.sample.d).translate(-item.source.x - item.source.width / 2, -item.source.y).scale(scale).toString();
+        paths.push(svgpath(leanMark(local, item.sample, body.slant, height)).translate(bounds.x + bounds.width / 2 + shift, y).round(1).toString());
         y += item.source.height * scale;
       }
       fit = { factor: Math.round(factor * 100) / 100, gap: Math.round(gap), top: Math.round(y), fits: y <= 1000 };
@@ -414,6 +419,41 @@ export function strokeContrast(glyphs) {
   }
   return Number.isFinite(thin) && thick > 0 ? Math.max(.1, Math.min(1, thin / thick)) : .8;
 }
+// Độ nghiêng của chữ (kiểu Italic/Oblique): tâm nét thân l/I ở 75% chiều cao lệch so với ở 25%, chia khoảng cao.
+// Chữ đứng ≈ 0; Italic thường 0.15–0.25 (8–14°). Dấu dựng thêm phải nghiêng theo và đặt theo trục nghiêng.
+export function measureSlant(glyphs) {
+  for (const char of ['l', 'I', 'i']) {
+    const glyph = glyphs.get(char);
+    if (!glyph?.d) continue;
+    const contours = flattenOutline(glyph.d);
+    let y0 = Infinity, y1 = -Infinity;
+    for (const c of contours) for (const [, y] of c) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const centerAt = f => {
+      const y = y0 + (y1 - y0) * f, xs = [];
+      for (const c of contours) for (let i = 0; i < c.length; i++) {
+        const [ax, ay] = c[i], [bx, by] = c[(i + 1) % c.length];
+        if ((ay <= y) !== (by <= y)) xs.push(ax + (y - ay) / (by - ay) * (bx - ax));
+      }
+      xs.sort((a, b) => a - b);
+      let best = null;
+      for (let i = 0; i + 1 < xs.length; i += 2) if (!best || xs[i + 1] - xs[i] < best[1] - best[0]) best = [xs[i], xs[i + 1]];
+      return best ? { x: (best[0] + best[1]) / 2, y } : null;
+    };
+    const a = centerAt(.3), b = centerAt(.7);
+    if (!a || !b || b.y === a.y) continue;
+    const slant = (b.x - a.x) / (b.y - a.y);
+    return Math.abs(slant) < .03 ? 0 : Math.max(-.5, Math.min(.5, slant));
+  }
+  return 0;
+}
+// Dấu Xưởng tự dựng (đứng) được nghiêng theo chữ quanh giữa chiều cao của dấu; dấu lấy từ font đã nghiêng sẵn.
+const DOT_BELOW = String.fromCharCode(0x323);
+const isDrawn = sample => sample?.nativeSize || sample?.source === 'Dựng từ nét chữ';
+function leanMark(d, sample, slant, height) {
+  if (!slant || !isDrawn(sample)) return d;
+  return svgpath(d).translate(0, -height / 2).skewX(Math.atan(slant) * 180 / Math.PI).translate(0, height / 2).toString();
+}
+
 export function measureStem(glyphs) {
   for (const char of ['l', 'I', 'i']) {
     const glyph = glyphs.get(char);
@@ -433,7 +473,7 @@ export function measureBody(glyphs) {
   const capHeight = top(['H', 'I', 'E', 'T']) ?? xHeight / .72;
   const width = chars => { for (const c of chars) { const b = box(c); if (b) return b.width; } };
   const oWidth = width(['o', 'e', 'a', 'u']) ?? .95 * xHeight;
-  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs) };
+  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs), slant: measureSlant(glyphs) };
 }
 
 export function deriveMarkSamples(glyphs) {
