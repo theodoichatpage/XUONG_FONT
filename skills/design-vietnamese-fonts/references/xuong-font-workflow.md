@@ -13,7 +13,8 @@ Dự án hiện tại: https://xuong-font.vercel.app/ ; mã nguồn theodoichatp
 ## Điểm nối khi sửa mã
 
 - `site/mark-spacing.js`: chỉnh contour dấu rời, giữ advance. Khi thay thuật toán, kiểm dấu trên, dấu dưới, counter thân, râu và dấu hàn vào thân.
-- `site/vietnamese.js`: ghép chữ Việt và dấu. Không ghi đè glyph nhập đã được người dùng sửa nếu chưa được yêu cầu.
+- `site/vietnamese.js`: ghép chữ Việt và dấu. Không ghi đè glyph nhập đã được người dùng sửa nếu chưa được yêu cầu. Dấu font gốc không có (thường là râu, nặng, hỏi) được dựng theo nét của chính font, không dùng hình mẫu cố định.
+- `site/mark-standards.js`: số chuẩn dấu đo từ font chuyên nghiệp ([chuẩn đo dấu](mark-standards.md)). Đổi số ở đây, rồi chạy `npm run check:marks` để so lại với dấu gốc của nhà thiết kế.
 - `site/font-import.js`: đọc outline/mã/metrics. Đừng làm mất alias Unicode.
 - `site/font-family.js`: sinh weight; phải kiểm lại từng style và đọc lại file xuất.
 - `src/vietnamese-design-rules.mjs`: chỉ dẫn thiết kế dùng trong các bước AI. Giữ nguồn và các số heuristic được phân biệt.

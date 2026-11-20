@@ -1141,7 +1141,7 @@ $('derive-marks').addEventListener('click', () => {
   const fitted = generated.filter(glyph => glyph.markFit);
   const squeezed = fitted.filter(glyph => glyph.markFit.factor < 1).map(glyph => glyph.char);
   const overflow = fitted.filter(glyph => !glyph.markFit.fits).map(glyph => glyph.char);
-  const ruleReport = ` Đã áp quy tắc dấu trong skill: dấu chữ hoa 90% và sát thân hơn chữ thường; mũ, trăng không rộng quá nguyên âm; chồng dấu nằm trong chiều cao dòng`
+  const ruleReport = ` Dấu dựng theo chuẩn đo từ 20 font đã Việt hóa: cao theo x-height, rộng theo chữ o, dày theo nét thân, khoảng hở dấu–thân như font chuyên nghiệp; dấu hoa gần bằng dấu thường và sát thân hơn; chồng dấu nằm trong chiều cao dòng`
     + (squeezed.length ? ` (thu nhỏ thêm để vừa dòng: ${squeezed.join(' ')})` : '') + '.'
     + (overflow.length ? ` CẦN XEM: ${overflow.join(' ')} vẫn vượt chiều cao dòng.` : '');
   const message = `Đã dựng ${madeMarks.length} dấu mẫu theo độ dày nét ${Math.round(stem)} đơn vị`

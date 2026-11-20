@@ -1,5 +1,6 @@
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
+import { MARK_STANDARDS as STD, STROKE_PER_MEASURED } from './mark-standards.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
@@ -47,6 +48,7 @@ function undotI(glyph) {
 
 export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false, requireReferenceMarks = false } = {}) {
   const result = [];
+  const body = measureBody(glyphs);
   for (const char of accented) {
     if (['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
     const [root, ...marks] = char.normalize('NFD');
@@ -63,12 +65,14 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     if (!original) continue;
     const bounds = glyphBounds(original);
     const bodyTop = bounds.y + bounds.height;
-    let top = bodyTop + 28;
+    const isCap = root !== root.toLowerCase();
+    // Khoảng hở chuẩn đo từ font đã Việt hóa: dấu trên chữ thường 0.136 x-height, chữ hoa 0.105, nặng 0.093.
+    const gapUpper = (isCap ? STD.gap.cap : STD.gap.lower)[0] * body.xHeight, gapBelow = STD.gap.below[0] * body.xHeight;
+    let top = bodyTop + gapUpper;
     let advance = original.advance;
     const paths = [original.d];
     // Dấu dựng từ nét (nativeSize) được xếp theo quy tắc skill sau vòng lặp: chữ hoa dấu nhỏ và sát hơn,
     // mũ/trăng không rộng quá nguyên âm, cả chồng dấu phải nằm trong chiều cao dòng.
-    const isCap = root !== root.toLowerCase();
     const stack = [];
     let fit, derived;
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
@@ -93,10 +97,14 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             // (o cong v\u00e0o trong n\u00ean kh\u00f4ng d\u00f9ng khung ch\u1eef nh\u1eadt), c\u1eafm g\u1ed1c r\u00e2u v\u00e0o trong n\u00e9t \u0111\u1ec3 li\u1ec1n kh\u1ed1i.
             const attachY = bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9);
             const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
-            const inset = .45 * (sample.stem || bounds.width * .2);
-            const horn = sameDirection(sample.d, original.d);
+            const stem = sample.stem || bounds.width * .2, inset = .45 * stem;
+            // Chuẩn đo: độ vươn phải theo độ rộng chữ gốc, đầu râu cao hơn đỉnh thân theo x-height.
+            const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
+            const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
+            const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem);
+            const horn = sameDirection(shape, original.d);
             paths.push(svgpath(horn).translate(edge - inset, attachY).round(1).toString());
-            const hornRight = edge - inset + source.x + source.width;
+            const hornRight = bounds.x + bounds.width + reach;
             advance = Math.max(advance, Math.ceil(hornRight + 25));
             continue;
           }
@@ -117,8 +125,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           const ownSize = sample.nativeSize || sample.source === 'Font gốc';   // dấu lấy từ chính font: giữ cỡ gốc
           const scale = Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
-          if (mark === '\u0323') y = bounds.y - 28 - height;
-          else top += height + 28;
+          if (mark === '\u0323') y = bounds.y - gapBelow - height;
+          else top += height + gapUpper;
           paths.push(svgpath(sample.d).translate(-source.x - source.width / 2, -source.y)
             .scale(scale).translate(x, y).round(1).toString());
           continue;
@@ -134,7 +142,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     }
     if (stack.length) {
       // Quy tắc skill mục 8 (chữ hoa) và "Các mức số": dấu hoa 90%, khoảng hở hoa chặt hơn thường.
-      const sizeRule = isCap ? .9 : 1, gapRule = isCap ? 22 : 28, minGap = 14;
+      const sizeRule = isCap ? STD.capHeightRatio : 1, gapRule = gapUpper, minGap = .06 * body.xHeight;
       const widthRule = isCap ? .7 : .8;   // mũ, trăng: kiểm độ rộng theo nguyên âm
       const items = stack.map(({ mark, sample, source }) => {
         const wide = mark === '̂' || mark === '̆';
@@ -142,8 +150,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
         return { mark, sample, source, scale: Math.min(sizeRule, limit) };
       });
       // Cả chồng dấu phải vừa chiều cao dòng (ascender 1000, chừa 20).
-      const base = top - 28;   // trên các dấu đã đặt trước (dấu lấy từ font gốc)
-      const room = 980 - base;
+      const base = top - gapUpper;   // trên các dấu đã đặt trước (dấu lấy từ font gốc)
+      // Đỉnh cả chồng dấu: chữ thường tới ~0.89 em, chữ hoa tới ~0.98 em (đo từ font đã Việt hóa).
+      const room = 1000 * (isCap ? STD.stackTop.cap[0] : STD.stackTop.lower[2]) - base;
       const need = (factor, gap) => items.reduce((sum, item) => sum + gap + item.source.height * item.scale * factor, 0);
       let factor = 1, gap = gapRule;
       if (need(1, gapRule) > room) {
@@ -223,36 +232,97 @@ export function strokeAlong(points, width) {
   return polygon([...left, ...right.reverse()]);
 }
 
+// Làm phẳng outline thành polyline để đo (chạy được cả trong trình duyệt và node).
+function flattenOutline(d, steps = 12) {
+  const contours = [];
+  let cur = null;
+  svgpath(d).abs().unshort().unarc().iterate((s, i, px, py) => {
+    const c = s[0];
+    if (c === 'M') { cur = [[s[1], s[2]]]; contours.push(cur); return; }
+    if (!cur || c === 'Z') return;
+    if (c === 'L') cur.push([s[1], s[2]]);
+    else if (c === 'H') cur.push([s[1], py]);
+    else if (c === 'V') cur.push([px, s[1]]);
+    else if (c === 'Q' || c === 'C') {
+      const P = c === 'C' ? [[px, py], [s[1], s[2]], [s[3], s[4]], [s[5], s[6]]] : [[px, py], [s[1], s[2]], [s[3], s[4]]];
+      for (let k = 1; k <= steps; k++) {
+        const t = k / steps; let q = P;
+        while (q.length > 1) q = q.slice(1).map((p, j) => [q[j][0] + (p[0] - q[j][0]) * t, q[j][1] + (p[1] - q[j][1]) * t]);
+        cur.push(q[0]);
+      }
+    }
+  });
+  return contours.filter(c => c.length > 2);
+}
+// Bề dày thân đứng: đo ngang ở 40–60% chiều cao (bỏ chân serif, móc đầu l của font mono), lấy trung vị đoạn hẹp nhất.
+function stemThickness(d) {
+  const contours = flattenOutline(d);
+  let y0 = Infinity, y1 = -Infinity;
+  for (const c of contours) for (const p of c) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const widths = [];
+  for (let k = 0; k <= 10; k++) {
+    const y = y0 + (y1 - y0) * (.4 + .02 * k), xs = [];
+    for (const c of contours) for (let i = 0; i < c.length; i++) {
+      const [ax, ay] = c[i], [bx, by] = c[(i + 1) % c.length];
+      if ((ay <= y) !== (by <= y)) xs.push(ax + (y - ay) / (by - ay) * (bx - ax));
+    }
+    xs.sort((a, b) => a - b);
+    const spans = []; for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > .5) spans.push(xs[i + 1] - xs[i]);
+    if (spans.length) widths.push(Math.min(...spans));
+  }
+  widths.sort((a, b) => a - b);
+  return widths.length ? widths[Math.floor(widths.length / 2)] : null;
+}
 export function measureStem(glyphs) {
   for (const char of ['l', 'I', 'i']) {
     const glyph = glyphs.get(char);
     if (!glyph?.d) continue;
     const box = glyphBounds(glyph);
-    if (box.width > 0 && box.height / box.width >= 3) return box.width;
+    if (!(box.width > 0 && box.height > 0)) continue;
+    const width = stemThickness(glyph.d);
+    if (width && box.height / width >= 3) return width;
   }
   return 90;
 }
+// Các số đo nền của bộ chữ để đặt kích thước dấu theo chuẩn: x-height, chiều cao hoa, độ rộng o và O.
+export function measureBody(glyphs) {
+  const box = char => { const g = glyphs.get(char); return g?.d ? glyphBounds(g) : null; };
+  const top = chars => { for (const c of chars) { const b = box(c); if (b) return b.y + b.height; } };
+  const xHeight = top(['x', 'z', 'v', 'u', 'n']) ?? (top(['o']) ?? 520) * .97;
+  const capHeight = top(['H', 'I', 'E', 'T']) ?? xHeight / .72;
+  const width = chars => { for (const c of chars) { const b = box(c); if (b) return b.width; } };
+  const oWidth = width(['o', 'e', 'a', 'u']) ?? .95 * xHeight;
+  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3 };
+}
 
 export function deriveMarkSamples(glyphs) {
-  const stem = measureStem(glyphs), t = Math.max(28, Math.min(130, stem * .82));
+  // Kích thước theo MARK_STANDARDS (đo từ 20 font đã Việt hóa): cao theo x-height, rộng theo chữ o,
+  // độ dày theo nét thân với đường cong của font chuyên nghiệp (font đậm có dấu nhẹ hơn thân).
+  const stem = measureStem(glyphs), { xHeight: xH, oWidth: oW } = measureBody(glyphs);
+  const t = STROKE_PER_MEASURED * STD.thickness(stem);
+  const H = key => STD.height[key][0] * xH, W = key => STD.width[key][0] * oW;
   const marks = new Map();
   const add = (mark, d) => marks.set(mark, { char: mark, d, advance: 0, source: 'Dựng từ nét chữ', origin: 'inferred',
     nativeSize: true, stem, approved: false, locked: false });
 
   // Sắc và huyền: nét xiên, đầu trên rộng hơn đầu dưới.
-  const acuteH = Math.max(95, 1.9 * t), span = .55 * acuteH, slope = Math.sin(Math.atan2(acuteH, span));
-  const wide = 1.12 * t / slope, narrow = .72 * t / slope;
+  const acuteH = H('acute');
+  let span = .5 * acuteH, slope, wide, narrow;
+  for (let k = 0; k < 3; k++) {   // độ rộng tổng (span + đầu rộng) theo chuẩn
+    slope = Math.sin(Math.atan2(acuteH, span)); wide = 1.12 * t / slope; narrow = .72 * t / slope;
+    span = Math.max(.18 * acuteH, W('acute') - wide);
+  }
   add('́', polygon([[0, 0], [narrow, 0], [span + wide, acuteH], [span, acuteH]]));
-  add('̀', polygon([[span, 0], [span + narrow, 0], [wide, acuteH], [0, acuteH]]));
+  add('̀', polygon([[span + wide, 0], [span + wide - narrow, 0], [0, acuteH], [wide, acuteH]]));   // ảnh gương của sắc
 
   // Mũ: chevron đỉnh bằng, nét nhẹ hơn thân và hẹp hơn nguyên âm (skill: kiểm độ rộng theo nguyên âm).
-  const capT = .88 * t, capH = Math.max(90, 1.75 * capT), half = 1.15 * capH, angle = Math.atan2(capH, half);
+  const capT = .84 * t, capH = Math.max(H('circumflex'), 1.6 * capT), half = Math.max(W('circumflex') / 2, .9 * capH), angle = Math.atan2(capH, half);
   const leg = capT / Math.sin(angle), notch = capH - capT / Math.cos(angle), flat = .3 * capT;
   add('̂', polygon([[-half, 0], [-half + leg, 0], [0, notch], [half - leg, 0], [half, 0], [flat, capH], [-flat, capH]]));
 
   // Trăng: lưỡi liềm giữa hai cung tròn, đáy đậm nhất, hai đầu thon và cắt ngang bằng nhau, đối xứng.
   // Dùng cung tròn (không phải nửa elip) để mép trong không tự gập thành khấc ở hai đầu.
-  const breveT = .78 * t, breveHalf = Math.max(100, 1.9 * t), breveH = .62 * breveHalf, breveEnd = .45 * breveT;
+  const breveT = t, breveHalf = .44 * W('breve'), breveH = Math.max(H('breve'), 1.5 * breveT), breveEnd = .45 * breveT;
   const outerR = (breveHalf ** 2 + breveH ** 2) / (2 * breveH);
   const innerHalf = breveHalf - breveEnd, innerH = breveH - breveT, innerR = (innerHalf ** 2 + innerH ** 2) / (2 * innerH);
   const arcPoints = (r, cy, half, steps, reverse) => {
@@ -264,9 +334,9 @@ export function deriveMarkSamples(glyphs) {
 
   // Ngã: sóng một nhịp mềm. Bán kính cong của đường tâm luôn lớn hơn nửa độ dày nét
   // để mép không tự gập thành răng cưa (skill: giữ nhịp uốn và nét sạch).
-  const tildeT = .82 * t, waveW = Math.max(200, 3.9 * t), waveSpan = 2.5 * Math.PI;
+  const tildeT = .9 * t, waveW = Math.max(W('tilde') - .3 * tildeT, 3 * tildeT), waveSpan = 2.5 * Math.PI;
   const curvature = (waveSpan / waveW) ** 2;
-  const amplitude = Math.min(.32 * t + 10, 1 / (curvature * .62 * tildeT));
+  const amplitude = Math.max(.15 * tildeT, Math.min((H('tilde') - tildeT) / 2, 1 / (curvature * .62 * tildeT)));
   add('̃', strokeAlong(Array.from({ length: 49 }, (_, i) => {
     const phase = -.25 * Math.PI + waveSpan * i / 48;
     return [-waveW / 2 + waveW * i / 48, amplitude * Math.sin(phase)];
@@ -274,7 +344,9 @@ export function deriveMarkSamples(glyphs) {
 
   // Hỏi: móc gọn, lòng mở, khác dấu chấm hỏi (skill). Đầu móc thon, cung tròn đều, cuối cung uốn mềm về giữa
   // rồi thành chân ngắn thẳng đứng, đầu chân cắt ngang. Nét nhẹ hơn thân chữ.
-  const hookT = .55 * t, hookR = .55 * t, hookTail = .38 * t, hookBendDrop = .25 * hookR;
+  // Rộng = cung từ 160° đến 20° (~1.94R) cộng độ dày; cao = chân + uốn + cung.
+  const hookT = .8 * t, hookR = Math.max(.75 * hookT, (W('hook') - hookT) / 1.94), hookBendDrop = .25 * hookR;
+  const hookTail = Math.max(.2 * hookR, H('hook') - hookR - hookT / 2 - 1.16 * hookR - hookBendDrop);
   const hookC = 1.16 * hookR + hookBendDrop + hookTail;
   const hookArc = Array.from({ length: 25 }, (_, i) => {
     const a = Math.PI * (160 - 220 * i / 24) / 180;
@@ -293,10 +365,9 @@ export function deriveMarkSamples(glyphs) {
   // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
   const period = glyphs.get('.');
   if (period?.d) {
-    // Skill: nặng đối chiếu dấu chấm về độ lớn, nhưng tránh dấu nặng quá lớn. Ở kiểu mảnh (Thin, Light)
-    // dấu chấm thường to gấp 2–3 lần nét chữ để dễ thấy cuối câu; dấu nặng chỉ cần cỡ khoảng 1,7 lần nét.
-    const box = glyphBounds(period), size = Math.max(box.width, box.height), cap = Math.max(28, 1.7 * stem);
-    const k = size > cap ? cap / size : 1;
+    // Chuẩn đo: nặng ≈ 0.88 dấu chấm, trong khoảng 0.9–1.75 lần nét thân (kiểu mảnh có dấu chấm to 2–3 lần nét).
+    const box = glyphBounds(period), size = Math.max(box.width, box.height), [, lo, hi] = STD.dotBelow.stem;
+    const k = Math.min(hi * stem, Math.max(lo * stem, STD.dotBelow.vsPeriod[0] * size)) / size;
     add('̣', svgpath(period.d).translate(-box.x, -box.y).scale(k).round(1).toString());
   }
   else {
@@ -306,12 +377,18 @@ export function deriveMarkSamples(glyphs) {
 
   // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ,
   // thon nhẹ về đầu và cắt bằng theo kiểu đầu nét của bộ chữ.
-  const hornT = .95 * stem, hornH = Math.max(110, 1.55 * hornT), hornW = .9 * hornT + 45;
-  add('̛', strokeAlong(Array.from({ length: 25 }, (_, i) => {
-    const s = i / 24;
-    return [hornW * Math.sin(s * Math.PI / 2), hornH * Math.pow(s, 1.8)];
-  }), s => hornT * (1 - .18 * s)));
+  // Khi ghép, râu được vẽ lại theo độ vươn và độ cao đầu râu chuẩn của từng chữ (o, u, O, U).
+  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem));
   return { marks, stem, thickness: t };
+}
+
+// Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ, thon nhẹ về đầu.
+export function hornShape(width, height, thickness) {
+  const w = Math.max(.6 * thickness, width - .45 * thickness);
+  return strokeAlong(Array.from({ length: 25 }, (_, i) => {
+    const s = i / 24;
+    return [w * Math.sin(s * Math.PI / 2), height * Math.pow(s, 1.8)];
+  }), s => thickness * (1 - .18 * s));
 }
 
 // Chiều của contour lớn nhất trong glyph: gạch phải cùng chiều để chỗ chồng lên thân được tô, không bị khoét.

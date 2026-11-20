@@ -15,5 +15,6 @@ export const vietnameseDesignInstruction = [
   'Respect the font’s established accented-i convention; do not mechanically add dots to all accented i forms.',
   'Reassess marks separately for uppercase, lowercase and each weight; automatic emboldening is only a draft.',
   'Project constraints: preserve reference evidence, baseline, body contours and advances unless the requested task changes them. Do not move joined outlines as if they were detachable marks.',
-  'No universal numeric gap is prescribed. Choose optical spacing from the actual font and report uncertainty rather than claiming untested correctness.'
+  'No universal numeric gap is prescribed. Choose optical spacing from the actual font and report uncertainty rather than claiming untested correctness.',
+  'Measured starting points from 20 professionally Vietnamese-ready fonts (Arial, Times, Segoe UI Light-Black, Tahoma, Verdana, Courier, Calibri, Consolas, Palatino), as ratios of the same font: tone/structural marks about 0.33 x-height tall (tilde 0.27); acute 0.41, circumflex 0.64, breve 0.69, tilde 0.72, hook 0.33 of the o width; mark-to-body gap 0.136 x-height lowercase, 0.105 uppercase, 0.093 for the dot below; uppercase marks nearly as tall as lowercase (0.97); dot below about 0.88 of the period and 0.9-1.75 stems; heavier weights have marks lighter than the stem, thin weights have marks close to the stem. Treat these as typical values, not rules from the source.'
 ].join(' ');

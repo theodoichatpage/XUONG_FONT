@@ -15,6 +15,7 @@
     "check:inputs": "node scripts/check-family-inputs.cjs",
     "check:clean": "node scripts/check-clean-reference.cjs",
     "check:outline": "node scripts/check-outline-cleanup.cjs && node scripts/check-outline-ui.cjs",
+    "check:marks": "node scripts/check-vietnamese-marks.cjs",
     "check:corners": "node scripts/check-sharp-corners.cjs && node scripts/check-sharp-reference.cjs"
   },
   "dependencies": {

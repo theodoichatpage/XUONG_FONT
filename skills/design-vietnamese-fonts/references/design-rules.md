@@ -24,7 +24,7 @@ Nguồn: Donny Trương, Vietnamese Typography, [Design Challenges](https://viet
 
 ## Các mức số do Xưởng Font chọn để thử
 
-Không lấy số này làm kết luận từ trang nguồn:
+Số đo cỡ, độ dày, khoảng hở, nặng và râu từ 20 font đã Việt hóa nằm ở [chuẩn đo dấu](mark-standards.md); dùng số đó trước các mức dưới đây. Không lấy số nào làm kết luận từ trang nguồn:
 
 - Chuẩn hóa việc đo sang UPM 1000.
 - Thử tăng khoảng hở thêm 20 đơn vị, sau đó so trước/sau; cỡ dùng nhỏ có thể cần mức khác.
