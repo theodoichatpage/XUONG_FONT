@@ -64,3 +64,11 @@ Trong Family, bấm **Đối chiếu toàn Style từ ảnh gốc** rồi duyệ
 Nút Tạo bộ font dùng ảnh đen–trắng sạch trực tiếp; với nền phức tạp, gọi lại `/api/font-image` để Gemini dựng ảnh nền trắng rồi lưu như ảnh con riêng, không thay ảnh gốc. Các outline đó mang nguồn `inferred/ai-redraw`. Lựa chọn Style trong tên được giữ. Gemini cung cấp phiên âm và vùng dòng; bộ tách dùng khoảng trắng thật để định vị từ và thành phần nét để tách chữ.
 
 `npm run check:clean` chạy fixture ảnh ChatGPT đã tạo trong hội thoại: 40 ký tự có outline, 29 qua ngưỡng hình học. Vùng dòng/phiên âm trong fixture được chú giải, chưa phải nghiệm thu Gemini nhận diện thực tế. Xem `reports/co-tet-clean-2026-11-19.md`.
+
+### Nắn thẳng và làm mượt outline
+
+Bấm một glyph có nét để mở cửa sổ ký tự, chọn **Nắn thẳng và làm mượt outline**. Có mức Nhẹ/Vừa/Rõ, bản gốc/bản mới cùng hệ tọa độ và chồng hình. Chỉ Áp dụng mới ghi vào bản đang làm; outline trước đó được giữ trong `outlineUndo` để hoàn tác sau khi tải lại trang. Glyph đã khóa không được sửa. Nếu đang sửa dự án Family, cập nhật đúng Style và kiểm tra outline cũ trước khi lưu; dữ liệu IndexedDB không đổi phiên bản.
+
+Công cụ chạy cục bộ, không dùng Gemini. Nó khớp đoạn thẳng/đường Bézier theo biên hiện có, giữ contour và chiều advance, có chặn lệch biên/diện tích và giao nhau mới. Ngưỡng là heuristic của Xưởng, không phải tiêu chuẩn thiết kế font. Không thay O bằng ellipse hoặc tự nắn font đã duyệt hàng loạt. Sau sửa, trạng thái duyệt và kết quả đối chiếu cũ bị xóa để kiểm lại.
+
+Kiểm tra: `npm run check:outline`. Xem `reports/outline-cleanup-2026-11-20.md` về kiểm hình học, TTF và giới hạn kiểm giao diện.

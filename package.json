@@ -13,7 +13,8 @@
     "check:reconstruction": "node scripts/check-reconstruction.cjs",
     "check:fidelity": "node scripts/check-reference-fidelity.cjs",
     "check:inputs": "node scripts/check-family-inputs.cjs",
-    "check:clean": "node scripts/check-clean-reference.cjs"
+    "check:clean": "node scripts/check-clean-reference.cjs",
+    "check:outline": "node scripts/check-outline-cleanup.cjs && node scripts/check-outline-ui.cjs"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",

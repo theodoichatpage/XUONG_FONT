@@ -282,6 +282,15 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     finally{flowRunning=false;flowSignal=undefined;flowTarget=undefined;flowImages=undefined;}
   }
   const restoration=(async()=>{try{await renderProjects();const id=localStorage.getItem('xuong-font-active-family');if(id){project=await loadFamilyProject(id);if(project)render();}}catch(error){say('Không mở được dự án đã lưu: '+error.message);}})();
-  return {createFromCurrent,async projectStyles(){await restoration;return project?.styles||[];},
+  return {createFromCurrent,async saveOutlineEdit(previous,next,metrics){
+    await restoration;if(!metrics?.sourceProjectId)return;
+    if(!project||project.id!==metrics.sourceProjectId)throw Error('Mở lại đúng Family trước khi lưu chỉnh outline.');
+    const style=project.styles.find(s=>s.weight===metrics.weight&&s.italic===!!metrics.italic),stored=style?.glyphs.find(g=>g.char===previous.char);
+    if(!style)throw Error('Không tìm thấy đúng Style trong Family để lưu outline.');
+    if(stored&&(stored.locked||stored.d!==previous.d))throw Error('Glyph trong Family đã đổi hoặc đã khóa; chưa ghi đè.');
+    const snapshot=structuredClone(style);
+    replaceProjectGlyph(style,next);
+    try{await persist('Đã lưu chỉnh outline '+next.char);render();}catch(error){Object.assign(style,snapshot);throw error;}
+  },async projectStyles(){await restoration;return project?.styles||[];},
     async storedLayout(file){await restoration;if(!project)return;const digest=await digestReference(file),image=project.images.find(i=>i.digest===digest&&i.layoutText);return image?{text:image.layoutText,style:image.layoutStyle}:undefined;},async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;root.open=true;$('advanced').open=true;render();await showProof();$('proof-section').scrollIntoView({block:'start'});},open:()=>{root.open=true;root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
 }

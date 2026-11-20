@@ -1,3 +1,4 @@
+import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { digestReference, readableStyle } from './family-inputs.js';
@@ -329,6 +330,19 @@ let reviewRequest;
 let reviewVersion = 0;
 let retraceSource;
 let retraceCandidate;
+const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,commit:async(previous,next)=>{
+  if(previous.locked||glyphs.get(previous.char)!==previous)throw Error('Chữ đã khóa hoặc đã đổi. Đóng rồi mở lại ký tự để chỉnh.');
+  const state={glyphs:[...glyphs.values()].map(g=>g===previous?next:g),name:$('name').value,sample:$('sample').value,spacing:$('spacing').value,importedMetrics};
+  const priorState=localStorage.getItem(storageKey);
+  localStorage.setItem(storageKey,JSON.stringify(state));
+  try{await familyWorkspace.saveOutlineEdit(previous,next,importedMetrics);}catch(error){if(priorState==null)localStorage.removeItem(storageKey);else localStorage.setItem(storageKey,priorState);throw error;}
+  glyphs.set(next.char,next);reviewGlyph=next;refresh();
+  const width=Math.max(1,next.advance),svg=`<svg xmlns="http://www.w3.org/2000/svg" width="270" height="320" viewBox="-30 -1025 ${width+60} 1290"><rect x="-30" y="-1025" width="${width+60}" height="1290" fill="#fffaf1"/><path transform="scale(1 -1)" d="${next.d}" fill="#592f29"/></svg>`;
+  viewerImage.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  retraceCandidate=undefined;$('accept-retrace').hidden=$('cancel-retrace').hidden=true;
+  reviewProof=undefined;$('ai-proof').hidden=true;$('ai-review-run').disabled=true;
+}});
+
 
 function showGlyphProof(proof) {
   reviewProof = proof;
@@ -345,6 +359,7 @@ function resetGlyphReview(glyph) {
   reviewRequest?.abort();
   reviewRequest = undefined;
   reviewGlyph = glyph;
+  outlineCleanup.reset();
   reviewProof = retraceSource = retraceCandidate = undefined;
   $('retrace-actions').hidden = true;
   $('retrace-glyph').disabled = false;
@@ -368,6 +383,7 @@ function proofForSource(image, box, glyph) {
 
 async function openGlyphReview() {
   if (!reviewGlyph) return;
+  outlineCleanup.reset();
   $('viewer-scroll').hidden = true;
   $('ai-review').hidden = false;
   $('gemini-key-review').append($('gemini-key-field'));
