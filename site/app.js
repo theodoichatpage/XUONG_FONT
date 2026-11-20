@@ -1,4 +1,5 @@
 import svgpath from 'svgpath';
+import { xuongFontFile } from './font-rename.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline} from './outline-cleanup.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -931,11 +932,13 @@ function scheduleFont() {
       document.fonts.add(face);
       $('preview').style.fontFamily = face.family + ', Georgia, serif';
       $('preview').style.lineHeight = String((ascent - descent) / UPM);
-      const blob = new Blob([ttf], { type: 'font/ttf' });
+      // File tải về và bản lưu vào bộ sưu tập mang tiền tố XFVN (tên trong file và tên hiển thị).
+      const branded = xuongFontFile(ttf, name);
+      const blob = new Blob([branded.buffer], { type: 'font/ttf' });
       downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
-      download.download = (name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
-      currentFontExport = { name, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
+      download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
+      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
       if (repairRecheckPending) { repairRecheckPending = false; await editorFontCheck.run([currentFontExport], { propose: false }); }
     } catch (error) {

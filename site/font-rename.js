@@ -124,3 +124,23 @@ export function prefixedNames(label, names, prefix) {
     family: family.startsWith(prefix) ? family : prefix + family,
   };
 }
+
+// Mọi font Xưởng xuất ra (lưu, tải, family tự sinh) mang tiền tố này ở tên bộ sưu tập và tên trong file,
+// để không trùng tên với font gốc khi cài. Font gốc người dùng nhập vào không đổi.
+export const XUONG_PREFIX = 'XFVN - ';
+const toArrayBuffer = data => data instanceof ArrayBuffer ? data : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+export function xuongFontFile(input, label) {
+  const buffer = toArrayBuffer(input);
+  const names = prefixedNames(label, readFontNames(buffer), XUONG_PREFIX);
+  const current = readFontNames(buffer);
+  const family = current.typoFamily || current.family || '';
+  const renamed = family === names.family ? buffer : renameFontFamily(buffer, names.family);
+  return { buffer: renamed, label: names.label, family: names.family };
+}
+export async function withXuongPrefix(record) {
+  const original = await record.blob.arrayBuffer(), result = xuongFontFile(original, record.name);
+  if (result.label === record.name && result.buffer === original) return record;
+  const extension = record.filename?.match(/\.(ttf|otf)$/i)?.[0] || '.ttf';
+  return { ...record, ...(record.family ? { family: result.family } : {}), name: result.label,
+    filename: result.label.replace(/[<>:"/\|?*]/g, '-') + extension, blob: new Blob([result.buffer], { type: record.blob.type || 'font/ttf' }) };
+}

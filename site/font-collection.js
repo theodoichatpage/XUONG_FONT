@@ -2,7 +2,7 @@ import { familyWeights, familyStyles, identifyFamilyStyle } from './family-style
 import { createFontFamily } from './font-family.js';
 import opentype from 'opentype.js';
 import { familyPreflight } from './family-validation.js';
-import { readFontNames, renameFontFamily, prefixedNames } from './font-rename.js';
+import { withXuongPrefix } from './font-rename.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
 
@@ -247,7 +247,20 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
 
   async function refresh(preferred = selectedId) {
     records = await accessFonts('readonly', store => store.getAll());
-    $('collection-prefix-undo').hidden = !records.some(record => record.renamedFrom);
+    // Font làm trên Xưởng lưu từ trước khi có tiền tố XFVN: đổi tên một lần (giữ bản cũ trong renamedFrom).
+    const madeInXuong = record => 'fromImages' in record || record.generatedFrom != null || /Việt hóa/i.test(record.name);
+    const pending = records.filter(record => madeInXuong(record) && !record.name.startsWith('XFVN - '));
+    if (pending.length) {
+      for (const record of pending) {
+        try {
+          const renamed = await withXuongPrefix(record);
+          const digest = await fontDigest(renamed.blob);
+          await accessFonts('readwrite', store => store.put({ ...renamed, digest,
+            renamedFrom: record.renamedFrom || { name: record.name, filename: record.filename, blob: record.blob, digest: record.digest } }));
+        } catch { /* Giữ nguyên font không đọc được bảng tên. */ }
+      }
+      records = await accessFonts('readonly', store => store.getAll());
+    }
     // On first opening, automatically show the most recently saved font.
     // IndexedDB assigns increasing numeric IDs to newly added font records.
     const newest = records.reduce((latest, record) =>
@@ -461,51 +474,6 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     });
   });
 
-  // Đổi tên hàng loạt: chỉ font làm trên Xưởng (lưu từ trình chỉnh sửa có trường fromImages, hoặc family tự sinh).
-  // Giữ bản trước trong renamedFrom để hoàn tác được.
-  const madeInXuong = record => 'fromImages' in record || record.generatedFrom != null || /Việt hóa/i.test(record.name);
-  const prefixUndo = $('collection-prefix-undo');
-  const updateUndo = () => { prefixUndo.hidden = !records.some(record => record.renamedFrom); };
-  $('collection-prefix-apply').addEventListener('click', () => {
-    const prefix = $('collection-prefix').value;
-    if (!prefix.trim()) return void (status.textContent = 'Nhập tiền tố trước, ví dụ “XFVN - ”.');
-    const targets = records.filter(record => madeInXuong(record) && !record.name.startsWith(prefix));
-    if (!targets.length) return void (status.textContent = 'Không còn font làm trên Xưởng nào chưa có tiền tố “' + prefix + '”.');
-    const sample = targets.slice(0, 4).map(record => '• ' + record.name + ' → ' + prefixedNames(record.name, {}, prefix).label).join('\n');
-    if (!window.confirm('Đổi tên ' + targets.length + ' font làm trên Xưởng (cả tên trong file font)?\n' + sample + (targets.length > 4 ? '\n…' : '') + '\nCó thể hoàn tác bằng nút “Hoàn tác đổi tên”.')) return;
-    run(async () => {
-      let done = 0; const failed = [];
-      for (const record of targets) {
-        try {
-          const buffer = await record.blob.arrayBuffer();
-          const names = prefixedNames(record.name, readFontNames(buffer), prefix);
-          const blob = new Blob([renameFontFamily(buffer, names.family)], { type: record.blob.type || 'font/ttf' });
-          const extension = (record.filename?.match(/\.(ttf|otf)$/i)?.[0]) || '.ttf';
-          const updated = { ...record, ...(record.family ? { family: names.family } : {}), name: names.label, filename: names.label.replace(/[<>:"/\|?*]/g, '-') + extension, blob,
-            digest: await fontDigest(blob), renamedFrom: record.renamedFrom || { name: record.name, filename: record.filename, blob: record.blob, digest: record.digest } };
-          await accessFonts('readwrite', store => store.put(updated));
-          done++;
-        } catch (error) { failed.push(record.name + ' (' + error.message + ')'); }
-      }
-      await refresh(selectedId);
-      updateUndo();
-      status.textContent = 'Đã đổi tên ' + done + ' font.' + (failed.length ? ' Không đổi được: ' + failed.join(', ') + '.' : '');
-    });
-  });
-  prefixUndo.addEventListener('click', () => {
-    const renamed = records.filter(record => record.renamedFrom);
-    if (!renamed.length || !window.confirm('Trả lại tên cũ cho ' + renamed.length + ' font?')) return;
-    run(async () => {
-      for (const record of renamed) {
-        const { renamedFrom, ...rest } = record;
-        await accessFonts('readwrite', store => store.put({ ...rest, ...renamedFrom }));
-      }
-      await refresh(selectedId);
-      updateUndo();
-      status.textContent = 'Đã trả lại tên cũ cho ' + renamed.length + ' font.';
-    });
-  });
-
   $('collection-vietnamize').addEventListener('click', () => {
     const record = records.find(item => item.id === selectedId);
     if (!record) return;
@@ -629,7 +597,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         // Regular already exists as the selected source. Save only new styles.
         if (!result.isSource) {
           const { text, ...saved } = result;
-          await addFont({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id });
+          await addFont(await withXuongPrefix({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id }));
         }
         const savedLabel = document.createElement('span');
         savedCount++;
