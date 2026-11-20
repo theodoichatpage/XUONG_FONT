@@ -70,7 +70,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     // mũ/trăng không rộng quá nguyên âm, cả chồng dấu phải nằm trong chiều cao dòng.
     const isCap = root !== root.toLowerCase();
     const stack = [];
-    let fit;
+    let fit, derived;
     for (const mark of [...marks].sort((a, b) => Number(b === '\u0302' || b === '\u0306') - Number(a === '\u0302' || a === '\u0306'))) {
       let x = bounds.x + bounds.width / 2;
       let y = top;
@@ -82,7 +82,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
         advance += Math.max(0, Math.ceil(84 * scale - overlap));
         continue;
       }
-      const sample = toneSamples.has(mark) ? glyphs.get(mark) : undefined;
+      // Dấu chưa có trong font (ví dụ font gốc chỉ có á à ã â ă, thiếu râu, nặng, hỏi): dựng theo nét của
+      // chính bộ chữ thay vì dùng hình mẫu cố định, để độ dày khớp kiểu chữ (Thin, Bold...).
+      const sample = toneSamples.has(mark) ? glyphs.get(mark)?.d ? glyphs.get(mark) : (derived ??= deriveMarkSamples(glyphs).marks).get(mark) : undefined;
       if (sample) {
         const source = glyphBounds(sample);
         if (source.width > 0 && source.height > 0) {
@@ -112,7 +114,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           }
           if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
-          const scale = Math.min(sample.nativeSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
+          const ownSize = sample.nativeSize || sample.source === 'Font gốc';   // dấu lấy từ chính font: giữ cỡ gốc
+          const scale = Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - 28 - height;
           else top += height + 28;
@@ -139,14 +142,15 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
         return { mark, sample, source, scale: Math.min(sizeRule, limit) };
       });
       // Cả chồng dấu phải vừa chiều cao dòng (ascender 1000, chừa 20).
-      const room = 980 - bodyTop;
+      const base = top - 28;   // trên các dấu đã đặt trước (dấu lấy từ font gốc)
+      const room = 980 - base;
       const need = (factor, gap) => items.reduce((sum, item) => sum + gap + item.source.height * item.scale * factor, 0);
       let factor = 1, gap = gapRule;
       if (need(1, gapRule) > room) {
         gap = Math.max(minGap, gapRule - (need(1, gapRule) - room) / items.length);
         factor = Math.max(.7, Math.min(1, (room - gap * items.length) / need(1, 0)));
       }
-      let y = bodyTop;
+      let y = base;
       for (const item of items) {
         const scale = item.scale * factor;
         y += gap;
