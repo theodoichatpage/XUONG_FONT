@@ -292,7 +292,13 @@ export function deriveMarkSamples(glyphs) {
 
   // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
   const period = glyphs.get('.');
-  if (period?.d) add('̣', svgpath(period.d).round(1).toString());
+  if (period?.d) {
+    // Skill: nặng đối chiếu dấu chấm về độ lớn, nhưng tránh dấu nặng quá lớn. Ở kiểu mảnh (Thin, Light)
+    // dấu chấm thường to gấp 2–3 lần nét chữ để dễ thấy cuối câu; dấu nặng chỉ cần cỡ khoảng 1,7 lần nét.
+    const box = glyphBounds(period), size = Math.max(box.width, box.height), cap = Math.max(28, 1.7 * stem);
+    const k = size > cap ? cap / size : 1;
+    add('̣', svgpath(period.d).translate(-box.x, -box.y).scale(k).round(1).toString());
+  }
   else {
     const r = .62 * t;
     add('̣', polygon(Array.from({ length: 16 }, (_, i) => [Math.cos(i * Math.PI / 8) * r, Math.sin(i * Math.PI / 8) * r])));
