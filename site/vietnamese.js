@@ -210,7 +210,8 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           if (mark === '\u031b' && sample.nativeSize) {
             // Skill: r\u00e2u n\u1ed1i v\u00e0o th\u00e2n \u1edf v\u00f9ng tr\u00ean b\u00ean ph\u1ea3i o/u. T\u00ecm m\u00e9p ph\u1ea3i th\u1eadt c\u1ee7a n\u00e9t t\u1ea1i \u0111\u1ed9 cao n\u1ed1i
             // (o cong v\u00e0o trong n\u00ean kh\u00f4ng d\u00f9ng khung ch\u1eef nh\u1eadt), c\u1eafm g\u1ed1c r\u00e2u v\u00e0o trong n\u00e9t \u0111\u1ec3 li\u1ec1n kh\u1ed1i.
-            const attachY = bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9);
+            // Chân râu nằm gọn trong thân: mép trên của chân không cao hơn đỉnh thân (chữ đậm nét dày dễ tạo bậc khấc).
+            const attachY = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .45 * (sample.stem || bounds.width * .2) * .9);
             const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
             const stem = sample.stem || bounds.width * .2, inset = .45 * stem;
             // Chuẩn đo: độ vươn phải theo độ rộng chữ gốc, đầu râu cao hơn đỉnh thân theo x-height.
@@ -589,11 +590,21 @@ export function deriveMarkSamples(glyphs) {
 
 // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ, thon nhẹ về đầu.
 export function hornShape(width, height, thickness) {
-  const w = Math.max(.6 * thickness, width - .45 * thickness);
-  return strokeAlong(Array.from({ length: 25 }, (_, i) => {
-    const s = i / 24;
-    return [w * Math.sin(s * Math.PI / 2), height * Math.pow(s, 1.8)];
-  }), s => thickness * (1 - .18 * s));
+  // Đường tâm râu: đi ngang ra rồi cong lên. Đầu râu bo tròn (không cắt phẳng), và đỉnh ngoài của đầu bo
+  // chạm đúng chiều cao yêu cầu, nên với chữ đậm (nét dày) đường tâm thấp hơn tương ứng.
+  const end = thickness * .82, w = Math.max(.6 * thickness, width - .45 * thickness);
+  const h = Math.max(.3 * height, height - end / 2);
+  const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [w * Math.sin(s * Math.PI / 2), h * Math.pow(s, 1.8)]; });
+  const left = [], right = [];
+  points.forEach((point, i) => {
+    const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (1 - .18 * i / 24) / 2;
+    left.push([point[0] - dy / length * half, point[1] + dx / length * half]);
+    right.push([point[0] + dy / length * half, point[1] - dx / length * half]);
+  });
+  const [ex, ey] = points.at(-1), [px, py] = points.at(-2), angle = Math.atan2(ey - py, ex - px), cap = [];
+  for (let k = 1; k < 12; k++) { const t = angle + Math.PI / 2 - k * Math.PI / 12; cap.push([ex + Math.cos(t) * end / 2, ey + Math.sin(t) * end / 2]); }
+  return polygon([...left, ...cap, ...right.reverse()]);
 }
 
 // Chiều của contour lớn nhất trong glyph: gạch phải cùng chiều để chỗ chồng lên thân được tô, không bị khoét.

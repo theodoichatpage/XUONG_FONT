@@ -54,6 +54,10 @@ Râu hầu như luôn liền khối với o/u, nên đo theo khung bao:
 
 Bề dày râu gần bằng nét thân (đo được ở Ư: 0.86–0.92 nét thân). Râu ơ vươn ít vì bụng o đã tròn ra bên phải; râu ư vươn xa hơn vì thân u thẳng đứng.
 
+**Hình râu dựng cho chữ đậm (Bold, Black):** nét râu dày gần bằng nét thân, nên:
+- Chân râu nằm gọn trong thân: mép trên của chân không cao hơn đỉnh u/o, nếu không sẽ thành bậc khấc ở chỗ nối.
+- Đầu râu bo tròn, không cắt phẳng ngang; đỉnh ngoài của đầu bo chạm đúng độ cao đầu râu theo bảng trên (đường tâm thấp xuống nửa bề dày).
+
 **Độ rộng (advance) của ơ ư:** râu được phép lấn sang lề phải, không cộng cả đoạn râu vào độ rộng. Font chuyên nghiệp có lề phải của ư thường âm (Segoe −9, Verdana −46, Arial Italic −87), nên khoảng hở "ươ", "ưn" gần bằng "uo", "un". Xưởng cộng thêm 0.2 × đoạn râu chìa ra cho ư Ư, 0 cho ơ Ơ. Lề phải mới không âm quá 0.15 × độ rộng chữ so với lề gốc (Italic: 0.15 + 0.5 × độ nghiêng), để râu không đâm vào chữ kế bên. Cộng đủ cả đoạn râu cộng thêm lề làm "hương", "ưng" thưa hẳn ra.
 
 Kiểm: `node scripts/compare-horn-spacing.cjs` so khoảng hở ươ, ưn, ơn, ƯN giữa bản dựng và bản gốc của 25 font. Khi lập chuẩn, lệch trung vị 0–19/1000 em.
