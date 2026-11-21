@@ -287,6 +287,12 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       group.members.sort((a, b) => familyStyles.findIndex(style => style.style === identifyFamilyStyle(a)) - familyStyles.findIndex(style => style.style === identifyFamilyStyle(b)) || nameOrder.compare(a.name,b.name));
       if (group.members.some(record => record.id === selectedId)) expandedFamilies.add(group.key);
     }
+    // Đặt lại tên bản Việt hóa ghép theo kiểu chữ cho khớp font gốc (chỉ tên trong bộ sưu tập), một lần.
+    const renames = pairGroups().flatMap(group => group.rows.filter(row => row.renameTo && row.vietnamized.name !== row.renameTo));
+    if (renames.length) {
+      for (const row of renames) await accessFonts('readwrite', store => store.put({ ...row.vietnamized, name: row.renameTo, renamedFrom: row.vietnamized.renamedFrom || { name: row.vietnamized.name } }));
+      return refresh(preferred);
+    }
     $('collection-fonts').hidden = !records.length;
     $('collection-count').textContent = '(' + records.length + ')';
     renderFamilies(true);
@@ -340,6 +346,18 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         if (pair) used.add(pair.id);
         return { original, vietnamized: pair };
       });
+      // Bản Việt hóa cũ mang tên lệch (ví dụ "XFVN - Gilroy Thin" của "SVN-Gilroy Thin", đặt theo ô Tên bộ font lúc làm):
+      // ghép theo kiểu chữ khi tên không khớp font gốc nào; nhiều bản cùng kiểu thì lấy bản lưu sau cùng.
+      const originalKeys = new Set(group.originals.map(item => matchKey(item.name)));
+      for (const row of group.rows) {
+        if (row.vietnamized) continue;
+        const style = identifyFamilyStyle(row.original);
+        const candidates = group.vietnamized.filter(item => !used.has(item.id) && !originalKeys.has(matchKey(item.name)) && identifyFamilyStyle(item) === style);
+        if (!candidates.length || group.rows.filter(other => !other.vietnamized && identifyFamilyStyle(other.original) === style).length > 1) continue;
+        row.vietnamized = candidates.reduce((a, b) => Number(b.id) > Number(a.id) ? b : a);
+        row.renameTo = VI_PREFIX + row.original.name;
+        used.add(row.vietnamized.id);
+      }
       for (const item of group.vietnamized) if (!used.has(item.id)) group.rows.push({ vietnamized: item });
       group.done = group.rows.filter(row => row.original && row.vietnamized).length;
     }
