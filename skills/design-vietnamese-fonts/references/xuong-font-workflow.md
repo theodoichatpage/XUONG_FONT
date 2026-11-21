@@ -10,6 +10,12 @@ Dự án hiện tại: https://xuong-font.vercel.app/ ; mã nguồn theodoichatp
 4. Kiểm các dấu kép và cặp râu ngoài bộ xem trước tối đa sáu chữ. Nút hiện tại dịch/scale nhóm contour dấu rời, chưa tự sửa khoảng giữa hai tầng dấu và không tách dấu đã hàn vào thân.
 5. Xuất TTF để kiểm, rồi quay bộ sưu tập bấm **Lưu font đang làm**. Xác nhận style vẫn ở đúng family.
 
+## Bộ sưu tập và bản Việt hóa
+
+- Mọi font Xưởng xuất ra (lưu, tải, family tự sinh) tự mang tiền tố `XFVN - ` ở tên trong bộ sưu tập và tên family bên trong file (ví dụ `XFVN - Poppins-ThinItalic`, family `XFVN - Poppins`), để cài cạnh font gốc không trùng tên. Font gốc người dùng nhập vào giữ nguyên tên. Không cần nút đổi tên.
+- Danh sách hiển thị hai cột **Font gốc | Việt hóa**; tiêu đề family ghi tiến độ "Việt hóa N/M". Ghép cặp theo tên đã bỏ tiền tố, bỏ "Việt hóa", bỏ dấu gạch/khoảng trắng.
+- **Cập nhật bản Việt hóa cũ theo quy tắc mới:** chọn bản XFVN, bấm **Mở để chỉnh sửa**, bấm **Tạo dấu tiếng Việt**, rồi **Lưu font đang làm**. Không cần xóa font cũ. Xưởng so với font gốc cùng hàng: chữ font gốc không có là do Xưởng ghép, được ghép lại; dấu mẫu Xưởng đã dựng được dựng lại. Font gốc phải còn trong Bộ sưu tập; thiếu thì Xưởng giữ mọi chữ như nét gốc và báo. Chỉnh tay trước đó trên các chữ này sẽ bị thay.
+
 ## Điểm nối khi sửa mã
 
 - `site/mark-spacing.js`: chỉnh contour dấu rời, giữ advance. Khi thay thuật toán, kiểm dấu trên, dấu dưới, counter thân, râu và dấu hàn vào thân.

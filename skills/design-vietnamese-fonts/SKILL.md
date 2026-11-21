@@ -40,7 +40,7 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 
 ## Tạo family
 
-Dùng mẫu mặc định 16 vị trí: ExtraLight 200, Light 300, Regular 400, Medium 500, SemiBold 600, Bold 700, ExtraBold 800, Black 900; mỗi mức có kiểu đứng và Italic. Không tuyên bố mọi family đều bắt buộc có 16 kiểu. Đọc độ đậm gốc rồi chọn mốc tương ứng; không mặc định Medium trùng Regular. Kiểu nghiêng tạo bằng shear là bản nháp oblique, không phải thiết kế Italic hoàn chỉnh. Kiểm flags italic, góc nghiêng và metadata khi xuất hoặc sửa lại.
+Dùng mẫu mặc định 18 vị trí: Thin 100, ExtraLight 200, Light 300, Regular 400, Medium 500, SemiBold 600, Bold 700, ExtraBold 800, Black 900; mỗi mức có kiểu đứng và Italic. Không tuyên bố mọi family đều bắt buộc có đủ 18 kiểu. Đọc độ đậm gốc rồi chọn mốc tương ứng; không mặc định Medium trùng Regular. Kiểu nghiêng tạo bằng shear là bản nháp oblique, không phải thiết kế Italic hoàn chỉnh. Kiểm flags italic, góc nghiêng và metadata khi xuất hoặc sửa lại.
 
 Kiểm tra lại mỗi weight, không chỉ Regular. Offset làm dày có thể bít counter, nối dấu vào thân, làm dấu nặng quá lớn hoặc tăng độ vươn râu. Đánh dấu kết quả tự động là bản nháp đến khi kiểm tra xong. Giữ cùng tên family, tên style rõ và weight metadata đúng. Không đổi sidebearings toàn bộ để xử lý một va chạm dấu.
 

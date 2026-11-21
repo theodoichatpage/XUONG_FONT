@@ -120,6 +120,19 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 Đỉnh cả cụm: chữ thường 0.81–0.89 em, chữ hoa 0.96–1.0 em. Chồng thẳng dấu thanh lên trên mũ làm cụm hoa cao quá 1 em; đó là lý do các font này đặt dấu thanh lệch cạnh mũ. Khi vẫn vượt, thu dấu thanh (tối đa còn 65%) rồi hạ sát mũ/trăng, không thu mũ.
 
+## Chữ nghiêng (Italic, Oblique)
+
+- **Đo độ nghiêng:** lấy tâm nét thân `l` (hoặc `I`, `i`) ở 30% và 70% chiều cao; độ nghiêng = lệch ngang / chênh cao. Dưới 0.03 coi là chữ đứng. Italic thường 0.15–0.25 (8–14°).
+- **Dấu Xưởng tự dựng** (dựng từ nét chữ) được nghiêng theo chữ, quanh giữa chiều cao của dấu. Dấu lấy từ font đã nghiêng sẵn thì không nghiêng thêm.
+- **Vị trí:** mỗi dấu dịch ngang theo trục nghiêng: độ nghiêng × (giữa dấu − giữa thân chữ). Dấu trên lệch phải, dấu nặng lệch trái so với tâm khung chữ.
+- **Dấu nặng** không nghiêng hình (chấm vẫn là chấm), chỉ dịch theo trục.
+- **Râu** nghiêng từ chân râu, cùng góc với thân.
+- Khi Việt hóa Italic, dùng chính file Italic làm gốc, không lấy dấu của bản đứng rồi nghiêng.
+
+## Kiểu đầu nét
+
+Đo đầu trên và chân thân `l`: ở độ sâu 0.15 bề dày tính từ mép, mặt cắt dưới 0.85 bề dày ở **cả hai** đầu thì font có đầu tròn. Kết quả khi lập chuẩn: Comic Sans, Comic Sans Bold, Segoe Print là đầu tròn; Arial, Arial Black, Segoe UI (mọi độ đậm), Times, Calibri, Consolas, Verdana, Bahnschrift là đầu vuông/serif. Râu dựng theo đúng kiểu này (dấu hỏi dựng hiện chưa áp quy tắc đầu nét); không bo tròn khi nét chữ sắc vuông, không cắt vuông khi nét chữ tròn.
+
 ## Kiểm bằng máy
 
 `npm run check:marks` lấy các font trên (nếu máy có), xóa hết chữ có dấu, cho Xưởng dựng lại bằng chính luồng **Tạo dấu tiếng Việt**, rồi so với dấu gốc của nhà thiết kế. Bước kiểm tra đạt khi trung vị tỷ số dựng/gốc của từng chỉ số nằm trong khoảng 0,85–1,15 và không font nào lệch quá giới hạn từng chỉ số.
