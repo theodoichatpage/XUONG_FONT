@@ -176,15 +176,16 @@ const topology = value => shapeOf(contours(value));
 // điểm: góc vẫn nhọn, không thành đường ngang. Làm đậm: giữ giới hạn mũi nhọn 6 lần; mũi nào làm dính nét thì chỉ
 // cắt riêng mũi đó ở 2 lần. Cuối cùng mới bo tròn cả glyph.
 // Thu mảnh: mỗi mũi nhọn (góc lõm hẹp) đi sâu theo đúng đường song song, chỉ dừng lại khi phần nét còn lại phía trước
-// mỏng hơn `wall` (≈ nét đã thu mảnh), và không sâu quá 6 lần độ thu (tránh khe dài ở chỗ nối móc số 6). Không cắt mọi
+// mỏng hơn 60% thành nét gốc (theo tỷ lệ nét thân), và không sâu quá 6 lần độ thu (tránh khe dài ở chỗ nối móc số 6). Không cắt mọi
 // mũi ở 2 lần độ thu rồi kéo về một điểm: như vậy cạnh xiên của M, A bị kéo lệch, nét thành hình nêm, dày mỏng không đều.
-function truncateSpikes(source, amount, wall) {
-  const d = Math.abs(amount) * 16, minWall = wall * 16;
+function truncateSpikes(source, amount, stemRatio, newStem = 0) {
+  const d = Math.abs(amount) * 16, stemWidth = newStem * 16;
   const high = offsetPolygons(source, amount, 1000), low = offsetPolygons(source, amount, 2);
   const missing = clip(CL.ClipType.ctDifference, low, high);
   if (!missing.length) return high;
   const edges = source.flatMap(polygon => polygon.map((a, i) => [a, polygon[(i + 1) % polygon.length]]));
   const restored = [];
+  let pierced = false;
   for (const polygon of source) {
     const sign = Math.sign(CL.Clipper.Area(polygon));
     polygon.forEach((vertex, i) => {
@@ -209,8 +210,14 @@ function truncateSpikes(source, amount, wall) {
         const t = ((p.X - vertex.X) * fy - (p.Y - vertex.Y) * fx) / den, u = ((p.X - vertex.X) * by - (p.Y - vertex.Y) * bx) / den;
         if (t > 1 && u >= 0 && u <= 1) exit = Math.min(exit, t);
       }
+      // Thành nét còn lại phía trước mũi nhọn giữ ít nhất 60% thành nét gốc (theo tỷ lệ nét thân mới/cũ).
+      const minWall = .6 * exit * stemRatio;
       const depth = Math.max(d, Math.min(exit - d - minWall, 6 * d));
       if (depth >= tip) return;
+      // Cắt vì nét phía trước sẽ mỏng/thủng (không phải chỉ vì giới hạn 6 lần), và đoạn bằng để lại rộng quá 20% nét
+      // thân đã thu (mắt thấy được), mới là đổi kiểu chữ: kiểu này không đạt.
+      const flat = 2 * (tip - depth) * Math.tan(half);
+      if (exit - d - minWall < tip && flat > .2 * stemWidth) pierced = true;
       // Dải dọc theo mũi nhọn, từ độ sâu cho phép tới quá đầu mũi; chỉ trả lại phần vật liệu đã bị mũi nhọn lấy đi.
       const width = (tip - depth) * Math.tan(half) + 32, far = Math.max(tip, exit) + d, nx = -by, ny = bx;
       const strip = [[depth, width], [depth, -width], [far, -width], [far, width]]
@@ -220,18 +227,24 @@ function truncateSpikes(source, amount, wall) {
     });
   }
   // Nới phần trả lại ¼ đơn vị để dính liền với nét (cạnh chung trùng khít dễ bị làm tròn hở).
-  return restored.length ? clip(CL.ClipType.ctUnion, high, offsetPolygons(restored, .25, 2)) : high;
+  const result = restored.length ? clip(CL.ClipType.ctUnion, high, offsetPolygons(restored, .25, 2)) : high;
+  result.cut = pierced;
+  return result;
 }
-function reweigh(path, amount, wall = 2 * Math.abs(amount)) {
+function reweigh(path, amount, stemRatio = 1, newStem = 0) {
   const source = prepared(path), before = shapeOf(source);
   if (amount < 0) {
-    const trimmed = truncateSpikes(source, amount, wall);
-    if (shapeOf(trimmed) === before) return toPath(trimmed, amount);
+    // compromised: phải cắt mũi góc hẹp (hoặc phải bo tròn) mới không thủng nét, tức kiểu chữ đã khác bản gốc.
+    const mark = output => Object.assign(output, { compromised: true });
+    const trimmed = truncateSpikes(source, amount, stemRatio, newStem);
+    if (shapeOf(trimmed) === before) return trimmed.cut ? mark(toPath(trimmed, amount)) : toPath(trimmed, amount);
     const low = offsetPolygons(source, amount, 2);
     if (shapeOf(low) === before) {
       const pointed = repoint(low, source, amount);
-      return toPath(shapeOf(pointed) === before ? pointed : low, amount);
+      return mark(toPath(shapeOf(pointed) === before ? pointed : low, amount));
     }
+    const round = offsetPolygons(source, amount, 2, CL.JoinType.jtRound);
+    return mark(toPath(shapeOf(round) === before ? round : offsetPolygons(source, amount, 6), amount));
   } else {
     const high = offsetPolygons(source, amount, 6);
     if (shapeOf(high) === before) return toPath(high, amount);
@@ -361,12 +374,12 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     }
     const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [], keptChars = new Set();
     const markShift = amount ? markShifter(source, amount, upm) : null;
-    // Thành nét tối thiểu khi mũi nhọn của góc hẹp đi sâu vào (thu mảnh): 0.85 nét thân đã thu (đơn vị font).
-    const wall = .85 * Math.max(2 * Math.abs(amount), (sourceStem ?? 0) + 2 * amount);
+    // Tỷ lệ nét thân mới/cũ: thành nét phía trước mũi nhọn góc hẹp phải mảnh theo đúng tỷ lệ này (thu mảnh).
+    const stemRatio = sourceStem ? Math.max(.05, (sourceStem + 2 * amount) / sourceStem) : 1;
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
     // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
-    const upright = [], welded = new Set();
+    const upright = [], welded = new Set(), compromisedChars = new Set();
     for (let i = 0; i < source.glyphs.length; i++) {
       const old = source.glyphs.get(i);
       const originalPath = old.path ?? new opentype.Path();
@@ -374,7 +387,10 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       const required = chars.some(char => checkSet.has(char));
       let path = originalPath, advance = old.advanceWidth ?? upm / 2;
       if (amount && originalPath.commands?.length) {
-        try { path = reweigh(originalPath, amount, wall); advance += amount * 2; }
+        try {
+          path = reweigh(originalPath, amount, stemRatio, sourceStem ? sourceStem + 2 * amount : 0); advance += amount * 2;
+          if (path.compromised && required && chars.some(char => /[\p{L}\p{N}]/u.test(char) && !isAccented(char))) chars.forEach(char => compromisedChars.add(char));
+        }
         catch (error) { if (required && !chars.some(isAccented) && chars.some(char => /[\p{L}\p{N}]/u.test(char))) throw error; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }   // ký hiệu phụ quá mảnh: giữ nét gốc
         if (path !== originalPath && topology(originalPath) !== topology(path)) {
           // Chữ có dấu (Ấ, Õ...): nới nét làm dấu dính nhau/dính thân. Không bỏ cả kiểu: ghép lại ở lượt 2 từ
@@ -401,6 +417,10 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       upright.push({ path, light, advance });
       if (i % 40 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     }
+    // Chuẩn kiểu mảnh: thu mảnh tới mức này mà góc hẹp của chữ cái/số phải cắt bớt mới không thủng nét thì font không
+    // đạt kiểu này (nét không còn đều như bản gốc). Không tạo kiểu này; family không cần đủ mọi độ đậm.
+    if (compromisedChars.size) throw new Error('Không đạt chuẩn ' + style + ': thu mảnh tới mức này thì góc hẹp của ' + [...compromisedChars].slice(0, 12).join(' ')
+      + ' phải cắt bớt mới không thủng nét, nét không còn đều như bản gốc. Font này không làm được kiểu ' + style + ', bỏ qua kiểu này');
     // Lượt 2: ghép lại chữ có dấu bị dính từ thân và dấu đã làm đậm (thang 1000, trục y lên như trình sửa).
     const recomposed = welded.size ? recomposeWelded(upright, welded, codePointsByGlyph, upm) : new Map();
     for (const i of welded) if (!recomposed.has(i)) throw new Error('Không ghép lại được ' + (codePointsByGlyph.get(i) || []).map(code => String.fromCodePoint(code)).join('/') + ' sau khi đổi độ đậm. Giữ bản gốc; cần thiết kế lại mức đậm này.');
