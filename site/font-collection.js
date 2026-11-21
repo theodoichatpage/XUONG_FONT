@@ -318,41 +318,82 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     matrix.append(grid);
   }
 
+  // Danh sách hai cột: mỗi dòng là một kiểu, trái là font gốc, phải là bản Việt hóa (XFVN) tương ứng.
+  // Family gốc và family XFVN cùng tên được gộp thành một nhóm, tiêu đề ghi tiến độ Việt hóa.
+  const VI_PREFIX = 'XFVN - ';
+  const isVietnamized = record => record.name.startsWith(VI_PREFIX);
+  const matchKey = name => name.replace(/^XFVN - /, '').replace(/\s*Việt hóa\s*$/i, '').normalize('NFC').toLocaleLowerCase('vi').replace(/[^\p{L}\p{N}]/gu, '');
+  function pairGroups() {
+    const merged = new Map();
+    for (const group of groups) {
+      const family = group.family.replace(/^XFVN - /, '').trim() || group.family;
+      const key = family.normalize('NFC').toLocaleLowerCase('vi');
+      if (!merged.has(key)) merged.set(key, { key, family, originals: [], vietnamized: [] });
+      for (const record of group.members) merged.get(key)[isVietnamized(record) ? 'vietnamized' : 'originals'].push(record);
+    }
+    for (const group of merged.values()) {
+      const used = new Set();
+      group.rows = group.originals.map(original => {
+        const pair = group.vietnamized.find(item => !used.has(item.id) && matchKey(item.name) === matchKey(original.name));
+        if (pair) used.add(pair.id);
+        return { original, vietnamized: pair };
+      });
+      for (const item of group.vietnamized) if (!used.has(item.id)) group.rows.push({ vietnamized: item });
+      group.done = group.rows.filter(row => row.original && row.vietnamized).length;
+    }
+    return [...merged.values()].sort((a, b) => nameOrder.compare(a.family, b.family));
+  }
+
   function renderFamilies(revealSelected = false, focusKey) {
-    const rows = groups.flatMap(group => expandedFamilies.has(group.key)
-      ? [{ group }, ...group.members.map(record => ({ group, record }))] : [{ group }]);
-    // All families and styles live in one vertically scrollable list.
-    // No pagination: newly expanded families remain in the same scroll area.
     fonts.replaceChildren();
-    for (const { group, record } of rows) {
+    const choose = (record, button) => {
+      if (working || familyRunning) return;
+      fonts.querySelectorAll('[aria-pressed="true"]').forEach(item => item.setAttribute('aria-pressed', 'false'));
+      button.setAttribute('aria-pressed', 'true');
+      selectedId = record.id;
+      showSelection();
+    };
+    const cell = record => {
+      if (!record) { const empty = document.createElement('span'); empty.className = 'collection-empty-cell'; empty.textContent = '—'; return empty; }
       const button = document.createElement('button');
       button.type = 'button';
-      if (record) {
-        button.className = 'collection-variant';
-        const twins = group.members.filter(item => item.name === record.name);
-        // Mục trùng tên (lưu từ trước bản sửa): ghi rõ bản nào lưu sau để dễ chọn giữ.
-        button.textContent = record.name + (twins.length > 1 ? (Math.max(...twins.map(item => Number(item.id))) === Number(record.id) ? ' · bản lưu sau' : ' · bản lưu trước') : '');
-        button.setAttribute('aria-pressed', String(record.id === selectedId));
-        button.addEventListener('click', () => {
-          if (working || familyRunning) return;
-          fonts.querySelector('[aria-pressed="true"]')?.setAttribute('aria-pressed', 'false');
-          button.setAttribute('aria-pressed', 'true');
-          selectedId = record.id;
-          showSelection();
-        });
-      } else {
-        const expanded = expandedFamilies.has(group.key);
-        button.className = 'collection-family';
-        button.textContent = (expanded ? '▾ ' : '▸ ') + group.family + ' (' + group.members.length + ')';
-        button.setAttribute('aria-expanded', String(expanded));
-        button.addEventListener('click', () => {
-          if (expanded) expandedFamilies.delete(group.key);
-          else expandedFamilies.add(group.key);
-          renderFamilies(false, group.key);
-        });
+      button.className = 'collection-variant';
+      const twins = records.filter(item => item.name === record.name);
+      // Mục trùng tên (lưu từ trước bản sửa): ghi rõ bản nào lưu sau để dễ chọn giữ.
+      button.textContent = record.name + (twins.length > 1 ? (Math.max(...twins.map(item => Number(item.id))) === Number(record.id) ? ' · bản lưu sau' : ' · bản lưu trước') : '');
+      button.title = button.textContent;
+      button.setAttribute('aria-pressed', String(record.id === selectedId));
+      button.addEventListener('click', () => choose(record, button));
+      return button;
+    };
+    for (const group of pairGroups()) {
+      if (group.rows.some(row => row.original?.id === selectedId || row.vietnamized?.id === selectedId) && revealSelected) expandedFamilies.add(group.key);
+      const expanded = expandedFamilies.has(group.key);
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'collection-family';
+      const progress = group.originals.length ? ' · Việt hóa ' + group.done + '/' + group.originals.length : ' · ' + group.vietnamized.length + ' bản Việt hóa';
+      header.textContent = (expanded ? '▾ ' : '▸ ') + group.family + progress;
+      header.title = header.textContent.slice(2);
+      header.setAttribute('aria-expanded', String(expanded));
+      header.addEventListener('click', () => {
+        if (expanded) expandedFamilies.delete(group.key);
+        else expandedFamilies.add(group.key);
+        renderFamilies(false, group.key);
+      });
+      fonts.append(header);
+      if (focusKey === group.key) header.focus();
+      if (!expanded) continue;
+      const head = document.createElement('div');
+      head.className = 'collection-pair collection-pair-head';
+      head.innerHTML = '<span>Font gốc</span><span>Việt hóa</span>';
+      fonts.append(head);
+      for (const row of group.rows) {
+        const line = document.createElement('div');
+        line.className = 'collection-pair' + (row.original && !row.vietnamized ? ' pending' : '');
+        line.append(cell(row.original), cell(row.vietnamized));
+        fonts.append(line);
       }
-      fonts.append(button);
-      if (!record && focusKey === group.key) button.focus();
     }
     // Legacy paging controls are no longer needed.
     previousPage.hidden = true;

@@ -209,7 +209,12 @@ dialog::backdrop{background:#221a17bd}
 #collection-families{min-height:88px;border:1px solid var(--line);border-radius:7px}
 #collection-families button{display:block;text-align:left;width:100%;padding:4px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;border-color:transparent}
 #collection-families .collection-family{color:var(--red)}
-#collection-families .collection-variant{padding-left:22px}
+#collection-families .collection-variant{padding-left:8px}
+#collection-families .collection-pair{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding-left:14px;align-items:center}
+#collection-families .collection-pair-head{font-size:11px;font-weight:700;color:var(--muted,#7a6f66);padding-top:2px;padding-bottom:2px;text-transform:uppercase;letter-spacing:.04em}
+#collection-families .collection-pair-head span{padding:0 8px}
+#collection-families .collection-empty-cell{padding:4px 8px;font-size:13px;color:var(--muted,#9a8f86)}
+#collection-families .collection-pair.pending .collection-empty-cell{color:var(--red)}
 #collection-families button[aria-pressed=true]{background:var(--accent);color:var(--red)}
 .collection-pages{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px;font-size:12px}
 .collection-pages button{padding:2px 8px}
@@ -240,7 +245,7 @@ dialog::backdrop{background:#221a17bd}
 .studio-tabs button[aria-selected=true]{background:var(--red);color:white}
 #font-collection{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 #font-collection>.viewer-toolbar{padding:0 0 12px;border:0}
-#font-collection .collection-body{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:18px;padding:0;flex:1;min-height:0;overflow:hidden}
+#font-collection .collection-body{display:grid;grid-template-columns:minmax(300px,520px) minmax(0,1fr);gap:18px;padding:0;flex:1;min-height:0;overflow:hidden}
 .collection-library,.collection-detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;min-height:0;overflow:auto;overscroll-behavior:contain}
 .collection-library>.tool-row{margin-bottom:10px}
 #collection-editor{display:block;margin:0}
