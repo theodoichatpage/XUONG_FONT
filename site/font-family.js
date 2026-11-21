@@ -6,6 +6,7 @@ import { familyPreflight, missingFamilyStyles } from './family-validation.js';
 import { charset, composeVietnamese } from './vietnamese.js';
 import { auditMarks, auditMessage } from './rule-audit.js';
 import svgpath from 'svgpath';
+import outline from '../scripts/lib/outline-metrics.cjs';
 const checkSet = new Set(charset);
 const { applyStyleMetadata } = require('../src/font-style-metadata');
 const escapeXML = value => String(value).replace(/[&<>"']/g, ch => '&#' + ch.codePointAt(0) + ';');
@@ -203,6 +204,70 @@ function reweigh(path, amount) {
   return toPath(shapeOf(round) === before ? round : offsetPolygons(source, amount, 6), amount);
 }
 
+// Bề dày dấu theo độ đậm (skill, mark-standards "Bề dày theo độ đậm"): dấu ≈ min(20 + 0.27 × thân, 0.75 × thân)
+// (thang 1000), giữ tỷ lệ riêng của nhà thiết kế: dấu mới = dấu gốc × f(thân mới) / f(thân gốc). Tính riêng từng chữ
+// (bề dày 2A/P của chính dấu đó): đổi cùng một độ cho mọi dấu làm dấu mảnh (móc hỏi) gầy hẳn so với dấu dày (trăng, mũ)
+// ở kiểu Thin, nét dấu không đều. Thu mảnh còn giữ cỡ dấu (Segoe UI Light so với Regular: cao dấu chỉ giảm ~8%).
+// Trả về hàm cho độ nới mỗi bên (đơn vị font) phần dấu của một glyph, và vùng để phóng dấu về cỡ cũ; null nếu không đo được thân.
+function markShifter(source, amount, upm) {
+  const flat = glyph => glyph?.index && glyph.path.commands.length ? outline.flatten(toD(glyph.path, upm)) : null;
+  const l = flat(source.charToGlyph('l')) || flat(source.charToGlyph('I')), stem = l && outline.stemWidth(l);
+  if (!stem) return null;
+  const next = stem + 2 * amount * 1000 / upm;
+  if (!(next > 0)) return null;
+  const f = s => Math.min(20 + .27 * s, .75 * s);
+  const ratio = f(next) / f(stem);
+  return (glyph, chars) => {
+    // Chỉ đo và chỉnh riêng chữ Việt cần kiểm (các chữ có dấu khác dùng mức chung, tránh chậm với font nhiều glyph).
+    // Nặng là chấm đặc, không thu mảnh như nét: giữ cỡ (Tạo dấu tiếng Việt đã giữ nặng ≥ 0.9 nét thân).
+    if (!chars.some(char => checkSet.has(char))) return { shift: amount * .27 };
+    if (amount < 0 && chars.every(char => char.normalize('NFD').includes('̣') && [...char.normalize('NFD')].length === 2)) return { shift: 0 };
+    const base = chars.map(char => char.normalize('NFD')[0]).find(ch => ch && source.charToGlyph(ch)?.index);
+    const own = flat(glyph), plain = base && flat(source.charToGlyph(base)), extra = own && plain ? outline.extraContours(own, plain) : [];
+    const thickness = extra.length ? outline.strokeThickness(extra) : NaN;
+    if (!(Number.isFinite(thickness) && thickness > 0)) return { shift: amount * .27 };
+    if (amount > 0) return { shift: thickness * (ratio - 1) / 2 * upm / 1000 };
+    // Thu mảnh: thu nét rồi phóng dấu về lại cỡ cũ (restoreMarks), rồi đo lại bề dày thật và chỉnh độ thu đến khi
+    // đúng tỷ lệ × bề dày gốc (phóng lại làm nét dày lên nên không tính thẳng được). Giữ cỡ dấu như font chuyên nghiệp.
+    const plainBox = outline.boxOf(plain), area = { top: plainBox.y1 * upm / 1000, bottom: plainBox.y0 * upm / 1000 };
+    const measure = path => {
+      const marks = outline.flatten(toD(path, upm)).filter(contour => { const b = outline.box(contour); return b.y0 > plainBox.y1 || b.y1 < plainBox.y0; });
+      return marks.length ? outline.strokeThickness(marks) : NaN;
+    };
+    const target = ratio * thickness, build = shift => restoreMarks(reweigh(glyph.path, shift), shift, area);
+    let a = thickness * (ratio - 1) / 2 * upm / 1000, ta = measure(build(a)), b = a * 1.6, tb = measure(build(b));
+    for (let step = 0; step < 2 && Number.isFinite(ta) && Number.isFinite(tb) && Math.abs(tb - target) > .5 && tb !== ta; step++) {
+      const c = Math.min(0, b + (target - tb) * (b - a) / (tb - ta));
+      [a, ta, b, tb] = [b, tb, c, measure(build(c))];
+    }
+    return Number.isFinite(tb) ? { shift: b, restore: area } : { shift: thickness * (ratio - 1) / 2 * upm / 1000 };
+  };
+}
+// Phóng từng dấu (contour nằm hẳn trên đỉnh hoặc dưới chân chữ gốc) quanh tâm của nó về lại chiều cao trước khi thu nét;
+// dấu dẹt rộng (ngã, trăng) không rộng hơn bản gốc.
+function restoreMarks(path, shift, { top, bottom }) {
+  const contours = [];
+  for (const command of path.commands) {
+    if (command.type === 'M') contours.push([]);
+    contours.at(-1)?.push({ ...command });
+  }
+  for (const contour of contours) {
+    const points = contour.filter(command => Number.isFinite(command.x));
+    const ys = points.map(point => point.y), xs = points.map(point => point.x);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys), x0 = Math.min(...xs), x1 = Math.max(...xs);
+    if (!(y0 > top || y1 < bottom) || !(y1 > y0)) continue;
+    const scale = Math.min((y1 - y0 - 2 * shift) / (y1 - y0), (x1 - x0 - 2 * shift) / (x1 - x0)), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (const command of contour) for (const [x, y] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) {
+      if (!Number.isFinite(command[x])) continue;
+      command[x] = cx + (command[x] - cx) * scale;
+      command[y] = cy + (command[y] - cy) * scale;
+    }
+  }
+  const output = new opentype.Path();
+  output.commands = contours.flat();
+  return output;
+}
+
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
   if (record.projectId || record.fromImages) throw new Error('Family từ ảnh cần ảnh riêng của từng Style. Mở Tạo Family từ ảnh để tiếp tục; không sinh Bold bằng offset hoặc Italic bằng shear.');
   const original = await record.blob.arrayBuffer();
@@ -244,6 +309,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       continue;
     }
     const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [], keptChars = new Set();
+    const markShift = amount ? markShifter(source, amount, upm) : null;
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
     // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
@@ -272,7 +338,11 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       // để khoảng hở dấu–thân không bị nới nét thu hẹp (đối chiếu quy tắc: Bold làm hở còn ~0.06 x-height).
       let light;
       if (amount && originalPath.commands?.length && chars.some(isAccented)) {
-        try { light = reweigh(originalPath, amount * .27); } catch { light = originalPath; }
+        try {
+          const mark = markShift ? markShift(old, chars) : { shift: amount * .27 };
+          light = reweigh(originalPath, mark.shift);
+          if (mark.restore) light = restoreMarks(light, mark.shift, mark.restore);
+        } catch { light = originalPath; }
         if (!chars.every(char => /^[ơưƠƯ]$/.test(char))) welded.add(i);
       }
       upright.push({ path, light, advance });

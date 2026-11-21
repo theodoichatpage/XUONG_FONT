@@ -76,6 +76,8 @@ Font đậm có dấu nhẹ hơn thân, font mảnh có dấu gần bằng thân
 | Arial Bold | 137 | 59 | 57 |
 | Segoe UI Black | 208 | 65 | 76 |
 
+Khi Tạo family, áp công thức cho từng dấu (dấu mới = dấu gốc × f(thân mới) / f(thân gốc)), không đổi cùng một độ cho mọi dấu: UTM Bebas Thin đổi cùng độ làm trăng 0.9 thân, móc hỏi chỉ 0.5. Thu mảnh giữ chiều cao dấu (không rộng hơn bản gốc); nặng giữ cỡ.
+
 Không dùng một tỷ lệ cố định với nét thân (ví dụ 0,82): như vậy dấu font Black sẽ quá nặng và dấu font Thin quá mảnh hoặc bị chặn sàn quá dày.
 
 ## Nét đều hay nét thanh-đậm
