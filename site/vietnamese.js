@@ -130,6 +130,8 @@ function undotI(glyph) {
     if (segment[0] === 'M') contours.push([]);
     contours.at(-1)?.push(segment);
   }
+  // i không có chấm (font toàn chữ hoa như Bebas: ô i là hình I): dùng nguyên chữ làm thân.
+  if (contours.length === 1) return glyph;
   if (contours.length !== 2) return null;
   const parts = contours.map(contour => {
     const shape = { d: contour.map(([command, ...coordinates]) => command + coordinates.join(' ')).join('') };
@@ -166,7 +168,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     if (structural && tone && marks.filter(mark => mark !== structural).length === 1) {
       const tier = glyphs.get(structuredChar)?.d && (useStructured || !made.has(structuredChar)) ? glyphs.get(structuredChar) : made.get(structuredChar);
       const plainRoot = glyphs.get(root);
-      const isCapital = root !== root.toLowerCase();
+      const isCapital = root !== root.toLowerCase() || body.allCaps;
       const sample = pickMark(glyphs, tone, isCapital, capMarks, () => (derivedTwoTier ??= deriveMarkSamples(glyphs).marks));
       const placed = tier?.d && plainRoot?.d && sample?.d ? placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, body) : null;
       if (placed) {
@@ -184,7 +186,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     const bounds = glyphBounds(plain);
     if (plain !== original) { const full = glyphBounds(original); bounds.y = Math.min(bounds.y, full.y); }
     const bodyTop = bounds.y + bounds.height;
-    const isCap = root !== root.toLowerCase();
+    const isCap = root !== root.toLowerCase() || body.allCaps;
     // Khoảng hở chuẩn đo từ font đã Việt hóa: dấu trên chữ thường 0.136 x-height, chữ hoa 0.105, nặng 0.093.
     const gapUpper = (isCap ? STD.gap.cap : STD.gap.lower)[0] * body.xHeight, gapBelow = STD.gap.below[0] * body.xHeight;
     let top = bodyTop + gapUpper;
@@ -510,11 +512,14 @@ export function roundTerminals(glyphs) {
 export function measureBody(glyphs) {
   const box = char => { const g = glyphs.get(char); return g?.d ? glyphBounds(g) : null; };
   const top = chars => { for (const c of chars) { const b = box(c); if (b) return b.y + b.height; } };
-  const xHeight = top(['x', 'z', 'v', 'u', 'n']) ?? (top(['o']) ?? 520) * .97;
-  const capHeight = top(['H', 'I', 'E', 'T']) ?? xHeight / .72;
+  const rawX = top(['x', 'z', 'v', 'u', 'n']) ?? (top(['o']) ?? 520) * .97;
+  const capHeight = top(['H', 'I', 'E', 'T']) ?? rawX / .72;
+  // Font toàn chữ hoa (Bebas...): ô chữ thường là hình chữ hoa. Cỡ dấu tính theo x-height quy đổi (chữ hoa ≈ 1.4 x-height
+  // ở font chuẩn), nếu không dấu to gấp 1.4 lần; và mọi chữ dùng luật dấu chữ hoa (đối chiếu quy tắc phát hiện).
+  const allCaps = rawX / capHeight > .9, xHeight = allCaps ? capHeight / 1.4 : rawX;
   const width = chars => { for (const c of chars) { const b = box(c); if (b) return b.width; } };
   const oWidth = width(['o', 'e', 'a', 'u']) ?? .95 * xHeight;
-  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs), slant: measureSlant(glyphs), roundEnds: roundTerminals(glyphs) };
+  return { allCaps, xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs), slant: measureSlant(glyphs), roundEnds: roundTerminals(glyphs) };
 }
 
 export function deriveMarkSamples(glyphs) {

@@ -151,7 +151,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
         filename: record.filename, blob: record.blob });
       continue;
     }
-    const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [];
+    const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [], keptChars = new Set();
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
     // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
@@ -169,14 +169,15 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       let path = originalPath, advance = old.advanceWidth ?? upm / 2;
       if (amount && originalPath.commands?.length) {
         try { path = embolden(originalPath, amount); advance += amount * 2; }
-        catch (error) { if (required && !chars.some(isAccented)) throw error; keptOriginal.push(i); }   // ký hiệu phụ quá mảnh: giữ nét gốc
+        catch (error) { if (required && !chars.some(isAccented) && chars.some(char => /[\p{L}\p{N}]/u.test(char))) throw error; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }   // ký hiệu phụ quá mảnh: giữ nét gốc
         if (path !== originalPath && topology(originalPath) !== topology(path)) {
           // Chữ có dấu (Ấ, Õ...): nới nét làm dấu dính nhau/dính thân. Không bỏ cả kiểu: ghép lại ở lượt 2 từ
           // thân chữ và dấu đã làm đậm riêng, đặt dấu theo chuẩn đo như Tạo dấu tiếng Việt.
           // (glyph dùng chung cho cả chữ không dấu, như A và Á cùng một hình, vẫn phải giữ lòng chữ như chữ thường)
           if (chars.some(isAccented) && !chars.some(char => checkSet.has(char) && !isAccented(char))) welded.add(i);
           // Glyph ngoài bộ chữ cần kiểm (.notdef ở #0, ký hiệu ♠ ® ᵏ, chữ ngoại Ǻ Ⱥ): giữ nét gốc.
-          else if (!required) { path = originalPath; advance = old.advanceWidth ?? upm / 2; keptOriginal.push(i); }
+          // Dấu câu, ký hiệu (* % " ! ...): giữ nét gốc và báo, không bỏ cả kiểu vì một ký hiệu. Chữ cái, số vẫn phải giữ lòng chữ.
+          else if (!required || !chars.some(char => /[\p{L}\p{N}]/u.test(char))) { path = originalPath; advance = old.advanceWidth ?? upm / 2; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }
           else throw new Error('Biến đổi làm mất lòng chữ hoặc nối/tách nét tại ' + chars.join('/') + '. Giữ bản gốc; cần thiết kế lại mức đậm này.');
         }
       }
@@ -198,9 +199,10 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     for (let i = 0; i < upright.length; i++) {
       const { path } = recomposed.get(i) || upright[i];
       if (!path.commands.length) continue;
-      for (const code of codePointsByGlyph.get(i) || []) auditMap.set(String.fromCodePoint(code), { d: toD(path, upm), source: 'Ghép dấu' });
+      for (const code of codePointsByGlyph.get(i) || []) auditMap.set(String.fromCodePoint(code), { d: toD(path, upm), source: recomposed.has(i) ? 'Ghép dấu' : 'Font gốc' });
     }
-    const audit = auditMessage(auditMarks(auditMap, { madeOnly: false })).trim();
+    // Chỉ chấm chữ Xưởng ghép lại; chữ chỉ được nghiêng/đổi độ đậm giữ nét nhà thiết kế thì không chấm.
+    const audit = auditMessage(auditMarks(auditMap)).trim() + (keptChars.size ? ' Giữ nét gốc (đổi độ đậm làm dính/tách nét): ' + [...keptChars].join(' ') + '.' : '');
     for (let i = 0; i < upright.length; i++) {
       let { path, advance } = recomposed.get(i) || upright[i];
       if (italic) path = slantPath(path, angle);

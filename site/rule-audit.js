@@ -26,17 +26,27 @@ export function auditMarks(glyphs, { madeOnly = true, slant = 0 } = {}) {
   let measured;
   try { measured = metrics.measureFont(font); } catch { return null; }
   if (!measured) return null;
+  // Font toàn chữ hoa (Bebas...): ô chữ thường là hình chữ hoa (x-height ≈ chiều cao hoa) nên chấm theo chuẩn chữ hoa.
+  const allCaps = measured.xH / measured.capH > .9;
+  const rangeKey = key => {
+    if (!allCaps) return key;
+    if (key.startsWith('tier_')) return 'tier_' + key.slice(5).toUpperCase();
+    if (key.startsWith('rau_')) return 'rau_' + key.slice(4).toUpperCase();
+    return markChar[key] ? key + 'Cap' : key;
+  };
   const issues = [];
   let checked = 0;
   for (const [key, values] of Object.entries(measured)) {
     if (!values || typeof values !== 'object') continue;
     const char = charOf(key);
     if (!char || (madeOnly && real(glyphs.get(char)))) continue;
-    for (const [metric, value] of Object.entries(values)) {
-      const range = MARK_RANGES[key + '.' + metric];
+    for (let [metric, value] of Object.entries(values)) {
+      const range = MARK_RANGES[rangeKey(key) + '.' + metric];
       // dx (lệch tâm) đổi theo độ nghiêng chữ; cỡ so với dấu chấm chỉ có nghĩa khi font có dấu chấm thật.
       if (!range || !Number.isFinite(value) || metric === 'dx' || (metric === 'vsPeriod' && !glyphs.get('.')?.d)) continue;
       if (slant && (metric === 'side' || metric === 'reach')) continue;
+      // Chuẩn chữ hoa đo theo x-height của font có chữ thường (hoa ≈ 1.4 x-height); font toàn hoa đo theo chiều cao hoa nên quy đổi.
+      if (allCaps && (metric === 'h' || metric === 'gap') && !key.startsWith('tier_')) value *= 1.4;
       checked++;
       const [min, , max] = range, pad = (max - min) * .1;
       if (value < min - pad || value > max + pad) issues.push({ char, metric, value, range,

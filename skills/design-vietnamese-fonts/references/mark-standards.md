@@ -139,6 +139,10 @@ Ngã trên mũ (ẫ, Ẫ) và mọi dấu thanh trên trăng: đáy dấu thanh 
 
 Nặng: rộng không quá 0.36 độ rộng chữ thường mang dấu, 0.26 độ rộng chữ hoa (font chuẩn ọ ≤ 0.38, Ọ ≤ 0.27); font hẹp (mono, Black) có nặng nhỏ hơn dấu chấm.
 
+## Font toàn chữ hoa (Bebas...)
+
+Ô chữ thường là hình chữ hoa: đỉnh `x` ≥ 0.9 chiều cao hoa. Dấu dựng theo x-height quy đổi = chiều cao hoa / 1.4 (tỷ lệ hoa/x-height ở font chuẩn) và theo luật dấu chữ hoa cho mọi chữ; nếu lấy đỉnh `X` làm x-height thì dấu to gấp 1.4 lần. Chữ i không chấm (một contour) dùng nguyên làm thân cho ì í ỉ ĩ ị. Bước đối chiếu chấm font toàn hoa theo chuẩn chữ hoa.
+
 ## Kiểm bằng máy
 
 `npm run check:marks` lấy các font trên (nếu máy có), xóa hết chữ có dấu, cho Xưởng dựng lại bằng chính luồng **Tạo dấu tiếng Việt**, rồi so với dấu gốc của nhà thiết kế. Bước kiểm tra đạt khi trung vị tỷ số dựng/gốc của từng chỉ số nằm trong khoảng 0,85–1,15 và không font nào lệch quá giới hạn từng chỉ số.
