@@ -297,7 +297,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     if (!group) return;
     const title = document.createElement('h3');
     const slots = new Set(group.members.map(identifyFamilyStyle).filter(style => familyStyles.some(item => item.style === style)));
-    title.textContent = group.family + ' · ' + slots.size + ' kiểu đã có · không bắt buộc đủ 16'; matrix.append(title);
+    title.textContent = group.family + ' · ' + slots.size + ' kiểu đã có · không bắt buộc đủ ' + familyStyles.length; matrix.append(title);
     const grid = document.createElement('div'); grid.className = 'family-matrix';
     for (const weight of familyWeights) {
       const label = document.createElement('strong'); label.textContent = weight.name; grid.append(label);
@@ -560,7 +560,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     picker.append(row);
   }
   function updateFamilyCount() {
-    $('family-selection-count').textContent = picker.querySelectorAll('input:checked').length + ' / 16 kiểu';
+    $('family-selection-count').textContent = picker.querySelectorAll('input:checked').length + ' / ' + familyStyles.length + ' kiểu';
   }
   picker.addEventListener('change', updateFamilyCount);
   for (const [id, condition] of [['family-select-all', () => true],['family-select-none', () => false],['family-select-upright', input => !input.value.endsWith(' Italic')]]) $(id).addEventListener('click', () => {

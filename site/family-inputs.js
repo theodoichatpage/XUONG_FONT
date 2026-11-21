@@ -1,5 +1,5 @@
 import {familyStyles} from './family-styles.js';
-const aliases=[['ultra[\\s_-]*light','ExtraLight'],['extra[\\s_-]*light','ExtraLight'],['extra[\\s_-]*bold','ExtraBold'],['ultra[\\s_-]*bold','ExtraBold'],['semi[\\s_-]*bold','SemiBold'],['demi[\\s_-]*bold','SemiBold'],['regular','Regular'],['medium','Medium'],['light','Light'],['bold','Bold'],['black','Black'],['heavy','Black']];
+const aliases=[['ultra[\\s_-]*light','ExtraLight'],['extra[\\s_-]*light','ExtraLight'],['extra[\\s_-]*bold','ExtraBold'],['ultra[\\s_-]*bold','ExtraBold'],['semi[\\s_-]*bold','SemiBold'],['demi[\\s_-]*bold','SemiBold'],['hairline','Thin'],['thin','Thin'],['regular','Regular'],['medium','Medium'],['light','Light'],['bold','Bold'],['black','Black'],['heavy','Black']];
 export function parseFamilyInput(value){
   const original=String(value||'').trim();if(!original)throw Error('Nhập tên bộ font ở thanh trên.');
   let family=original,italic=false,explicit=false,weightName;
@@ -15,7 +15,7 @@ export function resolveNamedStyle(analysis,target){
 }
 export function readableStyle(id){
   const found=familyStyles.find(s=>s.style===id);if(!found)return 'Chưa xác định kiểu chữ';
-  const names={ExtraLight:'Rất mảnh',Light:'Mảnh',Regular:'Thông thường',Medium:'Vừa',SemiBold:'Hơi đậm',Bold:'Đậm',ExtraBold:'Rất đậm',Black:'Đậm nhất'};
+  const names={Thin:'Siêu mảnh',ExtraLight:'Rất mảnh',Light:'Mảnh',Regular:'Thông thường',Medium:'Vừa',SemiBold:'Hơi đậm',Bold:'Đậm',ExtraBold:'Rất đậm',Black:'Đậm nhất'};
   return names[found.name]+' · '+(found.italic?'chữ nghiêng':'chữ đứng')+' ('+id+')';
 }
 export async function digestReference(blob){
