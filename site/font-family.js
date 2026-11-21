@@ -91,46 +91,116 @@ function contours(path) {
   return paths.filter(points => points.length >= 3);
 }
 
-function embolden(path, amount, limit = 6, join = ClipperLib.JoinType.jtMiter) {
-  const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(path), ClipperLib.PolyFillType.pftNonZero);
+const CL = ClipperLib;
+function prepared(path) {
+  const polygons = CL.Clipper.SimplifyPolygons(contours(path), CL.PolyFillType.pftNonZero);
   // The largest contour determines the exterior winding.
   const largest = polygons.reduce((best, polygon) =>
-    Math.abs(ClipperLib.Clipper.Area(polygon)) > Math.abs(ClipperLib.Clipper.Area(best)) ? polygon : best, []);
-  if (largest.length && !ClipperLib.Clipper.Orientation(largest)) polygons.forEach(polygon => polygon.reverse());
-  // Góc nhọn (miter), không bo tròn: font góc sắc (UTM Bebas...) giữ góc chân chữ và đỉnh nét khi làm đậm/mảnh.
-  // Đường cong đã được chia nhỏ thành đoạn ngắn nên vẫn cong mượt. Góc quá nhọn (dài hơn 6 lần độ nới) mới bị cắt bằng.
-  const offset = new ClipperLib.ClipperOffset(limit, .5);
-  offset.AddPaths(polygons, join, ClipperLib.EndType.etClosedPolygon);
-  const result = new ClipperLib.Paths();
+    Math.abs(CL.Clipper.Area(polygon)) > Math.abs(CL.Clipper.Area(best)) ? polygon : best, []);
+  if (largest.length && !CL.Clipper.Orientation(largest)) polygons.forEach(polygon => polygon.reverse());
+  return polygons;
+}
+// Nới/thu nét song song từng cạnh. Góc nhọn (miter), không bo tròn: font góc sắc (UTM Bebas...) giữ góc chân chữ và
+// đỉnh nét. Đường cong đã được chia nhỏ thành đoạn ngắn nên vẫn cong mượt. Góc dài hơn `limit` lần độ nới bị cắt bằng.
+function offsetPolygons(polygons, amount, limit, join = CL.JoinType.jtMiter) {
+  const offset = new CL.ClipperOffset(limit, .5);
+  offset.AddPaths(polygons, join, CL.EndType.etClosedPolygon);
+  const result = new CL.Paths();
   offset.Execute(result, amount * 16);
   if (polygons.length && !result.length) throw new Error('Không thể cân nét một ký tự. Hãy giảm độ đậm.');
+  return result;
+}
+function toPath(polygons, amount) {
   const output = new opentype.Path();
-  for (const polygon of result) {
+  for (const polygon of polygons) {
+    if (!polygon.length) continue;
     output.moveTo(polygon[0].X / 16 + amount, polygon[0].Y / 16);
     for (const point of polygon.slice(1)) output.lineTo(point.X / 16 + amount, point.Y / 16);
     output.close();
   }
   return output;
 }
-
-const topology = value => {
-  const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
-  const positive = polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
-  return [polygons.length, Math.min(positive, polygons.length - positive)].join(':');
+function clip(type, subject, clipPaths) {
+  const clipper = new CL.Clipper(), out = new CL.Paths();
+  clipper.AddPaths(subject, CL.PolyType.ptSubject, true);
+  if (clipPaths.length) clipper.AddPaths(clipPaths, CL.PolyType.ptClip, true);
+  clipper.Execute(type, out, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+  return out;
+}
+const shapeOf = polygons => {
+  const simple = CL.Clipper.SimplifyPolygons(polygons, CL.PolyFillType.pftNonZero).filter(p => Math.abs(CL.Clipper.Area(p)) > 256);
+  const positive = simple.filter(p => CL.Clipper.Orientation(p)).length;
+  return [simple.length, Math.min(positive, simple.length - positive)].join(':');
 };
-// Góc nhọn trước; chỉ khi mũi nhọn (miter) của góc rất hẹp đâm xuyên nét mảnh (6 9 của UTM Bebas khi Thin) mới thử
-// giới hạn mũi nhọn ngắn hơn, cuối cùng mới bo tròn đúng glyph đó. Trả về bản đầu tiên giữ nguyên lòng chữ.
+// Mũi nhọn bị cắt để khỏi đâm xuyên nét để lại một đoạn bằng (lòng A, khe M thành đường ngang). Thu đoạn đó về một điểm
+// để góc vẫn nhọn: giữ đầu mút nằm trên cạnh đứng/ngang (thân M vẫn thẳng), cạnh xiên đổi góc rất nhẹ; hai cạnh đều xiên
+// thì nhọn ở giữa đoạn cắt.
+function repoint(result, source, amount) {
+  // Cạnh thường của bản thu mảnh song song với một cạnh gốc và cách nó đúng độ thu; đoạn cắt mũi nhọn thì không.
+  const distance = Math.abs(amount) * 16, edges = source.flatMap(polygon => polygon.map((a, i) => [a, polygon[(i + 1) % polygon.length]]));
+  const offsetEdge = (a, b) => edges.some(([p, q]) => {
+    const dx = q.X - p.X, dy = q.Y - p.Y, length = Math.hypot(dx, dy), ex = b.X - a.X, ey = b.Y - a.Y;
+    if (!length || Math.abs(dx * ey - dy * ex) > .01 * length * Math.hypot(ex, ey)) return false;
+    return Math.abs(Math.abs((a.X - p.X) * dy - (a.Y - p.Y) * dx) / length - distance) < 24;
+  });
+  const cuts = [];
+  for (const polygon of result) polygon.forEach((a, i) => {
+    const b = polygon[(i + 1) % polygon.length];
+    if (Math.hypot(b.X - a.X, b.Y - a.Y) < 4 * distance && !offsetEdge(a, b)) cuts.push([a, b]);
+  });
+  const near = (p, q) => Math.hypot(p.X - q.X, p.Y - q.Y) < 32;
+  const isCut = (a, b) => cuts.some(([p, q]) => (near(a, p) && near(b, q)) || (near(a, q) && near(b, p)));
+  const straight = (a, b) => Math.min(Math.abs(b.X - a.X), Math.abs(b.Y - a.Y)) < .02 * Math.hypot(b.X - a.X, b.Y - a.Y);
+  return result.map(polygon => {
+    const out = polygon.slice();
+    for (let i = 0; i < out.length && out.length > 3; i++) {
+      const a = out[i], b = out[(i + 1) % out.length];
+      if (!isCut(a, b)) continue;
+      const before = out[(i - 1 + out.length) % out.length], after = out[(i + 2) % out.length];
+      const keepA = straight(before, a), keepB = straight(b, after);
+      const tip = keepA && !keepB ? a : keepB && !keepA ? b : { X: Math.round((a.X + b.X) / 2), Y: Math.round((a.Y + b.Y) / 2) };
+      out.splice(i, 1, tip);
+      out.splice((i + 1) % out.length, 1);
+      if (i >= out.length) break;
+    }
+    return out;
+  });
+}
+function embolden(path, amount, limit = 6, join = CL.JoinType.jtMiter) {
+  return toPath(offsetPolygons(prepared(path), amount, limit, join), amount);
+}
+const topology = value => shapeOf(contours(value));
+// Thu mảnh: góc từ 60° trở lên giữ đúng đường song song. Góc hẹp hơn (khe giữa chữ M, đỉnh lòng chữ A, chỗ nối móc
+// số 6) nếu để trọn mũi nhọn sẽ đâm sâu vào nét hoặc xuyên thủng nét, nên cắt ở 2 lần độ thu rồi thu chỗ cắt về một
+// điểm: góc vẫn nhọn, không thành đường ngang. Làm đậm: giữ giới hạn mũi nhọn 6 lần; mũi nào làm dính nét thì chỉ
+// cắt riêng mũi đó ở 2 lần. Cuối cùng mới bo tròn cả glyph.
 function reweigh(path, amount) {
-  const before = topology(path);
-  let first;
-  for (const [limit, join] of [[6, ClipperLib.JoinType.jtMiter], [2, ClipperLib.JoinType.jtMiter], [2, ClipperLib.JoinType.jtRound]]) {
-    let result;
-    try { result = embolden(path, amount, limit, join); } catch (error) { if (!first) first = error; continue; }
-    if (!first) first = result;
-    if (topology(result) === before) return result;
+  const source = prepared(path), before = shapeOf(source);
+  if (amount < 0) {
+    const low = offsetPolygons(source, amount, 2);
+    if (shapeOf(low) === before) {
+      const pointed = repoint(low, source, amount);
+      return toPath(shapeOf(pointed) === before ? pointed : low, amount);
+    }
+  } else {
+    const high = offsetPolygons(source, amount, 6);
+    if (shapeOf(high) === before) return toPath(high, amount);
+    const low = offsetPolygons(source, amount, 2);
+    if (shapeOf(low) === before) {
+      // Phần khác nhau giữa hai bản là các mũi nhọn; chỉ cắt những mũi làm dính nét.
+      const pieces = clip(CL.ClipType.ctDifference, high, low).filter(piece => Math.abs(CL.Clipper.Area(piece)) > 64);
+      const apply = list => clip(CL.ClipType.ctDifference, high, list);
+      let needed = pieces;
+      for (const piece of pieces) {
+        const rest = needed.filter(other => other !== piece);
+        if (shapeOf(apply(rest)) === before) needed = rest;
+      }
+      const result = apply(needed);
+      return toPath(shapeOf(result) === before ? result : low, amount);
+    }
   }
-  if (first instanceof Error) throw first;
-  return first;
+  const round = offsetPolygons(source, amount, 2, CL.JoinType.jtRound);
+  return toPath(shapeOf(round) === before ? round : offsetPolygons(source, amount, 6), amount);
 }
 
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
