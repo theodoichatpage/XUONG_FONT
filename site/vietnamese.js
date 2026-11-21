@@ -218,9 +218,15 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
             const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem);
             const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
-            paths.push(svgpath(horn).translate(edge - inset, attachY).round(1).toString());
-            const hornRight = bounds.x + bounds.width + reach;
-            advance = Math.max(advance, Math.ceil(hornRight + 25));
+            const placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
+            paths.push(placedHorn);
+            // Râu lấn sang lề phải như font chuyên nghiệp; chỉ cộng một phần nhỏ của đoạn chìa ra (đo cả độ nghiêng).
+            const hornRight = glyphBounds({ d: placedHorn }).x + glyphBounds({ d: placedHorn }).width;
+            const right = bounds.x + bounds.width, rsb = original.advance - right;
+            // Giới hạn phần lấn: lề phải mới không âm quá 0.15 độ rộng chữ so với lề gốc (tránh râu đâm vào N, n kế bên);
+            // chữ nghiêng cho lấn thêm theo độ nghiêng vì chữ kế bên cũng nghiêng tránh ra (Italic: ~0.25).
+            const limit = hornRight + Math.min(rsb, 0) - (.15 + .5 * Math.abs(body.slant)) * bounds.width;
+            advance = Math.max(advance, Math.round(original.advance + STD.horn.advance[key] * Math.max(0, hornRight - right)), Math.ceil(limit));
             continue;
           }
           if (mark === '\u031b') {

@@ -16,7 +16,10 @@ export const MARK_STANDARDS = {
   // Nặng: thường nhỏ hơn dấu chấm một chút (trung vị 0.88, khoảng 0.67–1.0); cỡ 0.9–1.75 lần nét thân.
   dotBelow: { vsPeriod: [.88, .67, 1], stem: [1.21, .9, 1.75] },
   // Râu: độ vươn phải / độ rộng chữ gốc; độ cao đầu râu trên đỉnh thân / x-height.
-  horn: { reach: { o: .09, u: .27, O: .11, U: .25 }, tip: { o: .18, u: .18, O: .12, U: .25 } },
+  horn: { reach: { o: .09, u: .27, O: .11, U: .25 }, tip: { o: .18, u: .18, O: .12, U: .25 },
+    // Độ rộng (advance) tăng thêm = hệ số × phần râu chìa ra ngoài mép phải chữ gốc; phần còn lại lấn sang lề phải
+    // như font chuyên nghiệp. Chọn để khoảng hở ơn, ưn, ƯN, ươ khớp trung vị 25 font (lệch trung vị ≤ 20/1000).
+    advance: { o: 0, O: 0, u: .2, U: .2 } },
   // Chồng dấu (ấ, Ẩ...): đỉnh cả cụm / em. Font chuyên nghiệp cho dấu hoa chồng chạm gần 1000.
   // Độ tương phản nét (o: nét ngang mảnh / nét đứng dày) và độ thon sắc/huyền (đầu mảnh / đầu dày) theo nhóm.
   contrast: { monoline: [.9, 1], sans: [.67, .87], highContrast: [.2, .35] },
