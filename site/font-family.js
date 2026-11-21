@@ -3,9 +3,49 @@ import ClipperLib from 'clipper-lib';
 import svg2ttf from 'svg2ttf';
 import { familyWeights, familyStyles } from './family-styles.js';
 import { familyPreflight, missingFamilyStyles } from './family-validation.js';
+import { charset, composeVietnamese } from './vietnamese.js';
+import { auditMarks, auditMessage } from './rule-audit.js';
+import svgpath from 'svgpath';
+const checkSet = new Set(charset);
 const { applyStyleMetadata } = require('../src/font-style-metadata');
 const escapeXML = value => String(value).replace(/[&<>"']/g, ch => '&#' + ch.codePointAt(0) + ';');
 const { addKerning } = require('../src/kern-table');
+
+// Chữ Việt có dấu (trừ râu ơ ư và Đ đ vốn liền thân).
+const isAccented = char => checkSet.has(char) && [...char.normalize('NFD')].length > 1;
+const toD = (path, upm) => svgpath(path.toPathData(3)).scale(1000 / upm).toString();
+function fromD(d, upm) {
+  const output = new opentype.Path();
+  svgpath(d).scale(upm / 1000).abs().unshort().unarc().iterate(segment => {
+    const [c, ...v] = segment;
+    if (c === 'M') output.moveTo(v[0], v[1]);
+    else if (c === 'L') output.lineTo(v[0], v[1]);
+    else if (c === 'Q') output.quadraticCurveTo(v[0], v[1], v[2], v[3]);
+    else if (c === 'C') output.curveTo(v[0], v[1], v[2], v[3], v[4], v[5]);
+    else if (c === 'Z') output.close();
+  });
+  return output;
+}
+// Ghép lại chữ có dấu sau khi đổi độ đậm, từ thân chữ đã đổi độ đậm và dấu của nhà thiết kế.
+// upright[i].light: bản chữ có dấu chỉ đổi độ đậm 0.27 lần (bề dày dấu tăng chậm hơn thân: skill "Bề dày theo độ đậm"),
+// dùng làm nguồn hình dấu; dấu được đặt lại theo chuẩn đo (khoảng hở, hai tầng) như Tạo dấu tiếng Việt.
+function recomposeWelded(upright, targetsIndex, codePointsByGlyph, upm) {
+  const glyphs = new Map(), indexOf = new Map(), targets = new Set();
+  upright.forEach(({ path, light, advance }, i) => {
+    for (const code of codePointsByGlyph.get(i) || []) {
+      const char = String.fromCodePoint(code), shape = targetsIndex.has(i) && light ? light : path;
+      indexOf.set(char, i);
+      if (targetsIndex.has(i)) targets.add(char);
+      if (shape.commands.length || char === ' ') glyphs.set(char, { char, d: shape.commands.length ? toD(shape, upm) : '', advance: advance * 1000 / upm, source: 'Font gốc' });
+    }
+  });
+  const out = new Map();
+  for (const glyph of composeVietnamese(glyphs, char => targets.has(char))) {
+    if (!targets.has(glyph.char) || !glyph.d) continue;
+    out.set(indexOf.get(glyph.char), { path: fromD(glyph.d, upm), advance: glyph.advance * upm / 1000 });
+  }
+  return out;
+}
 
 function slantPath(path, angle) {
   const output = new opentype.Path(), shear = Math.tan(angle * Math.PI / 180);
@@ -111,33 +151,66 @@ export async function createFontFamily(record, chosen, text, onResult, options =
         filename: record.filename, blob: record.blob });
       continue;
     }
-    const amount = (target.offset - base.offset) * upm / 1000;
+    const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [];
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
+    // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
+    const upright = [], welded = new Set();
+    const topology = value => {
+      const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
+      const positive = polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
+      return [polygons.length, Math.min(positive, polygons.length - positive)].join(':');
+    };
     for (let i = 0; i < source.glyphs.length; i++) {
       const old = source.glyphs.get(i);
       const originalPath = old.path ?? new opentype.Path();
-      let path = amount && originalPath.commands?.length ? embolden(originalPath, amount) : originalPath;
-      if (italic) path = slantPath(path, angle);
-      if (amount && originalPath.commands.length) {
-        // Offset can erase a counter or weld a detached accent. Reject that draft.
-        const topology = value => {
-          const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
-          const positive=polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
-          return [polygons.length, Math.min(positive,polygons.length-positive)].join(':');
-        };
-        if (topology(originalPath) !== topology(path)) throw new Error('Biến đổi làm mất lòng chữ hoặc nối/tách nét tại ' + (old.unicodes?.map(c=>String.fromCodePoint(c)).join('/') || '#' + i) + '. Giữ bản gốc; cần thiết kế lại mức đậm này.');
+      const chars = (codePointsByGlyph.get(i) || []).map(code => String.fromCodePoint(code));
+      const required = chars.some(char => checkSet.has(char));
+      let path = originalPath, advance = old.advanceWidth ?? upm / 2;
+      if (amount && originalPath.commands?.length) {
+        try { path = embolden(originalPath, amount); advance += amount * 2; }
+        catch (error) { if (required && !chars.some(isAccented)) throw error; keptOriginal.push(i); }   // ký hiệu phụ quá mảnh: giữ nét gốc
+        if (path !== originalPath && topology(originalPath) !== topology(path)) {
+          // Chữ có dấu (Ấ, Õ...): nới nét làm dấu dính nhau/dính thân. Không bỏ cả kiểu: ghép lại ở lượt 2 từ
+          // thân chữ và dấu đã làm đậm riêng, đặt dấu theo chuẩn đo như Tạo dấu tiếng Việt.
+          // (glyph dùng chung cho cả chữ không dấu, như A và Á cùng một hình, vẫn phải giữ lòng chữ như chữ thường)
+          if (chars.some(isAccented) && !chars.some(char => checkSet.has(char) && !isAccented(char))) welded.add(i);
+          // Glyph ngoài bộ chữ cần kiểm (.notdef ở #0, ký hiệu ♠ ® ᵏ, chữ ngoại Ǻ Ⱥ): giữ nét gốc.
+          else if (!required) { path = originalPath; advance = old.advanceWidth ?? upm / 2; keptOriginal.push(i); }
+          else throw new Error('Biến đổi làm mất lòng chữ hoặc nối/tách nét tại ' + chars.join('/') + '. Giữ bản gốc; cần thiết kế lại mức đậm này.');
+        }
       }
+      // Chữ có dấu (trừ ơ ư Ơ Ư liền khối): giữ thêm bản đổi độ đậm nhẹ làm nguồn hình dấu, và ghép lại ở lượt 2
+      // để khoảng hở dấu–thân không bị nới nét thu hẹp (đối chiếu quy tắc: Bold làm hở còn ~0.06 x-height).
+      let light;
+      if (amount && originalPath.commands?.length && chars.some(isAccented)) {
+        try { light = embolden(originalPath, amount * .27); } catch { light = originalPath; }
+        if (!chars.every(char => /^[ơưƠƯ]$/.test(char))) welded.add(i);
+      }
+      upright.push({ path, light, advance });
+      if (i % 40 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    // Lượt 2: ghép lại chữ có dấu bị dính từ thân và dấu đã làm đậm (thang 1000, trục y lên như trình sửa).
+    const recomposed = welded.size ? recomposeWelded(upright, welded, codePointsByGlyph, upm) : new Map();
+    for (const i of welded) if (!recomposed.has(i)) throw new Error('Không ghép lại được ' + (codePointsByGlyph.get(i) || []).map(code => String.fromCodePoint(code)).join('/') + ' sau khi đổi độ đậm. Giữ bản gốc; cần thiết kế lại mức đậm này.');
+    // Tự đối chiếu quy tắc skill trên kiểu vừa sinh (dạng đứng, thang 1000): mọi chữ đều do Xưởng biến đổi nên chấm hết.
+    const auditMap = new Map();
+    for (let i = 0; i < upright.length; i++) {
+      const { path } = recomposed.get(i) || upright[i];
+      if (!path.commands.length) continue;
+      for (const code of codePointsByGlyph.get(i) || []) auditMap.set(String.fromCodePoint(code), { d: toD(path, upm), source: 'Ghép dấu' });
+    }
+    const audit = auditMessage(auditMarks(auditMap, { madeOnly: false })).trim();
+    for (let i = 0; i < upright.length; i++) {
+      let { path, advance } = recomposed.get(i) || upright[i];
+      if (italic) path = slantPath(path, angle);
       // Avoid Glyph's constructor: opentype.js 1.x drops Unicode aliases there.
-      const glyph = { unicodes: codePointsByGlyph.get(i) || [],
-        advanceWidth: Math.max(0, Math.round((old.advanceWidth ?? upm / 2) + (originalPath.commands.length ? amount * 2 : 0))), path };
-      glyphs.push(glyph);
+      glyphs.push({ unicodes: codePointsByGlyph.get(i) || [], advanceWidth: Math.max(0, Math.round(advance)), path });
       if (path.commands.length) {
         const bounds = path.getBoundingBox();
         ascent = Math.max(ascent, Math.ceil(bounds.y2));
         descent = Math.min(descent, Math.floor(bounds.y1));
       }
-      if (i % 40 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     }
     // Use the same TrueType writer as the editor's download flow.
     // This avoids a second CFF serialization path for imported outlines.
@@ -168,10 +241,10 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       if (index && point >= 32 && !checked.charToGlyphIndex(String.fromCodePoint(point))) {
         throw new Error('Bản xuất bị thiếu ký tự ' + String.fromCodePoint(point));
       }
-      if (index && point >= 32 && source.glyphs.get(index).path.commands.length && !checked.charToGlyph(String.fromCodePoint(point)).path.commands.length) throw new Error('Bản xuất làm rỗng glyph ' + String.fromCodePoint(point));
+      if (index && point >= 32 && checkSet.has(String.fromCodePoint(point)) && source.glyphs.get(index).path.commands.length && !checked.charToGlyph(String.fromCodePoint(point)).path.commands.length) throw new Error('Bản xuất làm rỗng glyph ' + String.fromCodePoint(point));
     }
     await onResult({ name: family + ' ' + style, family, filename: family + '-' + style.replace(/ /g, '') + '.ttf',
-      blob: new Blob([bytes], { type: 'font/ttf' }), style, weight, italic, draft: true, quality: { coverage: outputCheck.coverage.counts, checkedAt: new Date().toISOString(), optical: 'not-tested', method: 'outline-offset', oblique: italic }, isSource: false, text });
+      blob: new Blob([bytes], { type: 'font/ttf' }), style, weight, italic, draft: true, quality: { coverage: outputCheck.coverage.counts, checkedAt: new Date().toISOString(), optical: 'not-tested', method: 'outline-offset', oblique: italic, keptOriginal: keptOriginal.length, recomposed: recomposed.size, audit }, isSource: false, text });
     } catch (error) {
       if (!options.onError) throw error;
       await options.onError(style, error);

@@ -1,6 +1,7 @@
 import svgpath from 'svgpath';
 import { xuongFontFile } from './font-rename.js';
 import { ask } from './ask.js';
+import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline} from './outline-cleanup.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -16,7 +17,7 @@ import { setupFontCollection } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
-import { core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -1167,6 +1168,7 @@ $('derive-marks').addEventListener('click', () => {
     + (barred.length ? `, ${barred.map(glyph => glyph.char).join(' ')}` : '')
     + ` và ghép ${generated.length} chữ có dấu.` + ruleReport
     + (symbols.length ? ` Dựng thêm ${symbols.length} dấu câu, ký hiệu còn thiếu: ${symbols.map(g => g.char).join(' ')}.` : '')
+    + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) }))
     + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.';
   status(message);
   reportDesign(message);
@@ -1203,7 +1205,7 @@ $('accents').addEventListener('click', () => {
   if (!generated.length) return status('Hãy thêm chữ nguyên âm gốc trước, ví dụ A, E hoặc O.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);
   refresh();
-  status(`Đã ghép ${generated.length} ký tự có dấu từ nguyên âm hiện có. Bạn có thể thay bằng nét lấy từ ảnh.`);
+  status(`Đã ghép ${generated.length} ký tự có dấu từ nguyên âm hiện có. Bạn có thể thay bằng nét lấy từ ảnh.` + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) })));
 });
 $('remove').addEventListener('click', () => {
   if (busy || !glyphs.has(selected)) return;
@@ -1361,10 +1363,11 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   refresh();
   const added = missingBefore.filter(char => glyphs.has(char));
   const missing = charset.filter(char => !glyphs.has(char));
+  const audit = editOnly ? '' : auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) }));
   status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. '
     + (regenerable ? regenerable + ' chữ có dấu do Xưởng ghép (so với ' + original.name + '); bấm Tạo dấu tiếng Việt để ghép lại theo chuẩn mới. '
       : record.name.startsWith('XFVN - ') && !original ? 'Không thấy font gốc trong Bộ sưu tập nên mọi chữ được giữ như nét gốc; thêm font gốc vào Bộ sưu tập để ghép lại dấu. ' : '')
-    + 'Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
+    + 'Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.') + audit
     + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
   return true;
 }, runFontQuality);

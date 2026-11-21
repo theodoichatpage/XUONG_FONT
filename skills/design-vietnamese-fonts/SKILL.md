@@ -7,6 +7,14 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 
 Đọc [quy tắc thiết kế](references/design-rules.md) trước khi sửa hình chữ. Dùng [chuẩn đo dấu](references/mark-standards.md) khi cần số cụ thể: cỡ, độ dày, khoảng hở, nặng, râu theo từng loại font. Trước khi dựng dấu, phân loại font nét đều, sans thường hay thanh-đậm bằng độ tương phản nét; dấu phải theo đúng loại đó. Đọc [luồng Xưởng Font](references/xuong-font-workflow.md) để nối thao tác với ứng dụng. Dùng [bộ thử](references/proof-corpus.md) khi kiểm tra kết quả. Đọc [kiểm tra bộ chữ](references/checking-coverage.md) khi phân tích font mới hoặc font thành phẩm.
 
+## Quy trình bắt buộc: dựng theo quy tắc → tự đối chiếu → sửa quy tắc
+
+1. **Dựng theo quy tắc:** mọi bước tạo/sửa (Tạo dấu tiếng Việt, Việt hóa, Tạo family) dựng từ số đo trong [chuẩn đo dấu](references/mark-standards.md), không sửa tay từng góc chữ.
+2. **Tự đối chiếu ngay sau khi dựng:** Xưởng đo lại chữ vừa dựng bằng đúng phép đo đã dùng để lập chuẩn (`scripts/lib/mark-metrics.cjs`) và so với khoảng [min–max] của 20 font chuyên nghiệp (`site/mark-ranges.js`, sinh bởi `scripts/build-mark-ranges.cjs`). Kết quả hiện ngay trong dòng trạng thái ("đạt N/M chỉ số. CẦN XEM: ..."), và ở từng kiểu khi Tạo family. Chỉ chấm chữ do Xưởng ghép/dựng; nét của nhà thiết kế và nét lấy từ ảnh không bị chấm.
+3. **Lệch chuẩn thì sửa quy tắc dựng, không sửa tay chữ đó:** tìm vì sao luật dựng cho ra số lệch, sửa luật trong `site/vietnamese.js` / `site/font-family.js`, ghi lại trong skill, rồi chạy lại đối chiếu trên các font Windows (`npm run audit:rules` và `npm run check:marks`). Chỉ báo xong khi đối chiếu đạt.
+
+Ví dụ đã làm theo quy trình này: Ẫ đặt ngã quá thấp (đáy 0.94–1.00 chiều cao mũ, chuẩn 1.04–1.39) → luật hai tầng không hạ dấu thanh nằm trên mũ/trăng xuống dưới 1.04, thu nhỏ dấu thanh thay vào đó. Ọ nặng quá rộng ở font hẹp (0.29, chuẩn ≤ 0.27) → giới hạn bề rộng nặng theo chữ mang dấu. Family Bold làm hở dấu–thân còn 0.06 → ghép lại mọi chữ có dấu từ thân đã làm đậm và dấu làm đậm 0.27 lần.
+
 ## Xác định đầu vào
 
 1. Phân loại: ảnh chữ mẫu, file font, hay một kiểu trong family đang sửa.
@@ -41,6 +49,8 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 ## Tạo family
 
 Dùng mẫu mặc định 18 vị trí: Thin 100, ExtraLight 200, Light 300, Regular 400, Medium 500, SemiBold 600, Bold 700, ExtraBold 800, Black 900; mỗi mức có kiểu đứng và Italic. Không tuyên bố mọi family đều bắt buộc có đủ 18 kiểu. Đọc độ đậm gốc rồi chọn mốc tương ứng; không mặc định Medium trùng Regular. Kiểu nghiêng tạo bằng shear là bản nháp oblique, không phải thiết kế Italic hoàn chỉnh. Kiểm flags italic, góc nghiêng và metadata khi xuất hoặc sửa lại.
+
+Sinh weight bằng nới/thu nét (offset) làm dấu hai tầng (Ấ, Ẩ) và dấu sát thân (Õ) dính nhau ở kiểu đậm. Xưởng làm hai lượt: đổi độ đậm từng glyph ở dạng đứng; chữ có dấu nào bị dính thì ghép lại từ thân chữ và dấu đã đổi độ đậm, đặt theo chuẩn đo (như Tạo dấu tiếng Việt), rồi mới nghiêng. Glyph ngoài bộ chữ cần kiểm (.notdef ở #0, ký hiệu ♠ ® ᵏ, chữ ngoại Ǻ Ⱥ) hỏng khi đổi độ đậm thì giữ nét gốc, không bỏ cả kiểu. Chữ cái không dấu, số, dấu câu mất lòng chữ hoặc dính nét (chân serif h của Times khi rất đậm) vẫn làm kiểu đó thất bại.
 
 Kiểm tra lại mỗi weight, không chỉ Regular. Offset làm dày có thể bít counter, nối dấu vào thân, làm dấu nặng quá lớn hoặc tăng độ vươn râu. Đánh dấu kết quả tự động là bản nháp đến khi kiểm tra xong. Giữ cùng tên family, tên style rõ và weight metadata đúng. Không đổi sidebearings toàn bộ để xử lý một va chạm dấu.
 

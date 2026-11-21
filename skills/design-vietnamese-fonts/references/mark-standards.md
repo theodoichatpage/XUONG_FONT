@@ -133,6 +133,12 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 Đo đầu trên và chân thân `l`: ở độ sâu 0.15 bề dày tính từ mép, mặt cắt dưới 0.85 bề dày ở **cả hai** đầu thì font có đầu tròn. Kết quả khi lập chuẩn: Comic Sans, Comic Sans Bold, Segoe Print là đầu tròn; Arial, Arial Black, Segoe UI (mọi độ đậm), Times, Calibri, Consolas, Verdana, Bahnschrift là đầu vuông/serif. Râu dựng theo đúng kiểu này (dấu hỏi dựng hiện chưa áp quy tắc đầu nét); không bo tròn khi nét chữ sắc vuông, không cắt vuông khi nét chữ tròn.
 
+## Hai tầng: dấu thanh nằm trên mũ/trăng
+
+Ngã trên mũ (ẫ, Ẫ) và mọi dấu thanh trên trăng: đáy dấu thanh không thấp hơn 1.04 chiều cao mũ/trăng (font chuẩn: 1.04–1.39). Khi cả cụm vượt chiều cao dòng (hoa 1.0 em, thường 0.9 em), thu dấu thanh (tối đa còn 50%) thay vì hạ xuống sát mũ. Dấu thanh lệch cạnh mũ (ấ ầ ẩ) vẫn được hạ tối đa 0.25 chiều cao mũ.
+
+Nặng: rộng không quá 0.36 độ rộng chữ thường mang dấu, 0.26 độ rộng chữ hoa (font chuẩn ọ ≤ 0.38, Ọ ≤ 0.27); font hẹp (mono, Black) có nặng nhỏ hơn dấu chấm.
+
 ## Kiểm bằng máy
 
 `npm run check:marks` lấy các font trên (nếu máy có), xóa hết chữ có dấu, cho Xưởng dựng lại bằng chính luồng **Tạo dấu tiếng Việt**, rồi so với dấu gốc của nhà thiết kế. Bước kiểm tra đạt khi trung vị tỷ số dựng/gốc của từng chỉ số nằm trong khoảng 0,85–1,15 và không font nào lệch quá giới hạn từng chỉ số.

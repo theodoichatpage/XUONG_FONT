@@ -674,6 +674,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         row.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--line)';
         const label = document.createElement('strong');
         label.textContent = result.style + (result.draft ? result.italic ? ' · Oblique tự động · cần duyệt' : ' · Bản nháp' : ' · Font gốc');
+        // Kết quả tự đối chiếu quy tắc skill của kiểu vừa sinh (đo trong createFontFamily).
+        const auditLine = document.createElement('p');
+        auditLine.className = 'help';
+        auditLine.textContent = result.quality?.audit || '';
         const proof = document.createElement('p');
         proof.style.cssText = 'font-size:32px;line-height:1.6;font-weight:400;font-style:normal;font-synthesis:none;letter-spacing:0;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap';
         if (previewLoaded) proof.style.fontFamily = face.family;
@@ -699,7 +703,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
           if (target && await vietnamize(target, { editOnly: true })) { editingRecord = target; selectedId = target.id; selectTab(false); }
         }));
         const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,editButton,savedLabel);
-        row.append(label,proof,actions); $('family-results').append(row);
+        row.append(label,auditLine,proof,actions); $('family-results').append(row);
         $('family-status').textContent = 'Đã hoàn tất ' + savedCount + ' / ' + styles.length + ': ' + result.style + '.';
       }, { existingStyles, baseWeight: anchor.weight, angle: Number($('family-italic-angle').value), onError: (style, error) => { failures.push(style + ': ' + error.message); } });
       await refresh(familyRecord.id);

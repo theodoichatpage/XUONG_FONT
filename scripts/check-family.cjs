@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),esbuild=require('esbuild'),svg2ttf=require('svg2ttf'),opentype=require('opentype.js');
 const dir=path.join(__dirname,'../.qa');fs.mkdirSync(dir,{recursive:true});
-function moduleFor(name,file){const output=path.join(dir,name+'.cjs');esbuild.buildSync({entryPoints:[path.join(__dirname,'..',file)],bundle:true,platform:'node',format:'cjs',outfile:output,external:['wawoff2','esm-potrace-wasm']});return require(output);}
+function moduleFor(name,file){const output=path.join(dir,name+'.cjs');esbuild.buildSync({entryPoints:[path.join(__dirname,'..',file)],bundle:true,platform:'node',format:'cjs',outfile:output,external:['wawoff2','esm-potrace-wasm'],inject:[path.join(__dirname,'lib','dom-bbox-shim.mjs')]});return require(output);}
 const {familyPreflight,missingFamilyStyles}=moduleFor('family-validation','site/family-validation.js');
 const {createFontFamily}=moduleFor('family-generator','site/font-family.js');
 const {vietnameseCheckCharacters}=moduleFor('coverage','site/font-coverage.js');

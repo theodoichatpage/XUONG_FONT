@@ -62,8 +62,12 @@ function placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, b
   const limit = 1000 * (isCapital ? STD.stackTop.cap[2] : .9);
   let y = mark.y + rule.bottom * mark.height + (rule.lift || 0) * body.xHeight;
   let k = standalone * rule.scale / source.height;
-  if (y + source.height * k > limit) k = Math.max(k * .65, (limit - y) / source.height);
-  if (y + source.height * k > limit) y = Math.max(y - .25 * mark.height, limit - source.height * k);
+  // Dấu thanh đặt trên mũ/trăng (ngã trên mũ, mọi dấu trên trăng): font chuyên nghiệp không hạ đáy dấu thanh xuống dưới
+  // 1.04 chiều cao mũ (tier_Ẫ.bottom 1.04–1.39), mà thu nhỏ dấu thanh thêm (tối đa còn 50%) để vừa dòng.
+  const above = rule.bottom >= .95, floor = above ? mark.y + Math.max(rule.bottom, 1.04) * mark.height : y - .25 * mark.height;
+  if (above) y = Math.max(y, floor);
+  if (y + source.height * k > limit) k = Math.max(k * (above ? .5 : .65), (limit - y) / source.height);
+  if (y + source.height * k > limit) y = Math.max(floor, limit - source.height * k);
   const w = source.width * k;
   const x = rule.left !== undefined ? cx + rule.left * mark.width
     : rule.right !== undefined ? cx + rule.right * mark.width - w
@@ -248,7 +252,10 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
           const ownSize = sample.nativeSize || sample.source === 'Font gốc';   // dấu lấy từ chính font: giữ cỡ gốc
-          const scale = Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width);
+          // Nặng không rộng quá khoảng font chuẩn dùng so với chữ mang dấu (ọ ≤ 0.38, Ọ ≤ 0.267 độ rộng chữ):
+          // chữ hẹp (font mono, Black) sẽ có nặng nhỏ lại thay vì to bằng dấu chấm.
+          const dotLimit = mark === '̣' ? (isCap ? .26 : .36) * bounds.width / source.width : Infinity;
+          const scale = Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width, dotLimit);
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - gapBelow - height;
           else top += height + gapUpper;
