@@ -211,9 +211,10 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             // Skill: r\u00e2u n\u1ed1i v\u00e0o th\u00e2n \u1edf v\u00f9ng tr\u00ean b\u00ean ph\u1ea3i o/u. T\u00ecm m\u00e9p ph\u1ea3i th\u1eadt c\u1ee7a n\u00e9t t\u1ea1i \u0111\u1ed9 cao n\u1ed1i
             // (o cong v\u00e0o trong n\u00ean kh\u00f4ng d\u00f9ng khung ch\u1eef nh\u1eadt), c\u1eafm g\u1ed1c r\u00e2u v\u00e0o trong n\u00e9t \u0111\u1ec3 li\u1ec1n kh\u1ed1i.
             // Chân râu nằm gọn trong thân: mép trên của chân không cao hơn đỉnh thân (chữ đậm nét dày dễ tạo bậc khấc).
-            const attachY = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .45 * (sample.stem || bounds.width * .2) * .9);
-            const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
+            // Bề dày chân râu .9 nét thân, nên tâm chân phải thấp hơn đỉnh thân ít nhất nửa bề dày (.45 nét) cộng chút dư.
             const stem = sample.stem || bounds.width * .2, inset = .45 * stem;
+            const attachY = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .5 * stem);
+            const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
             // Chuẩn đo: độ vươn phải theo độ rộng chữ gốc, đầu râu cao hơn đỉnh thân theo x-height.
             const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
