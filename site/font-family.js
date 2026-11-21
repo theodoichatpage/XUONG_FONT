@@ -175,9 +175,58 @@ const topology = value => shapeOf(contours(value));
 // số 6) nếu để trọn mũi nhọn sẽ đâm sâu vào nét hoặc xuyên thủng nét, nên cắt ở 2 lần độ thu rồi thu chỗ cắt về một
 // điểm: góc vẫn nhọn, không thành đường ngang. Làm đậm: giữ giới hạn mũi nhọn 6 lần; mũi nào làm dính nét thì chỉ
 // cắt riêng mũi đó ở 2 lần. Cuối cùng mới bo tròn cả glyph.
-function reweigh(path, amount) {
+// Thu mảnh: mỗi mũi nhọn (góc lõm hẹp) đi sâu theo đúng đường song song, chỉ dừng lại khi phần nét còn lại phía trước
+// mỏng hơn `wall` (≈ nét đã thu mảnh), và không sâu quá 6 lần độ thu (tránh khe dài ở chỗ nối móc số 6). Không cắt mọi
+// mũi ở 2 lần độ thu rồi kéo về một điểm: như vậy cạnh xiên của M, A bị kéo lệch, nét thành hình nêm, dày mỏng không đều.
+function truncateSpikes(source, amount, wall) {
+  const d = Math.abs(amount) * 16, minWall = wall * 16;
+  const high = offsetPolygons(source, amount, 1000), low = offsetPolygons(source, amount, 2);
+  const missing = clip(CL.ClipType.ctDifference, low, high);
+  if (!missing.length) return high;
+  const edges = source.flatMap(polygon => polygon.map((a, i) => [a, polygon[(i + 1) % polygon.length]]));
+  const restored = [];
+  for (const polygon of source) {
+    const sign = Math.sign(CL.Clipper.Area(polygon));
+    polygon.forEach((vertex, i) => {
+      const prev = polygon[(i - 1 + polygon.length) % polygon.length], next = polygon[(i + 1) % polygon.length];
+      const ax = prev.X - vertex.X, ay = prev.Y - vertex.Y, cx = next.X - vertex.X, cy = next.Y - vertex.Y;
+      const la = Math.hypot(ax, ay), lc = Math.hypot(cx, cy);
+      if (!la || !lc) return;
+      // Góc lõm (phía vật liệu > 180°) và hẹp hơn 60°: mũi nhọn dài hơn 2 lần độ thu.
+      const cross = (vertex.X - prev.X) * cy - (vertex.Y - prev.Y) * cx;
+      if (cross * sign >= 0) return;
+      const ex = ax / la + cx / lc, ey = ay / la + cy / lc, el = Math.hypot(ex, ey);
+      if (!el) return;
+      const half = Math.acos(Math.max(-1, Math.min(1, (ax * cx + ay * cy) / (la * lc)))) / 2;
+      if (Math.sin(half) > .5) return;
+      const bx = -ex / el, by = -ey / el, tip = d / Math.sin(half);
+      // Tia từ đỉnh góc theo hướng mũi nhọn: khoảng tới mép nét phía trước (bỏ hai cạnh tạo góc).
+      let exit = Infinity;
+      for (const [p, q] of edges) {
+        if (p === vertex || q === vertex) continue;
+        const fx = q.X - p.X, fy = q.Y - p.Y, den = bx * fy - by * fx;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((p.X - vertex.X) * fy - (p.Y - vertex.Y) * fx) / den, u = ((p.X - vertex.X) * by - (p.Y - vertex.Y) * bx) / den;
+        if (t > 1 && u >= 0 && u <= 1) exit = Math.min(exit, t);
+      }
+      const depth = Math.max(d, Math.min(exit - d - minWall, 6 * d));
+      if (depth >= tip) return;
+      // Dải dọc theo mũi nhọn, từ độ sâu cho phép tới quá đầu mũi; chỉ trả lại phần vật liệu đã bị mũi nhọn lấy đi.
+      const width = (tip - depth) * Math.tan(half) + 32, far = Math.max(tip, exit) + d, nx = -by, ny = bx;
+      const strip = [[depth, width], [depth, -width], [far, -width], [far, width]]
+        .map(([along, side]) => ({ X: Math.round(vertex.X + bx * along + nx * side), Y: Math.round(vertex.Y + by * along + ny * side) }));
+      if (!CL.Clipper.Orientation(strip)) strip.reverse();
+      restored.push(...clip(CL.ClipType.ctIntersection, missing, [strip]));
+    });
+  }
+  // Nới phần trả lại ¼ đơn vị để dính liền với nét (cạnh chung trùng khít dễ bị làm tròn hở).
+  return restored.length ? clip(CL.ClipType.ctUnion, high, offsetPolygons(restored, .25, 2)) : high;
+}
+function reweigh(path, amount, wall = 2 * Math.abs(amount)) {
   const source = prepared(path), before = shapeOf(source);
   if (amount < 0) {
+    const trimmed = truncateSpikes(source, amount, wall);
+    if (shapeOf(trimmed) === before) return toPath(trimmed, amount);
     const low = offsetPolygons(source, amount, 2);
     if (shapeOf(low) === before) {
       const pointed = repoint(low, source, amount);
@@ -282,6 +331,8 @@ export async function createFontFamily(record, chosen, text, onResult, options =
   if (!Number.isFinite(angle) || angle < 1 || angle > 20) throw new Error('Góc nghiêng cần từ 1 đến 20 độ.');
   const family = record.family || source.getEnglishName('preferredFamily') || source.getEnglishName('fontFamily') || record.name.replace(/(?:[ -]+Regular)$/i, '').trim();
   const upm = source.unitsPerEm;
+  const stemGlyph = [source.charToGlyph('l'), source.charToGlyph('I')].find(glyph => glyph?.index && glyph.path.commands.length);
+  const sourceStem = stemGlyph ? outline.stemWidth(outline.flatten(stemGlyph.path.toPathData(3))) || null : null;
   // cmap is authoritative: multiple code points can share one outline.
   const codePointsByGlyph = new Map();
   for (const [code, index] of Object.entries(source.tables.cmap.glyphIndexMap)) {
@@ -310,6 +361,8 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     }
     const amount = (target.offset - base.offset) * upm / 1000, keptOriginal = [], keptChars = new Set();
     const markShift = amount ? markShifter(source, amount, upm) : null;
+    // Thành nét tối thiểu khi mũi nhọn của góc hẹp đi sâu vào (thu mảnh): 0.85 nét thân đã thu (đơn vị font).
+    const wall = .85 * Math.max(2 * Math.abs(amount), (sourceStem ?? 0) + 2 * amount);
     const glyphs = [];
     let ascent = source.ascender, descent = source.descender;
     // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
@@ -321,7 +374,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       const required = chars.some(char => checkSet.has(char));
       let path = originalPath, advance = old.advanceWidth ?? upm / 2;
       if (amount && originalPath.commands?.length) {
-        try { path = reweigh(originalPath, amount); advance += amount * 2; }
+        try { path = reweigh(originalPath, amount, wall); advance += amount * 2; }
         catch (error) { if (required && !chars.some(isAccented) && chars.some(char => /[\p{L}\p{N}]/u.test(char))) throw error; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }   // ký hiệu phụ quá mảnh: giữ nét gốc
         if (path !== originalPath && topology(originalPath) !== topology(path)) {
           // Chữ có dấu (Ấ, Õ...): nới nét làm dấu dính nhau/dính thân. Không bỏ cả kiểu: ghép lại ở lượt 2 từ
