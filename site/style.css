@@ -388,3 +388,6 @@ dialog::backdrop{background:#221a17bd}
 
 /* Ô nội dung chữ cần gõ trước khi dựng (không có Gemini). */
 #layout-text.needs-text { outline: 3px solid #b3261e; outline-offset: 2px; background: #fff4f2; }
+
+.ask-dialog{width:min(460px,92vw);padding:18px 20px}
+.ask-dialog p{margin:0 0 14px;line-height:1.5}

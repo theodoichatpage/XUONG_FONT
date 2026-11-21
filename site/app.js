@@ -1,5 +1,6 @@
 import svgpath from 'svgpath';
 import { xuongFontFile } from './font-rename.js';
+import { ask } from './ask.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline} from './outline-cleanup.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -793,7 +794,7 @@ async function trace(single) {
       }
     }
     const replacements = [...traced.keys()].filter(char => glyphs.get(char)?.source === 'Ảnh mẫu');
-    if (replacements.length && !window.confirm(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`)) {
+    if (replacements.length && !(await ask(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`, { ok: 'Thay nét' }))) {
       return status('Đã hủy thay nét.');
     }
     for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
@@ -1210,8 +1211,8 @@ $('remove').addEventListener('click', () => {
   updateComposed();
   refresh();
 });
-$('reset').addEventListener('click', () => {
-  if (busy || !window.confirm('Xóa tất cả ký tự trong bộ đang làm?')) return;
+$('reset').addEventListener('click', async () => {
+  if (busy || !(await ask('Xóa tất cả ký tự trong bộ đang làm?', { ok: 'Xóa bộ chữ' }))) return;
   glyphs.clear();
   importedMetrics = undefined;
   loadedSourceBlob = undefined;
@@ -1329,7 +1330,7 @@ $('sample').addEventListener('wheel', event => {
 
 const fontCollection = setupFontCollection(() => currentFontExport, async (record, { editOnly = false, original } = {}) => {
   if (busy || loading) throw new Error('Hãy đợi tác vụ đang chạy hoàn tất.');
-  if (glyphs.size && !confirm('Mở font này để chỉnh sửa? Bộ chữ đang làm sẽ được thay bằng font đã chọn.')) return false;
+  if (glyphs.size && !(await ask('Mở font này để chỉnh sửa? Bộ chữ đang làm sẽ được thay bằng font đã chọn.', { ok: 'Mở font' }))) throw new Error('Chưa mở: bạn đã chọn Hủy, bộ chữ đang làm giữ nguyên.');
   const imported = await importFontFile(record);
   const missingBefore = charset.filter(char => !imported.glyphs.has(char));
   const drafts = new Map(imported.glyphs);

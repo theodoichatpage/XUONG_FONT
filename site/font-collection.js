@@ -4,6 +4,7 @@ import opentype from 'opentype.js';
 import { familyPreflight } from './family-validation.js';
 import { withXuongPrefix } from './font-rename.js';
 import { charset } from './vietnamese.js';
+import { ask } from './ask.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
 
@@ -95,7 +96,7 @@ async function addFont(record) {
         const sameName = request.result.find(item => item.name === record.name);
         // Một tên chỉ có một mục: kiểu do Tạo family sinh ra không chèn thêm mục trùng tên với font bạn đã lưu.
         if (record.generatedFrom != null && sameName && sameName.generatedFrom == null) { result = { id: sameName.id, duplicate: true, kept: true }; return; }
-        const previous = record.generatedFrom != null
+        const previous = record.prefixOnly ? sameName : record.generatedFrom != null
           ? sameName || request.result.find(item => item.generatedFrom != null && item.family === record.family && identifyFamilyStyle(item) === identifyFamilyStyle(record))
           : isHungFont(record) ? request.result.findLast(isHungFont) : undefined;
         const add = previous ? store.put({ ...record, digest, id: previous.id }) : store.add({ ...record, digest });
@@ -406,7 +407,8 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   nextPage.addEventListener('click', () => { page++; renderFamilies(); });
 
   async function run(action) {
-    if (working) return;
+    // Đang chạy việc trước (lưu, Việt hóa cả family...): báo rõ thay vì im lặng không phản hồi khi bấm nút.
+    if (working) { status.textContent = 'Bộ sưu tập đang xử lý việc trước, đợi xong rồi bấm lại.'; return; }
     working = true;
     files.disabled = saveCurrent.disabled = true;
     fonts.setAttribute('aria-busy', 'true');
@@ -493,10 +495,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
       : replaced ? 'Đã cập nhật ' + record.name + ' (lưu đè bản cùng tên, không tạo mục mới).' : 'Đã lưu ' + record.name + '.';
   }));
 
-  $('collection-dedupe').addEventListener('click', () => {
+  $('collection-dedupe').addEventListener('click', async () => {
     const record = records.find(item => item.id === selectedId);
     const twins = record ? records.filter(item => item.id !== record.id && item.name === record.name) : [];
-    if (working || !twins.length || !window.confirm('Giữ mục đang chọn và xóa ' + twins.length + ' mục khác cùng tên “' + record.name + '” khỏi bộ sưu tập? Không hoàn tác được.')) return;
+    if (working || !twins.length || !(await ask('Giữ mục đang chọn và xóa ' + twins.length + ' mục khác cùng tên “' + record.name + '” khỏi bộ sưu tập? Không hoàn tác được.', { ok: 'Xóa mục trùng' }))) return;
     run(async () => {
       await accessFonts('readwrite', store => twins.map(item => store.delete(item.id)).at(-1));
       await refresh(record.id);
@@ -537,7 +539,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         const group = pairGroups().find(item => item.rows.some(row => row.original?.id === record.id));
         const others = [];
         for (const row of group?.rows || []) if (row.original && !row.vietnamized && row.original.id !== record.id && await hasVietnamese(row.original)) others.push(row.original);
-        const targets = [record, ...(others.length && confirm(record.name + ' đã có đủ chữ tiếng Việt nên chỉ cần thêm tiền tố XFVN.' + String.fromCharCode(10) + 'Làm luôn cho ' + others.length + ' font cùng family cũng đã có tiếng Việt và chưa có bản XFVN?') ? others : [])];
+        const targets = [record, ...(others.length && await ask(record.name + ' đã có đủ chữ tiếng Việt nên chỉ cần thêm tiền tố XFVN. Làm luôn cho ' + others.length + ' font cùng family cũng đã có tiếng Việt và chưa có bản XFVN?', { ok: 'Làm cả family', cancel: 'Chỉ font này' }) ? others : [])];
         for (const item of targets) await addPrefixedCopy(item);
         await refresh(record.id);
         status.textContent = 'Font đã có tiếng Việt: chỉ thêm tiền tố XFVN, không ghép lại dấu. Đã tạo ' + targets.length + ' bản: ' + targets.map(item => 'XFVN - ' + item.name).join(', ') + '.';
@@ -694,9 +696,9 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     }
   });
 
-  $('collection-remove').addEventListener('click', () => {
+  $('collection-remove').addEventListener('click', async () => {
     const record = records.find(item => item.id === selectedId);
-    if (working || !record || !window.confirm('Xóa “' + record.name + '” khỏi bộ sưu tập?')) return;
+    if (working || !record || !(await ask('Xóa “' + record.name + '” khỏi bộ sưu tập?', { ok: 'Xóa font' }))) return;
     run(async () => {
       await accessFonts('readwrite', store => store.delete(record.id));
       await refresh();
