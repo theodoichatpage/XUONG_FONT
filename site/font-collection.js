@@ -535,7 +535,9 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     const record = records.find(item => item.id === selectedId);
     if (!record) return;
     run(async () => {
-      if (await vietnamize(record, { editOnly: true })) {
+      // Bản Việt hóa (XFVN): đưa kèm font gốc để biết chữ nào do Xưởng ghép, cho phép Tạo dấu tiếng Việt ghép lại.
+      const original = isVietnamized(record) ? records.find(item => !isVietnamized(item) && matchKey(item.name) === matchKey(record.name)) : undefined;
+      if (await vietnamize(record, { editOnly: true, original })) {
         editingRecord = record;
         selectedId = record.id;
         selectTab(false);

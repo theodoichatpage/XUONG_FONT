@@ -238,7 +238,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             // The left base of the horn seats inside the upper-right stem.
             paths.push(svgpath(sample.d).translate(-source.x, -source.y).scale(scale)
               .translate(right - overlap, bodyTop - height * .62).round(1).toString());
-            advance += Math.max(0, Math.ceil(width - overlap));
+            // Râu lấy từ ảnh/font: cùng quy tắc độ rộng với râu dựng (lấn sang lề phải, chỉ cộng một phần).
+            const hornKey = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
+            advance += Math.max(0, Math.round(STD.horn.advance[hornKey] * (width - overlap)));
             continue;
           }
           if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }

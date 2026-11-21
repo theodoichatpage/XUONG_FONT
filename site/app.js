@@ -1327,7 +1327,7 @@ $('sample').addEventListener('wheel', event => {
   if (fixedWorkspace.matches) event.preventDefault();
 }, { passive: false });
 
-const fontCollection = setupFontCollection(() => currentFontExport, async (record, { editOnly = false } = {}) => {
+const fontCollection = setupFontCollection(() => currentFontExport, async (record, { editOnly = false, original } = {}) => {
   if (busy || loading) throw new Error('Hãy đợi tác vụ đang chạy hoàn tất.');
   if (glyphs.size && !confirm('Mở font này để chỉnh sửa? Bộ chữ đang làm sẽ được thay bằng font đã chọn.')) return false;
   const imported = await importFontFile(record);
@@ -1337,6 +1337,17 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
     importAccentSamples(drafts);
     for (const glyph of composeVietnamese(drafts)) {
       if (!drafts.has(glyph.char)) drafts.set(glyph.char, glyph);
+    }
+  }
+  // Mở lại bản Việt hóa: chữ font gốc không có là do Xưởng ghép trước đây. Đánh dấu là chữ ghép (không phải nét nhà
+  // thiết kế) và bỏ dấu mẫu Xưởng đã dựng, để Tạo dấu tiếng Việt dựng lại theo chuẩn mới nhất.
+  let regenerable = 0;
+  if (editOnly && original) {
+    const base = (await importFontFile(original)).glyphs;
+    for (const [char, glyph] of [...drafts]) {
+      if (base.has(char)) continue;
+      if (toneSamples.has(char)) { drafts.delete(char); continue; }
+      if ([...char.normalize('NFD')].length > 1 || char === 'Đ' || char === 'đ') { drafts.set(char, { ...glyph, source: 'Ghép dấu', origin: 'inferred' }); regenerable++; }
     }
   }
   auditRepairPending=false; markCandidates=[];
@@ -1349,7 +1360,10 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   refresh();
   const added = missingBefore.filter(char => glyphs.has(char));
   const missing = charset.filter(char => !glyphs.has(char));
-  status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
+  status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. '
+    + (regenerable ? regenerable + ' chữ có dấu do Xưởng ghép (so với ' + original.name + '); bấm Tạo dấu tiếng Việt để ghép lại theo chuẩn mới. '
+      : record.name.startsWith('XFVN - ') && !original ? 'Không thấy font gốc trong Bộ sưu tập nên mọi chữ được giữ như nét gốc; thêm font gốc vào Bộ sưu tập để ghép lại dấu. ' : '')
+    + 'Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.')
     + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
   return true;
 }, runFontQuality);
