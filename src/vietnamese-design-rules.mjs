@@ -11,6 +11,7 @@ export const vietnameseDesignInstruction = [
   'Detached accents must not touch the body or neighboring letters. Inspect whole words and uppercase leading; avoid clipping.',
   'Match the shapes and tip heights of paired ơ/ư horns. In complete letters horns must join the body; only draw detached horn samples when explicitly asked for isolated marks.',
   'Do not solve an overly wide horn by hiding it under T; review horn reach and then pair kerning.',
+  'Let the ơ/ư horn overhang the right sidebearing: widen ư/Ư by only about 0.2 of the horn overhang and ơ/Ơ by none, so ươ and ưn space like uo and un; keep the new right sidebearing no more than 0.15 of the letter width below the original (more for italics).',
   'Keep breve curved, hook above distinct from a full question mark, underdot below the baseline, and Đ/đ crossbars integrated with their stems.',
   'Respect the font’s established accented-i convention; do not mechanically add dots to all accented i forms.',
   'Reassess marks separately for uppercase, lowercase and each weight; automatic emboldening is only a draft.',

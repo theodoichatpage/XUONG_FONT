@@ -22,6 +22,7 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 | Sắc/huyền/hỏi/ngã chạm mũ/trăng | Khoảng hở giữa hai tầng dấu, vị trí ngang của dấu thanh |
 | Cả cụm dấu quá nặng hoặc nhỏ | Kích thước và độ dày dấu; không đổi nét thân chữ |
 | ƯT, ƠT hoặc dấu chạm chữ kế tiếp | Hình râu, độ vươn, sau đó kiểm tra kerning cặp |
+| "hương", "ưng" thưa ở chỗ râu | Advance của ơ ư: râu lấn sang lề phải, chỉ cộng 0.2 × đoạn râu chìa ra cho ư Ư, 0 cho ơ Ơ ([chuẩn đo](references/mark-standards.md#râu-ơ-ư)) |
 | Khoảng cách giữa hai chữ sai | Sidebearings, advance và kerning; không dịch dấu để che lỗi |
 | Chữ Đ hiện thành font khác | Bảng mã/cmap và glyph xuất; không vẽ lại Đ trước khi kiểm tra mã |
 | Dấu bị cắt ở đầu dòng | Vertical metrics và vùng hiển thị; không tự thu nhỏ cả font |

@@ -7,7 +7,7 @@ Nguồn: Donny Trương, Vietnamese Typography, [Design Challenges](https://viet
 1. **Vị trí:** chọn một hệ đặt sắc/huyền/hỏi quanh mũ; có thể đặt bên phải, chia hai phía hoặc xếp trên. Bố cục bên phải hỗ trợ sự nhất quán; không coi đó là phương án bắt buộc. Xếp trên cần kiểm chiều cao dòng.
 2. **Va chạm:** nhìn cả từ. Trong ví dụ Bất/đồng, dấu có thể đúng với nguyên âm nhưng vẫn đâm vào t hoặc đ kế bên. Kiểm va chạm với cả chữ trước lẫn sau.
 3. **Kerning có dấu:** đo khoảng trống của cả hình chữ và dấu. Các cặp như Vì, Kỳ, Tù có thể cần điều chỉnh khác chữ không dấu. Không lấy kerning của chữ gốc làm bằng chứng rằng bản có dấu đã ổn.
-4. **Kerning râu:** nhìn ƯT và ƠT. Râu quá vươn làm xuất hiện khoảng hở lớn; siết khoảng cách quá mức lại che râu. Ưu tiên xem lại độ vươn hình râu trước khi ép cặp chữ.
+4. **Kerning râu:** nhìn ƯT và ƠT. Râu quá vươn làm xuất hiện khoảng hở lớn; siết khoảng cách quá mức lại che râu. Ưu tiên xem lại độ vươn hình râu trước khi ép cặp chữ. Advance của ơ ư không cộng đủ đoạn râu: râu lấn sang lề phải (lề phải thường âm), để "ươ", "ưn" thưa xấp xỉ "uo", "un".
 5. **Cặp râu:** đối chiếu ƯƠ và ươ trong cùng hàng. Giữ ngôn ngữ hình dáng và độ cao đầu râu tương hợp; không lấy một râu in hoa thu nhỏ máy móc làm mặc định cho chữ thường.
 6. **Kích thước/độ đậm:** dấu phải đọc rõ ở weight đang xét. Nhìn bộ thử có hỏi, sắc, mũ ở Bold/Black; tránh dấu yếu so với thân hoặc dày thành một khối. Thu nhỏ dấu không tự đồng nghĩa với cân nét.
 7. **Hòa hợp:** nối phong cách dấu với tương phản, góc nét, đầu nét và nhịp của font. So khoảng hở theo thị giác; không chỉ cân bằng bounding box.
