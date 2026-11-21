@@ -97,8 +97,10 @@ function embolden(path, amount) {
   const largest = polygons.reduce((best, polygon) =>
     Math.abs(ClipperLib.Clipper.Area(polygon)) > Math.abs(ClipperLib.Clipper.Area(best)) ? polygon : best, []);
   if (largest.length && !ClipperLib.Clipper.Orientation(largest)) polygons.forEach(polygon => polygon.reverse());
-  const offset = new ClipperLib.ClipperOffset(2, .5);
-  offset.AddPaths(polygons, ClipperLib.JoinType.jtRound, ClipperLib.EndType.etClosedPolygon);
+  // Góc nhọn (miter), không bo tròn: font góc sắc (UTM Bebas...) giữ góc chân chữ và đỉnh nét khi làm đậm/mảnh.
+  // Đường cong đã được chia nhỏ thành đoạn ngắn nên vẫn cong mượt. Góc quá nhọn (dài hơn 6 lần độ nới) mới bị cắt bằng.
+  const offset = new ClipperLib.ClipperOffset(6, .5);
+  offset.AddPaths(polygons, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
   const result = new ClipperLib.Paths();
   offset.Execute(result, amount * 16);
   if (polygons.length && !result.length) throw new Error('Không thể cân nét một ký tự. Hãy giảm độ đậm.');
