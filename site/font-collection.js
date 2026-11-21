@@ -3,6 +3,7 @@ import { createFontFamily } from './font-family.js';
 import opentype from 'opentype.js';
 import { familyPreflight } from './family-validation.js';
 import { withXuongPrefix } from './font-rename.js';
+import { charset } from './vietnamese.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
 
@@ -515,10 +516,33 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     });
   });
 
+  // Font gốc đã đủ chữ tiếng Việt (ví dụ font SVN-...): không ghép dấu, chỉ lưu bản sao mang tiền tố XFVN
+  // (đổi tên trong file, outline giữ nguyên từng byte). Cùng family còn font như vậy thì hỏi làm luôn cả family.
+  const vietnameseLetters = charset.filter(char => [...char.normalize('NFD')].length > 1 || char === 'đ' || char === 'Đ');
+  async function hasVietnamese(record) {
+    try {
+      const font = opentype.parse(await record.blob.arrayBuffer());
+      return vietnameseLetters.every(char => font.charToGlyphIndex(char) > 0);
+    } catch { return false; }
+  }
+  async function addPrefixedCopy(record) {
+    const copy = await withXuongPrefix({ name: record.name, filename: record.filename, blob: record.blob, ...(record.family ? { family: record.family } : {}), generatedFrom: record.id });
+    await addFont({ ...copy, generatedFrom: record.id, prefixOnly: true });
+  }
   $('collection-vietnamize').addEventListener('click', () => {
     const record = records.find(item => item.id === selectedId);
     if (!record) return;
     run(async () => {
+      if (!isVietnamized(record) && await hasVietnamese(record)) {
+        const group = pairGroups().find(item => item.rows.some(row => row.original?.id === record.id));
+        const others = [];
+        for (const row of group?.rows || []) if (row.original && !row.vietnamized && row.original.id !== record.id && await hasVietnamese(row.original)) others.push(row.original);
+        const targets = [record, ...(others.length && confirm(record.name + ' đã có đủ chữ tiếng Việt nên chỉ cần thêm tiền tố XFVN.' + String.fromCharCode(10) + 'Làm luôn cho ' + others.length + ' font cùng family cũng đã có tiếng Việt và chưa có bản XFVN?') ? others : [])];
+        for (const item of targets) await addPrefixedCopy(item);
+        await refresh(record.id);
+        status.textContent = 'Font đã có tiếng Việt: chỉ thêm tiền tố XFVN, không ghép lại dấu. Đã tạo ' + targets.length + ' bản: ' + targets.map(item => 'XFVN - ' + item.name).join(', ') + '.';
+        return;
+      }
       if (await vietnamize(record)) { editingRecord = undefined; selectTab(false); }
     });
   });
