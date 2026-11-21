@@ -9,4 +9,5 @@ export function deriveAll(glyphs) {
   return { glyphs: next, stem };
 }
 export { toneSamples, measureStem };
+export { roundTerminals } from "../../site/vietnamese.js";
 export { importAccentSamples } from '../../site/font-import.js';

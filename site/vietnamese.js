@@ -217,7 +217,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             // Chuẩn đo: độ vươn phải theo độ rộng chữ gốc, đầu râu cao hơn đỉnh thân theo x-height.
             const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
-            const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem);
+            const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem, body.roundEnds);
             const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
             const placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
             paths.push(placedHorn);
@@ -475,6 +475,30 @@ export function measureStem(glyphs) {
   return 90;
 }
 // Các số đo nền của bộ chữ để đặt kích thước dấu theo chuẩn: x-height, chiều cao hoa, độ rộng o và O.
+// Kiểu đầu nét: đo đầu trên và chân thân l (hoặc i). Đầu tròn: ở độ sâu 0.15 bề dày tính từ đỉnh, mặt cắt chỉ còn ~0.7 bề dày;
+// đầu cắt phẳng (Poppins, Arial...) hoặc có chân serif: ≥ 0.85. Râu dựng theo đúng kiểu này.
+export function roundTerminals(glyphs) {
+  for (const char of ['l', 'i']) {
+    const glyph = glyphs.get(char);
+    if (!glyph?.d) continue;
+    const contours = flattenOutline(glyph.d).map(c => ({ c, top: Math.max(...c.map(p => p[1])), bottom: Math.min(...c.map(p => p[1])) }))
+      .sort((a, b) => (b.top - b.bottom) - (a.top - a.bottom));
+    const { c, top, bottom } = contours[0] || {};
+    if (!c) continue;
+    const widthAt = y => {
+      const xs = [];
+      for (let i = 0; i < c.length; i++) { const [ax, ay] = c[i], [bx, by] = c[(i + 1) % c.length]; if ((ay <= y) !== (by <= y)) xs.push(ax + (y - ay) / (by - ay) * (bx - ax)); }
+      xs.sort((a, b) => a - b);
+      return xs.length >= 2 ? xs.at(-1) - xs[0] : 0;
+    };
+    const mid = widthAt((top + bottom) / 2);
+    if (!(mid > 0)) continue;
+    // Cả đầu trên và chân thân đều tròn mới coi là font đầu tròn (đầu xiên của serif chỉ nhỏ ở đầu trên, chân có serif rộng).
+    return widthAt(top - .15 * mid) / mid < .85 && widthAt(bottom + .15 * mid) / mid < .85;
+  }
+  return false;
+}
+
 export function measureBody(glyphs) {
   const box = char => { const g = glyphs.get(char); return g?.d ? glyphBounds(g) : null; };
   const top = chars => { for (const c of chars) { const b = box(c); if (b) return b.y + b.height; } };
@@ -482,7 +506,7 @@ export function measureBody(glyphs) {
   const capHeight = top(['H', 'I', 'E', 'T']) ?? xHeight / .72;
   const width = chars => { for (const c of chars) { const b = box(c); if (b) return b.width; } };
   const oWidth = width(['o', 'e', 'a', 'u']) ?? .95 * xHeight;
-  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs), slant: measureSlant(glyphs) };
+  return { xHeight, capHeight, oWidth, OWidth: width(['O', 'U', 'A']) ?? oWidth * 1.3, contrast: strokeContrast(glyphs), slant: measureSlant(glyphs), roundEnds: roundTerminals(glyphs) };
 }
 
 export function deriveMarkSamples(glyphs) {
@@ -584,17 +608,19 @@ export function deriveMarkSamples(glyphs) {
   // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ,
   // thon nhẹ về đầu và cắt bằng theo kiểu đầu nét của bộ chữ.
   // Khi ghép, râu được vẽ lại theo độ vươn và độ cao đầu râu chuẩn của từng chữ (o, u, O, U).
-  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem));
+  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem, roundTerminals(glyphs)));
   return { marks, stem, thickness: t };
 }
 
 // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ, thon nhẹ về đầu.
-export function hornShape(width, height, thickness) {
-  // Đường tâm râu: đi ngang ra rồi cong lên. Đầu râu bo tròn (không cắt phẳng), và đỉnh ngoài của đầu bo
-  // chạm đúng chiều cao yêu cầu, nên với chữ đậm (nét dày) đường tâm thấp hơn tương ứng.
+export function hornShape(width, height, thickness, round = false) {
+  // Đường tâm râu: đi ngang ra rồi cong lên, tới đầu thì dựng đứng. Đầu râu theo kiểu đầu nét của bộ chữ:
+  // font đầu vuông (Poppins, Arial, Segoe...) cắt phẳng ngang như râu font chuyên nghiệp; font đầu tròn thì bo tròn.
+  // Đỉnh ngoài của đầu râu chạm đúng chiều cao yêu cầu, nên chữ đậm (nét dày) có đường tâm thấp hơn tương ứng.
   const end = thickness * .82, w = Math.max(.6 * thickness, width - .45 * thickness);
-  const h = Math.max(.3 * height, height - end / 2);
-  const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [w * Math.sin(s * Math.PI / 2), h * Math.pow(s, 1.8)]; });
+  const h = Math.max(.3 * height, height - (round ? end / 2 : 0));
+  const sweep = Math.PI / 2;
+  const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [w * Math.sin(s * sweep) / Math.sin(sweep), h * Math.pow(s, 1.8)]; });
   const left = [], right = [];
   points.forEach((point, i) => {
     const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
@@ -602,8 +628,11 @@ export function hornShape(width, height, thickness) {
     left.push([point[0] - dy / length * half, point[1] + dx / length * half]);
     right.push([point[0] + dy / length * half, point[1] - dx / length * half]);
   });
-  const [ex, ey] = points.at(-1), [px, py] = points.at(-2), angle = Math.atan2(ey - py, ex - px), cap = [];
-  for (let k = 1; k < 12; k++) { const t = angle + Math.PI / 2 - k * Math.PI / 12; cap.push([ex + Math.cos(t) * end / 2, ey + Math.sin(t) * end / 2]); }
+  const cap = [];
+  if (round) {
+    const [ex, ey] = points.at(-1), [px, py] = points.at(-2), angle = Math.atan2(ey - py, ex - px);
+    for (let k = 1; k < 12; k++) { const t = angle + Math.PI / 2 - k * Math.PI / 12; cap.push([ex + Math.cos(t) * end / 2, ey + Math.sin(t) * end / 2]); }
+  }
   return polygon([...left, ...cap, ...right.reverse()]);
 }
 

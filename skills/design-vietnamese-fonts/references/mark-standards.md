@@ -56,7 +56,8 @@ Bề dày râu gần bằng nét thân (đo được ở Ư: 0.86–0.92 nét th
 
 **Hình râu dựng cho chữ đậm (Bold, Black):** nét râu dày gần bằng nét thân, nên:
 - Chân râu nằm gọn trong thân: mép trên của chân không cao hơn đỉnh u/o, nếu không sẽ thành bậc khấc ở chỗ nối.
-- Đầu râu bo tròn, không cắt phẳng ngang; đỉnh ngoài của đầu bo chạm đúng độ cao đầu râu theo bảng trên (đường tâm thấp xuống nửa bề dày).
+- Đầu râu theo kiểu đầu nét của chính font. Đo đầu trên và chân thân `l`: ở độ sâu 0.15 bề dày, mặt cắt còn dưới 0.85 bề dày ở cả hai đầu thì là font đầu tròn (Comic Sans, Segoe Print) và râu bo tròn. Còn lại (Poppins, Arial, Segoe, Times...) râu cắt phẳng ngang ở đỉnh như râu của Segoe UI Black, Arial Black. Không bo tròn râu khi các nét khác của chữ sắc vuông.
+- Đỉnh ngoài của đầu râu chạm đúng độ cao đầu râu theo bảng trên (đầu bo tròn: đường tâm thấp xuống nửa bề dày).
 
 **Độ rộng (advance) của ơ ư:** râu được phép lấn sang lề phải, không cộng cả đoạn râu vào độ rộng. Font chuyên nghiệp có lề phải của ư thường âm (Segoe −9, Verdana −46, Arial Italic −87), nên khoảng hở "ươ", "ưn" gần bằng "uo", "un". Xưởng cộng thêm 0.2 × đoạn râu chìa ra cho ư Ư, 0 cho ơ Ơ. Lề phải mới không âm quá 0.15 × độ rộng chữ so với lề gốc (Italic: 0.15 + 0.5 × độ nghiêng), để râu không đâm vào chữ kế bên. Cộng đủ cả đoạn râu cộng thêm lề làm "hương", "ưng" thưa hẳn ra.
 
