@@ -137,7 +137,9 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 Ngã trên mũ (ẫ, Ẫ) và mọi dấu thanh trên trăng: đáy dấu thanh không thấp hơn 1.04 chiều cao mũ/trăng (font chuẩn: 1.04–1.39). Khi cả cụm vượt chiều cao dòng (hoa 1.0 em, thường 0.9 em), thu dấu thanh (tối đa còn 50%) thay vì hạ xuống sát mũ. Dấu thanh lệch cạnh mũ (ấ ầ ẩ) vẫn được hạ tối đa 0.25 chiều cao mũ.
 
-Nặng: rộng không quá 0.36 độ rộng chữ thường mang dấu, 0.26 độ rộng chữ hoa (font chuẩn ọ ≤ 0.38, Ọ ≤ 0.27); font hẹp (mono, Black) có nặng nhỏ hơn dấu chấm.
+Nặng: rộng không quá 0.36 độ rộng chữ thường mang dấu, 0.26 độ rộng chữ hoa (font chuẩn ọ ≤ 0.38, Ọ ≤ 0.27); font hẹp (mono, Black) có nặng nhỏ hơn dấu chấm. Nhưng không nhỏ hơn 0.9 nét thân (mức thấp nhất của chuẩn): chữ hoa rất hẹp, đậm (UTM Bebas Bold) giới hạn theo độ rộng làm chấm nhỏ hơn cả nét chữ.
+
+Độ rộng dấu khi đối chiếu: đo cả theo độ rộng chữ mang dấu (`w`) và theo x-height (`wx`); đạt nếu khớp một trong hai. Font hẹp (UTM Bebas) có dấu gốc rộng 0.56–0.89 lần độ rộng chữ, lệch chuẩn `w` nhưng khớp `wx`.
 
 ## Font toàn chữ hoa (Bebas...)
 

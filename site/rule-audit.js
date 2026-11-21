@@ -45,10 +45,16 @@ export function auditMarks(glyphs, { madeOnly = true, slant = 0 } = {}) {
       // dx (lệch tâm) đổi theo độ nghiêng chữ; cỡ so với dấu chấm chỉ có nghĩa khi font có dấu chấm thật.
       if (!range || !Number.isFinite(value) || metric === 'dx' || (metric === 'vsPeriod' && !glyphs.get('.')?.d)) continue;
       if (slant && (metric === 'side' || metric === 'reach')) continue;
+      if (metric === 'wx') continue;
       // Chuẩn chữ hoa đo theo x-height của font có chữ thường (hoa ≈ 1.4 x-height); font toàn hoa đo theo chiều cao hoa nên quy đổi.
       if (allCaps && (metric === 'h' || metric === 'gap') && !key.startsWith('tier_')) value *= 1.4;
       checked++;
       const [min, , max] = range, pad = (max - min) * .1;
+      const fits = (v, [a, , b], p = (b - a) * .1) => v >= a - p && v <= b + p;
+      // Độ rộng dấu: font hẹp (UTM Bebas) có chữ hẹp nhưng dấu vẫn theo cỡ chữ, nên đạt nếu khớp theo độ rộng chữ
+      // hoặc theo x-height (dấu gốc của nhà thiết kế Bebas lệch chuẩn theo độ rộng chữ nhưng khớp theo x-height).
+      const wxRange = MARK_RANGES[rangeKey(key) + '.wx'];
+      if (metric === 'w' && wxRange && Number.isFinite(values.wx) && fits(values.wx * (allCaps ? 1.4 : 1), wxRange)) continue;
       if (value < min - pad || value > max + pad) issues.push({ char, metric, value, range,
         text: `${char} ${label[metric] || metric} ${value.toFixed(2)} (chuẩn ${min.toFixed(2)}–${max.toFixed(2)})` });
     }

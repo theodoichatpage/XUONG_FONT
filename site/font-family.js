@@ -91,7 +91,7 @@ function contours(path) {
   return paths.filter(points => points.length >= 3);
 }
 
-function embolden(path, amount) {
+function embolden(path, amount, limit = 6, join = ClipperLib.JoinType.jtMiter) {
   const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(path), ClipperLib.PolyFillType.pftNonZero);
   // The largest contour determines the exterior winding.
   const largest = polygons.reduce((best, polygon) =>
@@ -99,8 +99,8 @@ function embolden(path, amount) {
   if (largest.length && !ClipperLib.Clipper.Orientation(largest)) polygons.forEach(polygon => polygon.reverse());
   // Góc nhọn (miter), không bo tròn: font góc sắc (UTM Bebas...) giữ góc chân chữ và đỉnh nét khi làm đậm/mảnh.
   // Đường cong đã được chia nhỏ thành đoạn ngắn nên vẫn cong mượt. Góc quá nhọn (dài hơn 6 lần độ nới) mới bị cắt bằng.
-  const offset = new ClipperLib.ClipperOffset(6, .5);
-  offset.AddPaths(polygons, ClipperLib.JoinType.jtMiter, ClipperLib.EndType.etClosedPolygon);
+  const offset = new ClipperLib.ClipperOffset(limit, .5);
+  offset.AddPaths(polygons, join, ClipperLib.EndType.etClosedPolygon);
   const result = new ClipperLib.Paths();
   offset.Execute(result, amount * 16);
   if (polygons.length && !result.length) throw new Error('Không thể cân nét một ký tự. Hãy giảm độ đậm.');
@@ -111,6 +111,26 @@ function embolden(path, amount) {
     output.close();
   }
   return output;
+}
+
+const topology = value => {
+  const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
+  const positive = polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
+  return [polygons.length, Math.min(positive, polygons.length - positive)].join(':');
+};
+// Góc nhọn trước; chỉ khi mũi nhọn (miter) của góc rất hẹp đâm xuyên nét mảnh (6 9 của UTM Bebas khi Thin) mới thử
+// giới hạn mũi nhọn ngắn hơn, cuối cùng mới bo tròn đúng glyph đó. Trả về bản đầu tiên giữ nguyên lòng chữ.
+function reweigh(path, amount) {
+  const before = topology(path);
+  let first;
+  for (const [limit, join] of [[6, ClipperLib.JoinType.jtMiter], [2, ClipperLib.JoinType.jtMiter], [2, ClipperLib.JoinType.jtRound]]) {
+    let result;
+    try { result = embolden(path, amount, limit, join); } catch (error) { if (!first) first = error; continue; }
+    if (!first) first = result;
+    if (topology(result) === before) return result;
+  }
+  if (first instanceof Error) throw first;
+  return first;
 }
 
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
@@ -158,11 +178,6 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     let ascent = source.ascender, descent = source.descender;
     // Lượt 1: làm đậm/mảnh từng glyph ở dạng đứng và kiểm lòng chữ.
     const upright = [], welded = new Set();
-    const topology = value => {
-      const polygons = ClipperLib.Clipper.SimplifyPolygons(contours(value), ClipperLib.PolyFillType.pftNonZero);
-      const positive = polygons.filter(p => ClipperLib.Clipper.Orientation(p)).length;
-      return [polygons.length, Math.min(positive, polygons.length - positive)].join(':');
-    };
     for (let i = 0; i < source.glyphs.length; i++) {
       const old = source.glyphs.get(i);
       const originalPath = old.path ?? new opentype.Path();
@@ -170,7 +185,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       const required = chars.some(char => checkSet.has(char));
       let path = originalPath, advance = old.advanceWidth ?? upm / 2;
       if (amount && originalPath.commands?.length) {
-        try { path = embolden(originalPath, amount); advance += amount * 2; }
+        try { path = reweigh(originalPath, amount); advance += amount * 2; }
         catch (error) { if (required && !chars.some(isAccented) && chars.some(char => /[\p{L}\p{N}]/u.test(char))) throw error; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }   // ký hiệu phụ quá mảnh: giữ nét gốc
         if (path !== originalPath && topology(originalPath) !== topology(path)) {
           // Chữ có dấu (Ấ, Õ...): nới nét làm dấu dính nhau/dính thân. Không bỏ cả kiểu: ghép lại ở lượt 2 từ
@@ -187,7 +202,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       // để khoảng hở dấu–thân không bị nới nét thu hẹp (đối chiếu quy tắc: Bold làm hở còn ~0.06 x-height).
       let light;
       if (amount && originalPath.commands?.length && chars.some(isAccented)) {
-        try { light = embolden(originalPath, amount * .27); } catch { light = originalPath; }
+        try { light = reweigh(originalPath, amount * .27); } catch { light = originalPath; }
         if (!chars.every(char => /^[ơưƠƯ]$/.test(char))) welded.add(i);
       }
       upright.push({ path, light, advance });

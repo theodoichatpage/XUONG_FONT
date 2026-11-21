@@ -144,7 +144,7 @@ function undotI(glyph) {
 
 export function composeVietnamese(glyphs, replace = () => false, { replaceHorn = false, requireReferenceMarks = false } = {}) {
   const result = [];
-  const body = measureBody(glyphs), capMarks = new Map(), made = new Map();
+  const body = measureBody(glyphs), bodyStem = measureStem(glyphs), capMarks = new Map(), made = new Map();
   let derivedTwoTier;
   for (const char of accented) {
     if (['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyphs.get(char)?.source) && !replace(char)) continue;
@@ -257,7 +257,10 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           // Nặng không rộng quá khoảng font chuẩn dùng so với chữ mang dấu (ọ ≤ 0.38, Ọ ≤ 0.267 độ rộng chữ):
           // chữ hẹp (font mono, Black) sẽ có nặng nhỏ lại thay vì to bằng dấu chấm.
           const dotLimit = mark === '̣' ? (isCap ? .26 : .36) * bounds.width / source.width : Infinity;
-          const scale = Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width, dotLimit);
+          // Nhưng nặng không nhỏ hơn 0.9 nét thân (chuẩn đo: 0.9–1.75): chữ hẹp đậm (UTM Bebas Bold) giới hạn theo độ rộng
+          // làm chấm nhỏ hơn cả nét chữ.
+          const dotMin = mark === '̣' && bodyStem ? .9 * bodyStem / Math.max(source.width, source.height) : 0;
+          const scale = Math.max(dotMin, Math.min(ownSize ? 1 : targetHeight / source.height, bounds.width * 1.2 / source.width, dotLimit));
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - gapBelow - height;
           else top += height + gapUpper;

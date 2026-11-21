@@ -29,6 +29,7 @@ function measureFont(font) {
       const r = {
         h: mb.h / xH,                                   // chiều cao dấu / x-height
         w: mb.w / bb.w,                                 // độ rộng dấu / độ rộng nguyên âm
+        wx: mb.w / xH,                                  // độ rộng dấu / x-height (font hẹp như Bebas: dấu rộng so với chữ)
         t: M.strokeThickness(extra) / stem,             // bề dày nét dấu (2A/P) / nét thân
         gap: (mark === '̣' ? bb.y0 - mb.y1 : mb.y0 - bb.y1) / xH,   // khoảng hở / x-height
         dx: ((mb.x0 + mb.x1) / 2 - (bb.x0 + bb.x1) / 2) / bb.w,      // lệch tâm ngang / độ rộng nguyên âm

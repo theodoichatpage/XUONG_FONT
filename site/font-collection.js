@@ -686,9 +686,10 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         const link = document.createElement('a');
         link.className = 'download'; link.href = url; link.download = result.filename; link.textContent = 'Tải ' + result.style;
         // Regular already exists as the selected source. Save only new styles.
+        let savedId = result.isSource ? sourceId : undefined;
         if (!result.isSource) {
           const { text, ...saved } = result;
-          await addFont(await withXuongPrefix({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id }));
+          savedId = (await addFont(await withXuongPrefix({ ...saved, generatedFrom: familyRecord.generatedFrom ?? familyRecord.id })))?.id;
         }
         const savedLabel = document.createElement('span');
         savedCount++;
@@ -697,10 +698,12 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
         editButton.disabled = true;
         editButton.dataset.familyEdit = '';
         editButton.type = 'button'; editButton.textContent = 'Chỉnh sửa ' + result.style;
+        // Kiểu đã lưu mang tên "XFVN - ..." nên tìm theo id vừa lưu, không theo tên family gốc.
         editButton.addEventListener('click', () => run(async () => {
-          const target = result.isSource ? records.find(item => item.id === sourceId)
-            : records.find(item => item.family === result.family && identifyFamilyStyle(item) === result.style);
-          if (target && await vietnamize(target, { editOnly: true })) { editingRecord = target; selectedId = target.id; selectTab(false); }
+          const target = records.find(item => item.id === savedId);
+          if (!target) { $('family-status').textContent = 'Không tìm thấy ' + result.style + ' trong bộ sưu tập. Hãy mở từ danh sách bộ sưu tập.'; return; }
+          const original = isVietnamized(target) ? records.find(item => !isVietnamized(item) && matchKey(item.name) === matchKey(target.name)) : undefined;
+          if (await vietnamize(target, { editOnly: true, original })) { editingRecord = target; selectedId = target.id; selectTab(false); }
         }));
         const actions = document.createElement('div'); actions.className = 'tool-row'; actions.append(link,editButton,savedLabel);
         row.append(label,auditLine,proof,actions); $('family-results').append(row);
