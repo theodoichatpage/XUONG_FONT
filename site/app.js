@@ -5,6 +5,7 @@ import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline,fromImage} from './outline-cleanup.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
+import { outlineDefects } from './outline-quality.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { digestReference, readableStyle } from './family-inputs.js';
@@ -1546,20 +1547,32 @@ async function fixByRules() {
     status('Hoàn thiện font: chuẩn hóa chiều cao…'); await pause();
     const heights = normalizeHeights(next, glyph => editable(glyph) && (fromImage(glyph) || glyph.origin === 'inferred'));
     for (const glyph of heights.changed) next.set(glyph.char, glyph);
-    // 2. Nét dò từ ảnh: nắn nhẹ cạnh gồ ghề, làm nhọn góc bị bo (mức Nhẹ để giữ chi tiết trang trí).
-    const cleaned = [], time = new Date().toISOString();
-    const traced = [...next.values()].filter(g => g?.d && editable(g) && !g.outlineCleanup && fromImage(g) && g.source !== 'Ghép dấu' && !toneSamples.has(g.char));
-    for (const [index, glyph] of traced.entries()) {
-      if (index % 8 === 0) { status('Hoàn thiện font: nắn nét ' + (index + 1) + '/' + traced.length + '…'); await pause(); }
-      try {
-        const result = cleanOutline(glyph, { tolerance: .75 });
-        if (result.d === glyph.d) continue;
+    // 2. Viền không xù, đường cong không gấp khúc (đo bằng outlineDefects: xù, đoạn ngắn, gần đứng/ngang, gấp khúc).
+    // Áp cho mọi nét không phải font vẽ sẵn: dò ảnh, chữ dựng từ bộ phận, ký tự dựng. Thử mức Nhẹ → Vừa → Mạnh,
+    // lấy mức đầu tiên hết lỗi (hoặc ít lỗi nhất); cleanOutline giữ góc thật, lòng chữ và diện tích (lệch ≤ 4%).
+    const cleaned = [], rough = [], time = new Date().toISOString();
+    const smooth = async list => {
+      for (const [index, glyph] of list.entries()) {
+        if (index % 8 === 0) { status('Hoàn thiện font: làm mượt nét ' + (index + 1) + '/' + list.length + '…'); await pause(); }
+        const before = outlineDefects(glyph.d);
+        if (!before.total) continue;
+        let best = null;
+        for (const tolerance of [.75, 1.5, 3]) {
+          try {
+            const result = cleanOutline(glyph, { tolerance }), q = outlineDefects(result.d);
+            if (!best || q.total < best.q.total) best = { result, q };
+            if (!q.total) break;
+          } catch { /* mức này lệch quá giới hạn: thử mức khác */ }
+        }
+        if (!best || best.q.total >= before.total) { rough.push(glyph.char); continue; }
         const { outlineUndo, ...previous } = glyph;
-        next.set(glyph.char, { ...glyph, d: result.d, outlineUndo: previous, outlineCleanup: { ...result.stats, time, batch: true },
+        next.set(glyph.char, { ...glyph, d: best.result.d, outlineUndo: previous, outlineCleanup: { ...best.result.stats, time, batch: true },
           version: (glyph.version || 0) + 1, proof: undefined, identityVersion: undefined, pixelOutline: undefined });
-        cleaned.push(glyph.char);
-      } catch { /* nắn nhẹ vẫn lệch quá giới hạn: giữ nét gốc */ }
-    }
+        if (!cleaned.includes(glyph.char)) cleaned.push(glyph.char);
+        if (best.q.total) rough.push(glyph.char);
+      }
+    };
+    const smoothable = glyph => glyph?.d && editable(glyph) && glyph.source !== 'Font gốc' && glyph.source !== 'Ghép dấu';
     status('Hoàn thiện font: bổ sung chữ, dấu và ký tự…'); await pause();
     // 3. Dấu mẫu, Đ, chữ cái gốc từ bộ phận, chữ có dấu, dấu câu và ký tự đặc biệt.
     const hasVowel = ['A', 'E', 'O', 'a', 'e', 'o'].some(char => next.get(char)?.d);
@@ -1571,6 +1584,7 @@ async function fixByRules() {
     }
     const letters = deriveLetters(next).filter(glyph => charset.includes(glyph.char) && !real(glyphs.get(glyph.char)));
     for (const glyph of letters) next.set(glyph.char, glyph);
+    await smooth([...next.values()].filter(smoothable));   // chữ gốc (cả chữ vừa dựng) trước khi ghép dấu
     const failing = new Set((before?.issues || []).map(issue => issue.char).filter(char => glyphs.get(char)?.d && !real(glyphs.get(char))));
     const reshaped = new Set([...heights.changed.map(g => g.char), ...cleaned]);
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
@@ -1581,6 +1595,7 @@ async function fixByRules() {
     for (const glyph of generated) next.set(glyph.char, glyph);
     const symbols = deriveSymbols(next).filter(glyph => !real(glyphs.get(glyph.char)) && !(glyphs.get(glyph.char)?.d && glyphs.get(glyph.char).source !== 'Dựng từ nét chữ'));
     for (const glyph of symbols) next.set(glyph.char, glyph);
+    await smooth(symbols.map(g => next.get(g.char)).filter(smoothable));
     // Cỡ dấu câu theo nét thân (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
     const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of punctFix.changed) next.set(glyph.char, glyph);
@@ -1593,7 +1608,10 @@ async function fixByRules() {
     // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
     // trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning).
     const kerned = importedMetrics ? 0 : vietnameseKerning([...draft.values()].filter(g => g?.d)).length;
-    const changed = [...new Set([...snapshot.keys(), ...draft.keys()])].filter(char => snapshot.get(char) !== draft.get(char))
+    // Chỉ tính chữ thật sự đổi hình hoặc độ rộng (dựng lại ra y hệt thì không đưa vào bản xem trước).
+    const shape = g => svgpath(g.d).round(0).toString();
+    const same = (a, b) => a === b || (!!a && !!b && Math.round(a.advance) === Math.round(b.advance) && (a.d === b.d || shape(a) === shape(b)));
+    const changed = [...new Set([...snapshot.keys(), ...draft.keys()])].filter(char => !same(snapshot.get(char), draft.get(char)))
       .map(char => ({ char, before: snapshot.get(char), after: draft.get(char) }));
     const after = auditMarks(draft, { slant: measureSlant(draft) });
     const rebuilt = changed.filter(item => item.before && failing.has(item.char)).map(item => item.char);
@@ -1604,7 +1622,7 @@ async function fixByRules() {
     const reasons = new Map();
     const tag = (chars, text) => { for (const char of chars) reasons.set(char, [...(reasons.get(char) || []), text]); };
     tag(heights.changed.map(g => g.char), 'chiều cao');
-    tag(cleaned, 'nắn nét');
+    tag(cleaned, 'làm mượt nét');
     for (const g of letters) tag([g.char], 'dựng từ ' + g.derivedFrom);
     tag(rebuilt, 'ghép lại dấu');
     tag(added, 'ghép dấu');
@@ -1613,7 +1631,7 @@ async function fixByRules() {
     tag(dotBelow.changed.map(g => g.char), 'cỡ dấu nặng');
     const parts = [
       heights.changed.length && 'chuẩn chiều cao ' + heights.changed.length + ' chữ (' + list(heights.changed.map(g => g.char)) + ')',
-      cleaned.length && 'nắn nhẹ nét ' + cleaned.length + ' chữ dò từ ảnh',
+      cleaned.length && 'làm mượt viền và đường cong ' + cleaned.length + ' chữ (' + list(cleaned) + ')',
       letters.length && 'dựng ' + letters.length + ' chữ cái từ bộ phận (' + list(letters.map(g => g.char + '←' + g.derivedFrom)) + ')',
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
@@ -1621,7 +1639,7 @@ async function fixByRules() {
       punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo nét thân (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
     ].filter(Boolean);
-    const tail = (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')
+    const tail = (rough.length ? ' Còn lỗi viền/đường cong sau khi nắn (cần chỉnh tay hoặc thay ảnh): ' + list([...new Set(rough)]) + '.' : '') + (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')
       + (missing.length ? ' CẦN ẢNH MẪU (Xưởng không tự dựng được): ' + list(missing) + '.' : ' Đủ bộ ký tự.')
       + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font nhập: giữ nguyên kerning gốc.' : '')
       + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')

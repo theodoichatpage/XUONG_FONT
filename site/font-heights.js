@@ -59,7 +59,20 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
   const period = glyphs.get('.'), comma = glyphs.get(',');
   if (!(stem > 0) || !(period?.d || comma?.d)) return { changed: [], factor: 1 };
   let factor = 1;
-  if (period?.d) { const w = glyphBounds(period).width; if (w > 1.5 * stem || w < stem) factor = 1.2 * stem / w; }
+  // Chấm chữ i (contour nhỏ trên cùng của i): font chuẩn để dấu chấm rộng ≈ 1,06 × chấm i [0,7–1,3; Impact 0,73] (xuong-font-workflow.md 1b).
+  // Dùng chấm i làm chuẩn khi chính nó đúng cỡ (1,0–1,5 nét thân); chấm i trang trí to thì theo nét thân.
+  const iGlyph = glyphs.get('i');
+  let iDot = 0;
+  if (iGlyph?.d) {
+    const pieces = svgpath(iGlyph.d).abs().toString().split(/(?=M)/).filter(part => part.trim()).map(part => glyphBounds({ d: part })).sort((a, b) => b.y - a.y);
+    const ib = glyphBounds(iGlyph);
+    if (pieces.length >= 2 && pieces[0].height < ib.height * .35) iDot = pieces[0].width;
+  }
+  if (period?.d) {
+    const pb = glyphBounds(period), w = pb.width, size = Math.max(pb.width, pb.height);
+    if (iDot >= stem && iDot <= 1.5 * stem) { const r = w / iDot; if (r > 1.3 || r < .7) factor = 1.06 * iDot / w; }
+    else if (w > 1.5 * stem || w < stem) factor = 1.2 * stem / w;
+  }
   else { const h = glyphBounds(comma).height; if (h > 3.5 * stem || h < 2.1 * stem) factor = 2.9 * stem / h; }
   if (Math.abs(factor - 1) < .03) factor = 1;
   const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(part => part.trim());
@@ -94,8 +107,10 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
     const d = parts(g.d).map(part => {
       const b = glyphBounds({ d: part }), size = Math.max(b.width, b.height), aspect = b.height / (b.width || 1);
       if (size < 2.2 * stem && size < 2 * pSize && aspect > .6 && aspect < 1.7) {
-        const k = pSize / size;
-        return Math.abs(k - 1) > .08 ? scalePart(part, k, false) : part;
+        // Đo 18 font chuẩn: chấm của : ; bằng đúng dấu chấm (0,92–1,0); chấm của ! ? 0,74–1,15 (Tahoma, Verdana 0,74).
+        const ratio = size / pSize, loose = char === '!' || char === '?';
+        const off = loose ? ratio < .72 || ratio > 1.18 : Math.abs(ratio - 1) > .08;
+        return off ? scalePart(part, pSize / size, false) : part;
       }
       if (char === ';' && cHeight && aspect >= 1.7 && b.y < 0 && size < 6 * stem) {
         const k = cHeight / b.height;   // đuôi phẩy của ; theo dấu phẩy, giữ đỉnh (đầu chấm) tại chỗ

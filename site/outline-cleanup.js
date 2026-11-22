@@ -1,4 +1,5 @@
 import svgpath from 'svgpath';
+import { outlineDefects } from './outline-quality.js';
 
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
@@ -115,7 +116,7 @@ function smoothClosed(p,k){if(k<1)return p.map(x=>[...x]);const n=p.length;retur
 function smoothOpen(p,k){return p.map((_,i)=>{if(i===0||i===p.length-1)return p[i];const r=Math.min(k,i,p.length-1-i);let x=0,y=0;for(let j=-r;j<=r;j++){x+=p[i+j][0];y+=p[i+j][1];}return [x/(2*r+1),y/(2*r+1)];});}
 const arcLength=p=>p.reduce((n,x,i)=>n+(i?dist(x,p[i-1]):0),0);
 
-function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRounded=false){
+function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRounded=false,force=false){
   const straightTol=2.5*level+2,cornerRadius=10*level+10,curveTol=level+1,step=Math.max(.5,arcLength(p)/p.length);
   const smoothK=Math.max(1,Math.round((3*level+4)/step));
   // Góc đo trên nét đã làm mịn khoảng 10 đơn vị và cửa sổ 20 đơn vị: răng cưa không bị tính là góc.
@@ -129,7 +130,7 @@ function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRou
   // Răng cưa thưa (bước vài chục đơn vị) không lộ trên cửa sổ hẹp nhưng tạo rất nhiều điểm gãy: vẫn là nét dò ảnh.
   const noisy=noisyFine||kinkList.length>Math.max(12,arcLength(P)/80),kinks=noisy||sharpenRounded?[]:kinkList;   // chữ dò ảnh: điểm gãy là đoạn nối của bước dò, không khóa
   // Nét sạch không phải dò từ ảnh (dấu, ký hiệu Xưởng dựng; font vẽ sẵn): không có gì để nắn, giữ nguyên đường gốc.
-  if(!noisy&&!sharpenRounded&&!givenRuns)return {keep:true,lines:0,corners:0};
+  if(!noisy&&!sharpenRounded&&!givenRuns&&!force)return {keep:true,lines:0,corners:0};   // force: đường cong bị vẽ bằng nhiều đoạn thẳng (gấp khúc), cần dựng lại đường cong
   const minPts=Math.ceil(36/step),longPts=Math.ceil(110/step),cornerPts=Math.ceil(2*cornerRadius/step);
   const edgeTol=noisy?straightTol:Math.min(straightTol,.75);   // nét sạch không có nhiễu: cạnh thẳng phải thẳng thật
   const straight=(i,j)=>{const line=lineFit(P.slice(i,j+1));return line.max<=edgeTol&&bow((noisy?S:P).slice(i,j+1),line)<=(line.max>1.5?Math.max(1,.15*straightTol):Math.max(.3,.5*line.max));};   // nét sạch: cung nhẹ không bị coi là cạnh thẳng
@@ -169,7 +170,7 @@ function straightenContour(p,level,givenRuns,cache,protectedPoints=[],sharpenRou
   }
   // Đoạn thẳng ngắn không chạm góc nào thì là một phần đường cong: bỏ, để phần cong liền mạch, không gãy.
   const keep=lines.filter((L,k)=>L.j-L.i>=longPts||gaps[k].corner||gaps[(k-1+gaps.length)%gaps.length].corner);
-  if(keep.length<lines.length)return straightenContour(p,level,runs.filter(([i])=>keep.some(L=>L.i===i)).map(([i,j])=>[i,j]),{P,S,T,start},protectedPoints,sharpenRounded);
+  if(keep.length<lines.length)return straightenContour(p,level,runs.filter(([i])=>keep.some(L=>L.i===i)).map(([i,j])=>[i,j]),{P,S,T,start},protectedPoints,sharpenRounded,force);
   // Góc dựng lại không được làm cạnh thẳng đảo chiều; nếu có thì nối cong như cũ.
   for(const [k,L]of lines.entries())if(dot(sub(L.b,L.a),L.line.d)<=1){for(const g of [gaps[k],gaps[(k-1+gaps.length)%gaps.length]])if(g.corner){g.corner=false;g.A.b=projectOn(g.A.line,P[g.A.j]);g.B.a=projectOn(g.B.line,P[g.B.i]);}}
   const segments=[['M',...lines[0].a]];let corners=0;
@@ -216,6 +217,9 @@ export function cleanOutline(glyph,{tolerance=1.5}={}){
   // Chữ dò từ ảnh (và chữ mượn, ghép dấu dựa trên chữ dò ảnh): góc bo là do dò ảnh, dựng lại góc nhọn.
   // Font vẽ sẵn và dấu/ký hiệu Xưởng tự dựng: góc bo là cố ý, giữ nguyên.
   const sharpenRounded=fromImage(glyph);
+  // Contour có đường cong gấp khúc (chuỗi đoạn thẳng quay 3–35°, như chữ dựng từ bộ phận hay nét đổi độ đậm): dựng lại đường cong.
+  const faceted=[];{let k=-1;for(const seg of svgpath(glyph.d).abs().unshort().unarc().segments){if(seg[0]==='M'){k++;faceted[k]=[];}faceted[k]?.push(seg.join(' '));}}
+  for(let i=0;i<faceted.length;i++)faceted[i]=outlineDefects(faceted[i].join(' ')).kinks>0;
   // Đường gốc của từng contour (tọa độ tuyệt đối) để giữ nguyên phần không cần nắn.
   const originalParts=[];for(const seg of svgpath(glyph.d).abs().unshort().unarc().segments){if(seg[0]==='M')originalParts.push([]);originalParts.at(-1)?.push(seg[0]==='z'?['Z']:seg);}
   const allY=original.flat().map(q=>q[1]),glyphHeight=Math.max(...allY)-Math.min(...allY);
@@ -225,7 +229,7 @@ export function cleanOutline(glyph,{tolerance=1.5}={}){
     // Phần nhỏ (dấu, chấm, móc) trong chữ ghép dấu là nét Xưởng dựng: không áp cách nắn của chữ dò ảnh.
     const b=boxes[index],apart=b.y0>=main.y1||b.y1<=main.y0;   // dấu trên/dưới, chấm chữ i: tách hẳn khỏi thân chính
     const small=original.length>1&&b!==main&&(apart||Math.max(b.x1-b.x0,b.y1-b.y0)<.4*glyphHeight);
-    const r=straightenContour(p,tolerance,undefined,undefined,protectedPoints[index]||[],sharpenRounded&&!small);
+    const r=straightenContour(p,tolerance,undefined,undefined,protectedPoints[index]||[],sharpenRounded&&!small,faceted[index]);
     if(r.keep){result.push(originalParts[index]);continue;}result.push(r.segments);lines+=r.lines;corners+=r.corners;}
   const d=serialize(result),after=sampleOutline(d,.12);let maxDeviation=0,areaBefore=0,areaAfter=0;
   // Giới hạn: cạnh lệch tối đa bằng độ gồ ghề cho phép cộng bán kính bo được làm nhọn lại.
