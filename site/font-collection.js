@@ -8,6 +8,8 @@ import { ask } from './ask.js';
 // Store the original font files so downloads preserve the imported bytes.
 let database;
 
+// Đọc một font đã lưu theo id (dùng khi trình sửa cần kiểm lại file gốc, ví dụ dấu Xưởng trong file).
+export function getFontRecord(id) { return id == null ? Promise.resolve(undefined) : accessFonts('readonly', store => store.get(id)); }
 function accessFonts(mode, action) {
   database ??= new Promise((resolve, reject) => {
     const request = indexedDB.open('xuong-font-collection', 1);

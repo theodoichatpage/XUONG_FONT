@@ -15,7 +15,7 @@ import { createFontCheckPanel } from './font-check-panel.js';
 import { reviewMarkRepairs } from './ai-mark-repair.js';
 import { adjustGlyphMarks, autoFixMarks } from './mark-spacing.js';
 import { importFontFile, importAccentSamples } from './font-import.js';
-import { setupFontCollection } from './font-collection.js';
+import { setupFontCollection, getFontRecord } from './font-collection.js';
 import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
@@ -1364,12 +1364,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   glyphs = new ProtectedGlyphMap(drafts);
   // Font do chính người dùng dựng từ ảnh trong Xưởng rồi lưu lại (không phải file font của nhà thiết kế khác):
   // fromImages đã từng đúng, hoặc bản lưu từ trình sửa mang tên riêng (không phải bản Việt hóa XFVN của font khác).
-  // Nhận diện bằng dấu Xưởng trong file (mô tả "Made with draw-your-font"), cả khi font được Nhập TTF vào Bộ sưu tập.
-  // Bản Việt hóa (XFVN, "Việt hóa") của font khác cũng mang dấu Xưởng nhưng nét là của nhà thiết kế: chỉ coi là của
-  // người dùng khi font gốc của nó cũng do Xưởng xuất.
-  const vietnamizedCopy = /^XFVN - /.test(record.name) || /Việt hóa/i.test(record.name);
-  const originalOwn = original ? (await importFontFile(original)).madeByXuong : false;
-  const ownFont = editOnly && (record.fromImages === true || (vietnamizedCopy ? originalOwn : imported.madeByXuong || 'fromImages' in record));
+  const ownFont = editOnly && await isOwnRecord(record, original);
   importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}), ...(ownFont ? { ownFont: true } : {}) };
   loadedSourceBlob = record.blob;
   $('name').value = (record.name + (editOnly ? '' : ' Việt hóa')).slice(0, 40);
@@ -1539,6 +1534,19 @@ async function openQualityFont(result) {
   if (isQualityEditorSource(result)) { $('open-font-workspace').click(); return; }
   if (await fontCollection.editRecord(result.record)) editorFontCheck.setResults([result]);
 }
+// Font do chính người dùng dựng trong Xưởng (không phải nét của nhà thiết kế khác):
+// - file Xưởng xuất mang mô tả "Made with draw-your-font" (src/assemble.js), kể cả khi được Nhập TTF vào Bộ sưu tập;
+// - bản Việt hóa / kiểu family sinh ra (tên XFVN, "Việt hóa") cũng mang dấu đó, nên xét font gốc của nó
+//   (generatedFrom, hoặc bản gốc được ghép cặp) — ví dụ "XFVN - Sử Việt Kiêu Hùng Regular Italic" sinh từ "Sử Việt Kiêu Hùng".
+async function isOwnRecord(record, original, depth = 0) {
+  if (!record?.blob || depth > 4) return false;
+  if (record.fromImages === true) return true;
+  if (/^XFVN - /.test(record.name) || /Việt hóa/i.test(record.name)) {
+    const source = record.generatedFrom != null ? await getFontRecord(record.generatedFrom) : original;
+    return source && source.id !== record.id ? isOwnRecord(source, undefined, depth + 1) : false;
+  }
+  return (await importFontFile(record)).madeByXuong;
+}
 // Nút "Hoàn thiện font chữ": chạy lần lượt mọi bước sửa theo quy tắc skill, áp dụng luôn rồi kiểm file; một lần Hoàn tác.
 // Chữ đã khóa, đã duyệt giữ nguyên.
 let completionRun = false, completionPending = false;
@@ -1553,6 +1561,11 @@ async function fixByRules() {
     const snapshot = new Map(glyphs), next = new Map(glyphs);
     // 1. Chiều cao: chân đúng đường chân, đỉnh cùng nhóm bằng nhau.
     status('Hoàn thiện font: chuẩn hóa chiều cao…'); await pause();
+    // Font mở từ Bộ sưu tập trước khi có nhận diện (thông tin lưu trong trình duyệt không có ownFont): đọc lại file đã lưu.
+    if (importedMetrics && !importedMetrics.ownFont && importedMetrics.sourceRecordId != null) {
+      try { if (await isOwnRecord(await getFontRecord(importedMetrics.sourceRecordId))) importedMetrics = { ...importedMetrics, ownFont: true }; }
+      catch { /* không đọc được: giữ như font nhà thiết kế khác */ }
+    }
     const own = !!importedMetrics?.ownFont;   // font người dùng tự dựng, mở lại từ Bộ sưu tập: sửa như nét dò ảnh
     const ours = glyph => own || glyph.source !== 'Font gốc';
     const heights = normalizeHeights(next, glyph => editable(glyph) && (own || fromImage(glyph) || glyph.origin === 'inferred'));
