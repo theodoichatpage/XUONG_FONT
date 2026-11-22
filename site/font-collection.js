@@ -330,7 +330,8 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
   // Family gốc và family XFVN cùng tên được gộp thành một nhóm, tiêu đề ghi tiến độ Việt hóa.
   const VI_PREFIX = 'XFVN - ';
   const isVietnamized = record => record.name.startsWith(VI_PREFIX);
-  const matchKey = name => name.replace(/^XFVN - /, '').replace(/\s*Việt hóa\s*$/i, '').normalize('NFC').toLocaleLowerCase('vi').replace(/[^\p{L}\p{N}]/gu, '');
+  // "Regular"/"Normal" ở cuối tên là kiểu mặc định: "XFVN - Sử Việt Kiêu Hùng Regular" vẫn là bản Việt hóa của "Sử Việt Kiêu Hùng".
+  const matchKey = name => name.replace(/^XFVN - /, '').replace(/\s*Việt hóa\s*$/i, '').replace(/[\s_-]+(regular|normal)\s*$/i, '').normalize('NFC').toLocaleLowerCase('vi').replace(/[^\p{L}\p{N}]/gu, '');
   function pairGroups() {
     const merged = new Map();
     for (const group of groups) {
