@@ -99,6 +99,9 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   function render(){
     release();confirmationCards?.replaceChildren();if(confirmation)confirmation.hidden=true;$('content').hidden=!project;if(!project)return;
     if(root.classList.contains('fp-guided')){const count=project.images.filter(i=>!i.confirmed&&!i.excluded).length;$('quick-status').textContent=count?'Còn '+count+' ảnh cần chọn kiểu chữ hoặc Bỏ qua ảnh này.':'Đã xác nhận ảnh. Bấm Tạo bộ font ở vùng ảnh mẫu để tiếp tục.';}
+    // Dự án lưu không có kiểu 'Regular' (ví dụ chỉ có Bold): chọn kiểu có chữ đầu tiên thay vì báo lỗi khi mở lại.
+    if(!activeStyle())styleId=project.styles.find(s=>s.glyphs?.length)?.id||project.styles[0]?.id;
+    if(!activeStyle())return;
     $('name').value=project.name;$('projects').value=project.id;const style=activeStyle();$('threshold').value=String(activeGlyph()?.processing?.threshold??128);$('style-name').value=style.name;$('rendering').checked=!!style.verification?.rendering;
     $('style-state').textContent=project.name+' '+style.name+' · weight '+style.weight+' · '+styleStatus(style)+' · '+style.glyphs.length+' glyph vector. Vị trí trống không phải font đã tạo.';
     $('matrix').replaceChildren();for(const weight of familyStyles.filter(s=>!s.italic)){const label=document.createElement('strong');label.textContent=weight.style+' '+weight.weight;$('matrix').append(label);for(const italic of [false,true]){const slot=project.styles.find(s=>s.id===weight.style+(italic?' Italic':'')),button=document.createElement('button');button.type='button';button.textContent=(italic?'Italic':'Roman')+' · '+styleStatus(slot);button.setAttribute('aria-pressed',String(slot.id===styleId));button.addEventListener('click',()=>{if(busy)return;styleId=slot.id;selectedChar=slot.glyphs[0]?.char||'i';render();void showProof();});$('matrix').append(button);}}

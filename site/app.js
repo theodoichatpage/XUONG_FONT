@@ -1531,8 +1531,8 @@ async function openQualityFont(result) {
   if (isQualityEditorSource(result)) { $('open-font-workspace').click(); return; }
   if (await fontCollection.editRecord(result.record)) editorFontCheck.setResults([result]);
 }
-// Nút "Hoàn thiện font chữ": chạy lần lượt mọi bước sửa theo quy tắc skill, cho xem trước Trước/Sau; bấm Áp dụng
-// chỉnh dấu mới ghi vào bộ chữ rồi kiểm file; một lần Hoàn tác. Chữ đã khóa, đã duyệt giữ nguyên.
+// Nút "Hoàn thiện font chữ": chạy lần lượt mọi bước sửa theo quy tắc skill, áp dụng luôn rồi kiểm file; một lần Hoàn tác.
+// Chữ đã khóa, đã duyệt giữ nguyên.
 let completionRun = false, completionPending = false;
 async function fixByRules() {
   if (busy || loading || !glyphs.size) return false;
@@ -1602,7 +1602,6 @@ async function fixByRules() {
     // Dấu nặng = 0,88 [0,67–1,0] dấu chấm, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
     const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
-    // Skill SKILL.md "Dựng và chỉnh": xem trước trước/sau, chỉ ghi vào bộ chữ khi áp dụng, giữ hoàn tác.
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
     const draft = new ProtectedGlyphMap(next);
     // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
@@ -1619,16 +1618,6 @@ async function fixByRules() {
     const added = changed.filter(item => !item.before && !special.has(item.char)).map(item => item.char).filter(char => charset.includes(char));
     const missing = charset.filter(char => !draft.get(char)?.d);
     const list = chars => chars.slice(0, 30).join(' ') + (chars.length > 30 ? ' …' : '');
-    const reasons = new Map();
-    const tag = (chars, text) => { for (const char of chars) reasons.set(char, [...(reasons.get(char) || []), text]); };
-    tag(heights.changed.map(g => g.char), 'chiều cao');
-    tag(cleaned, 'làm mượt nét');
-    for (const g of letters) tag([g.char], 'dựng từ ' + g.derivedFrom);
-    tag(rebuilt, 'ghép lại dấu');
-    tag(added, 'ghép dấu');
-    tag(symbols.map(g => g.char), 'dựng ký tự');
-    tag(punctFix.changed.map(g => g.char), 'cỡ dấu câu');
-    tag(dotBelow.changed.map(g => g.char), 'cỡ dấu nặng');
     const parts = [
       heights.changed.length && 'chuẩn chiều cao ' + heights.changed.length + ' chữ (' + list(heights.changed.map(g => g.char)) + ')',
       cleaned.length && 'làm mượt viền và đường cong ' + cleaned.length + ' chữ (' + list(cleaned) + ')',
@@ -1648,51 +1637,16 @@ async function fixByRules() {
       status('Hoàn thiện font: không có gì cần sửa theo quy tắc.' + tail + ' Đang kiểm file font…');
       return false;   // không có bản xem trước: kiểm file luôn
     }
-    // Bản xem trước: mỗi chữ một thẻ Trước/Sau (cùng cỡ, baseline, viewBox), có thể bỏ từng chữ; Áp dụng chỉnh dấu ghi cả lượt.
-    $('open-font-workspace').click();
-    $('mark-spacing-tools').hidden = false;
-    markCandidates = changed;
-    auditRepairPending = true;
-    completionPending = true;
-    renderCompletionProof(changed, reasons);
-    $('apply-mark-spacing').disabled = false;
-    $('mark-spacing-report').textContent = 'Hoàn thiện font — bản xem trước ' + changed.length + ' chữ: ' + parts.join('; ') + '.' + tail
-      + ' Chưa thay đổi font. Bỏ chữ nào không muốn, rồi bấm Áp dụng chỉnh dấu; Xưởng sẽ tự kiểm file và sửa khoảng dấu sau khi áp dụng.';
-    $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
-    status('Hoàn thiện font: đã chuẩn bị ' + changed.length + ' thay đổi theo quy tắc skill. Chưa thay đổi font — xem Trước/Sau rồi bấm Áp dụng chỉnh dấu.');
+    // Người dùng (22/11/2026): bấm Hoàn thiện là áp dụng luôn, không hiện bảng xem trước; Hoàn tác chỉnh dấu quay lại cả lượt.
+    glyphs = draft;
+    lastMarkChange = changed; completionRun = true;
+    $('undo-mark-spacing').disabled = false;
+    repairRecheckPending = { propose: true };
+    status('Hoàn thiện font: ' + parts.join('; ') + '.' + tail + ' Bấm Hoàn tác chỉnh dấu để quay lại toàn bộ. Đang kiểm file font…');
+    busy = false;
+    refresh();
     return true;
   } finally { busy = false; }
-}
-function renderCompletionProof(changes, reasons) {
-  const proof = $('mark-spacing-proof'), ns = 'http://www.w3.org/2000/svg';
-  proof.replaceChildren();
-  const glyphSvg = glyph => {
-    const svg = document.createElementNS(ns, 'svg'), path = document.createElementNS(ns, 'path');
-    svg.setAttribute('viewBox', `-40 -1000 ${Math.max(glyph.advance || 600, 300) + 80} 1300`);   // cùng cỡ, cùng baseline
-    path.setAttribute('d', glyph.d); path.setAttribute('transform', 'scale(1,-1)');
-    svg.append(path); return svg;
-  };
-  for (const { char, before, after } of changes) {
-    const card = document.createElement('div'), title = document.createElement('strong');
-    title.textContent = char + ' · ' + (reasons.get(char) || ['thay đổi']).join(', ');
-    card.append(title);
-    for (const [label, glyph] of [['Trước', before], ['Sau', after]]) {
-      const figure = document.createElement('figure'), caption = document.createElement('figcaption');
-      caption.textContent = label;
-      if (glyph?.d) figure.append(glyphSvg(glyph)); else figure.append(document.createTextNode('(trống)'));
-      figure.append(caption); card.append(figure);
-    }
-    const reject = document.createElement('button');
-    reject.type = 'button'; reject.textContent = 'Bỏ chữ này';
-    reject.addEventListener('click', () => {
-      markCandidates = markCandidates.filter(item => item.char !== char);
-      card.remove();
-      $('apply-mark-spacing').disabled = !markCandidates.length;
-      status('Đã bỏ ' + char + ' khỏi lượt hoàn thiện. Còn ' + markCandidates.length + ' chữ chờ áp dụng.');
-    });
-    card.append(reject);
-    proof.append(card);
-  }
 }
 const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   getCurrent: () => currentFontExport, beforeCheck: fixByRules, onSelect: renderRuleQuality, onOpen: openQualityFont, onInspect: inspectQualityText,

@@ -69,9 +69,17 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
     if (pieces.length >= 2 && pieces[0].height < ib.height * .35) iDot = pieces[0].width;
   }
   if (period?.d) {
-    const pb = glyphBounds(period), w = pb.width, size = Math.max(pb.width, pb.height);
-    if (iDot >= stem && iDot <= 1.5 * stem) { const r = w / iDot; if (r > 1.3 || r < .7) factor = 1.06 * iDot / w; }
-    else if (w > 1.5 * stem || w < stem) factor = 1.2 * stem / w;
+    // Đo 16 font chuẩn (.qa/period-measure.mjs): font thường dấu chấm rộng 1,0–1,6 nét thân (trung vị 1,2);
+    // font hẹp (rộng H / cao H < 0,62: Impact 0,60, Bebas Neue 0,44–0,50) dấu chấm chỉ bằng nét thân: 0,73–0,98.
+    // Cao dấu chấm 0,126–0,205 chiều cao chữ hoa ở mọi font. Thứ tự: theo nét thân → theo chiều cao hoa → theo chấm i.
+    const pb = glyphBounds(period), w = pb.width, H = glyphs.get('H');
+    const condensed = !!(H?.d && capTop && glyphBounds(H).width / capTop < .62);
+    const [lo, hi, mid] = condensed ? [.7, 1.05, .95] : [1, 1.6, 1.2];
+    let target = 0;
+    if (w > hi * stem || w < lo * stem) target = mid * stem;
+    else if (capTop && pb.height > .21 * capTop) target = w * .17 * capTop / pb.height;
+    else if (iDot >= stem && iDot <= 1.5 * stem) { const r = w / iDot; if (r > 1.3 || r < .7) target = 1.06 * iDot; }
+    if (target) factor = target / w;
   }
   else { const h = glyphBounds(comma).height; if (h > 3.5 * stem || h < 2.1 * stem) factor = 2.9 * stem / h; }
   if (Math.abs(factor - 1) < .03) factor = 1;
