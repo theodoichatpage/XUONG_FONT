@@ -5,6 +5,7 @@
 // (Palatino để chân I E i thấp 29/1000, Calibri thấp 3/1000) là thiết kế cố ý.
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
+import { measureSlant } from './vietnamese.js';
 
 const FLAT_BOTTOM = 'BDEFHIKLPRTXZhiklmnrxz147';   // không có M N: đỉnh nhọn dưới chân được phép vượt dòng
 const GROUPS = [
@@ -97,14 +98,29 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
     if (dotOnly && capTop && tall.y + tall.height > 1.08 * capTop) d = svgpath(d).scale(capTop / (tall.y + tall.height)).round(1).toString();
     if (d !== g.d) cur.set(char, { ...g, d });
   }
+  const slant = measureSlant(glyphs) || 0;
+  const keepDotGap = (originalD, newD) => {
+    const pieces = list => list.map(part => ({ part, b: glyphBounds({ d: part }) })).sort((a, b2) => a.b.y - b2.b.y);
+    const before = pieces(parts(originalD)), after = pieces(parts(newD));
+    if (before.length !== 2 || after.length !== 2) return newD;
+    const gap = before[1].b.y - (before[0].b.y + before[0].b.height);   // hở giữa đỉnh chấm/phẩy dưới và đáy chấm trên
+    const dy = after[0].b.y + after[0].b.height + gap - after[1].b.y;
+    if (Math.abs(dy) < 1) return newD;
+    return [after[0].part, svgpath(after[1].part).translate(slant * dy, dy).round(1).toString()].join(' ');
+  };
   // Bước 2: chấm của : ; ! ? bằng đúng dấu chấm (lệch > 8% thì đưa về), chấm phẩy dưới của ; cao bằng dấu phẩy.
   const p = get('.'), c = get(',');
   const pSize = p?.d ? Math.max(glyphBounds(p).width, glyphBounds(p).height) : 0, cHeight = c?.d ? glyphBounds(c).height : 0;
   if (pSize) for (const char of [':', ';', '!', '?']) {
     const g = get(char);
     if (!g?.d || !editable(g)) continue;
-    const d = parts(g.d).map(part => {
+    let d = parts(g.d).map(part => {
       const b = glyphBounds({ d: part }), size = Math.max(b.width, b.height), aspect = b.height / (b.width || 1);
+      // Phần dưới của ; (xuống dưới đường chân) là dấu phẩy: cao bằng dấu phẩy của font, giữ đỉnh tại chỗ.
+      if (char === ';' && cHeight && b.y < -.1 * pSize && size < 6 * stem) {
+        const k = cHeight / b.height;
+        return Math.abs(k - 1) > .08 ? scalePart(part, k, true) : part;
+      }
       if (size < 2.2 * stem && size < 2 * pSize && aspect > .6 && aspect < 1.7) {
         // Đo 18 font chuẩn: chấm của : ; bằng đúng dấu chấm (0,92–1,0); chấm của ! ? 0,74–1,15 (Tahoma, Verdana 0,74).
         return Math.abs(size / pSize - 1) > .08 ? scalePart(part, pSize / size, false) : part;   // chấm bằng dấu chấm của chính font
@@ -115,6 +131,9 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
       }
       return part;
     }).join(' ');
+    // : ; giữ khoảng hở giữa hai chấm đúng như thiết kế gốc của font (đo trên glyph trước khi sửa): chấm nhỏ lại thì
+    // chấm trên hạ xuống theo, không treo lơ lửng ở chỗ cũ. Font nghiêng: dời theo trục nghiêng của chính font.
+    if ((char === ':' || char === ';') && d !== parts(g.d).join(' ')) d = keepDotGap(glyphs.get(char).d, d);
     if (d !== parts(g.d).join(' ')) cur.set(char, { ...g, d });
   }
   const changed = [];
