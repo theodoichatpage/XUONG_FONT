@@ -129,7 +129,8 @@ function clip(type, subject, clipPaths) {
   return out;
 }
 const shapeOf = polygons => {
-  const simple = CL.Clipper.SimplifyPolygons(polygons, CL.PolyFillType.pftNonZero).filter(p => Math.abs(CL.Clipper.Area(p)) > 256);
+  // Bỏ hạt bụi dò ảnh (< 6×6 đơn vị, ví dụ chấm 5 đơn vị² cạnh chữ w): không phải nét chữ, không tính vào lòng chữ/nét rời.
+  const simple = CL.Clipper.SimplifyPolygons(polygons, CL.PolyFillType.pftNonZero).filter(p => Math.abs(CL.Clipper.Area(p)) > 36 * 256);
   const positive = simple.filter(p => CL.Clipper.Orientation(p)).length;
   return [simple.length, Math.min(positive, simple.length - positive)].join(':');
 };
@@ -175,6 +176,7 @@ const topology = value => shapeOf(contours(value));
 // mỏng hơn 60% thành nét gốc (theo tỷ lệ nét thân), và không sâu quá 6 lần độ thu (tránh khe dài ở chỗ nối móc số 6). Không cắt mọi
 // mũi ở 2 lần độ thu rồi kéo về một điểm: như vậy cạnh xiên của M, A bị kéo lệch, nét thành hình nêm, dày mỏng không đều.
 function truncateSpikes(source, amount, stemRatio, newStem = 0, capHeight = 0) {
+  truncateSpikes.lastCut = false;   // glyph không có mũi nào bị cắt (thoát sớm) không được mang cờ cắt của glyph trước
   const d = Math.abs(amount) * 16, stemWidth = newStem * 16;
   const high = offsetPolygons(source, amount, 1000), low = offsetPolygons(source, amount, 2);
   const missing = clip(CL.ClipType.ctDifference, low, high);
@@ -234,8 +236,42 @@ function truncateSpikes(source, amount, stemRatio, newStem = 0, capHeight = 0) {
   truncateSpikes.lastCut = pierced;
   return result;
 }
+// Làm đậm: khe hẹp trang trí (khe giữa hai chân serif loe ở đỉnh H, đáy U, chân A…) hẹp hơn 2 lần độ nới thì khép lại
+// thành lòng kín mới. Nhà thiết kế giữ khe mở ở bản đậm, nên mở lại mỗi lòng mới bằng một rãnh mảnh theo đường ngắn
+// nhất ra ngoài (chính chỗ khe cũ). Lòng chữ có sẵn (A, O…) không đụng: lòng bị bít hoặc thắt tách đôi nghĩa là font
+// gốc không làm được mức đậm đó (kiểu đó bị làm mờ, không tạo).
+function reopenSlits(result, source, amount) {
+  const big = p => Math.abs(CL.Clipper.Area(p)) > 36 * 256;
+  const sourceHoles = CL.Clipper.SimplifyPolygons(source, CL.PolyFillType.pftNonZero).filter(p => !CL.Clipper.Orientation(p) && big(p));
+  const simple = CL.Clipper.SimplifyPolygons(result, CL.PolyFillType.pftNonZero).filter(big);
+  const outers = simple.filter(p => CL.Clipper.Orientation(p));
+  const centroid = p => ({ X: Math.round(p.reduce((s, q) => s + q.X, 0) / p.length), Y: Math.round(p.reduce((s, q) => s + q.Y, 0) / p.length) });
+  const fresh = simple.filter(p => !CL.Clipper.Orientation(p) && !sourceHoles.some(h => CL.Clipper.PointInPolygon(centroid(p), h) !== 0));
+  if (!fresh.length) return null;
+  const width = Math.max(4, Math.abs(amount) * .5) * 16, channels = [];
+  const nearest = (from, targets) => {
+    let best = null;
+    for (const a of from) for (const target of targets) for (let i = 0; i < target.length; i++) {
+      const p = target[i], q = target[(i + 1) % target.length], dx = q.X - p.X, dy = q.Y - p.Y, l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((a.X - p.X) * dx + (a.Y - p.Y) * dy) / l2)), b = { X: p.X + t * dx, Y: p.Y + t * dy };
+      const d = Math.hypot(b.X - a.X, b.Y - a.Y);
+      if (!best || d < best.d) best = { a, b, d };
+    }
+    return best;
+  };
+  for (const [hole, targets] of fresh.map(hole => [hole, outers])) {
+    const best = nearest(hole, targets);
+    if (!best || !best.d) continue;
+    const ux = (best.b.X - best.a.X) / best.d, uy = (best.b.Y - best.a.Y) / best.d, nx = -uy * width / 2, ny = ux * width / 2;
+    const from = { X: best.a.X - ux * 16, Y: best.a.Y - uy * 16 }, to = { X: best.b.X + ux * 32, Y: best.b.Y + uy * 32 };
+    channels.push([from, to].flatMap((pt, k) => k ? [{ X: pt.X + nx, Y: pt.Y + ny }, { X: pt.X - nx, Y: pt.Y - ny }] : [{ X: pt.X - nx, Y: pt.Y - ny }, { X: pt.X + nx, Y: pt.Y + ny }])
+      .map(pt => ({ X: Math.round(pt.X), Y: Math.round(pt.Y) })));
+  }
+  return channels.length ? clip(CL.ClipType.ctDifference, result, channels) : null;
+}
 function reweigh(path, amount, stemRatio = 1, newStem = 0, capHeight = 0) {
-  const source = prepared(path), before = shapeOf(source);
+  // Hạt bụi dò ảnh (< 6×6 đơn vị) bỏ trước khi đổi độ đậm, kẻo làm đậm phóng nó thành chấm thật.
+  const source = prepared(path).filter(p => Math.abs(CL.Clipper.Area(p)) > 36 * 256), before = shapeOf(source);
   if (amount < 0) {
     // compromised: phải cắt mũi góc hẹp (hoặc phải bo tròn) mới không thủng nét, tức kiểu chữ đã khác bản gốc.
     const mark = output => Object.assign(output, { compromised: true });
@@ -258,6 +294,8 @@ function reweigh(path, amount, stemRatio = 1, newStem = 0, capHeight = 0) {
   } else {
     const high = offsetPolygons(source, amount, 6);
     if (shapeOf(high) === before) return toPath(high, amount);
+    const opened = reopenSlits(high, source, amount);
+    if (opened && shapeOf(opened) === before) return toPath(opened, amount);
     const low = offsetPolygons(source, amount, 2);
     if (shapeOf(low) === before) {
       // Phần khác nhau giữa hai bản là các mũi nhọn; chỉ cắt những mũi làm dính nét.
@@ -338,6 +376,40 @@ function restoreMarks(path, shift, { top, bottom }) {
   const output = new opentype.Path();
   output.commands = contours.flat();
   return output;
+}
+
+// Kiểm trước kiểu nào font gốc làm được (cùng phép kiểm lượt 1 của createFontFamily, chỉ trên chữ cái và số không dấu):
+// làm mờ, không cho chọn kiểu không đạt (skill: family không cần đủ kiểu; kiểu không đạt chuẩn thì không tạo).
+// Trả về Map tên kiểu đứng → lý do không làm được (null nếu làm được). Kiểu nghiêng theo kiểu đứng cùng độ đậm.
+export async function familyFeasibility(record, { baseWeight } = {}, onProgress = () => {}) {
+  const source = opentype.parse(await record.blob.arrayBuffer());
+  const base = familyWeights.find(item => item.weight === Number(baseWeight))
+    || familyWeights.reduce((best, item) => Math.abs(item.weight - (source.tables.os2?.usWeightClass || 400)) < Math.abs(best.weight - (source.tables.os2?.usWeightClass || 400)) ? item : best);
+  const upm = source.unitsPerEm;
+  const stemGlyph = [source.charToGlyph('l'), source.charToGlyph('I')].find(glyph => glyph?.index && glyph.path.commands.length);
+  const capGlyph = source.charToGlyph('H'), capHeight = capGlyph?.index ? capGlyph.getBoundingBox().y2 : (source.ascender || upm) * .7;
+  const sourceStem = stemGlyph ? outline.stemWidth(outline.flatten(stemGlyph.path.toPathData(3))) || null : null;
+  const letters = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789Đđ'].map(char => [char, source.charToGlyph(char)])
+    .filter(([, glyph]) => glyph?.index && glyph.path.commands.length);
+  const verdict = new Map();
+  for (const target of familyWeights) {
+    if (target.weight === base.weight) { verdict.set(target.name, null); continue; }
+    onProgress(target.name);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const amount = (target.offset - base.offset) * upm / 1000;
+    const stemRatio = sourceStem ? Math.max(.05, (sourceStem + 2 * amount) / sourceStem) : 1;
+    const broken = [], cut = [];
+    for (const [char, glyph] of letters) {
+      try {
+        const path = reweigh(glyph.path, amount, stemRatio, sourceStem ? sourceStem + 2 * amount : 0, capHeight);
+        if (path.compromised) cut.push(char);
+        else if (topology(glyph.path) !== topology(path)) broken.push(char);
+      } catch { broken.push(char); }
+    }
+    verdict.set(target.name, broken.length ? 'lòng chữ bị bít hoặc nét dính/đứt ở ' + broken.slice(0, 10).join(' ')
+      : cut.length ? 'phải cắt bớt góc hẹp của ' + cut.slice(0, 10).join(' ') + ' mới không thủng nét' : null);
+  }
+  return verdict;
 }
 
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
@@ -496,3 +568,4 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     }
   }
 }
+export const __familyTest = { reweigh: (...a) => reweigh(...a), topology: v => topology(v), contours: p => contours(p) };   // chỉ cho script chẩn đoán .qa

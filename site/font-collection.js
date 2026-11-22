@@ -1,5 +1,5 @@
 import { familyWeights, familyStyles, identifyFamilyStyle } from './family-styles.js';
-import { createFontFamily } from './font-family.js';
+import { createFontFamily, familyFeasibility } from './font-family.js';
 import opentype from 'opentype.js';
 import { familyPreflight } from './family-validation.js';
 import { withXuongPrefix } from './font-rename.js';
@@ -608,13 +608,40 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     }
     picker.append(row);
   }
+  // Kiểm trước kiểu nào font gốc làm được theo quy tắc skill: kiểu không đạt làm mờ, không chọn được (rê chuột xem lý do).
+  let feasibilityRun = 0;
+  async function checkFeasibility() {
+    const run = ++feasibilityRun, record = familyRecord, note = $('family-status');
+    if (!record) return;
+    picker.querySelectorAll('input').forEach(input => {
+      if (!input.dataset.infeasible) return;
+      delete input.dataset.infeasible; input.disabled = !!input.dataset.occupied;
+      input.parentElement.title = input.disabled ? 'Đã có: giữ nguyên file và bản sửa hiện tại.' : 'Sinh bản nháp cần duyệt';
+    });
+    note.textContent = 'Đang kiểm kiểu nào font gốc làm được…';
+    try {
+      const verdict = await familyFeasibility(record, { baseWeight: $('family-base-weight').value }, name => { if (run === feasibilityRun) note.textContent = 'Đang kiểm kiểu ' + name + '…'; });
+      if (run !== feasibilityRun) return;
+      const bad = [];
+      picker.querySelectorAll('input').forEach(input => {
+        const reason = verdict.get(input.value.replace(/ Italic$/, ''));
+        if (!reason || input.dataset.occupied) return;
+        input.dataset.infeasible = 'true'; input.disabled = true; input.checked = false;
+        input.parentElement.title = 'Font gốc không làm được kiểu này: ' + reason;
+        if (!input.value.endsWith(' Italic')) bad.push(input.value + ' (' + reason + ')');
+      });
+      updateFamilyCount();
+      note.textContent = bad.length ? 'Kiểu mờ là kiểu font gốc không làm được theo quy tắc, nên không tạo: ' + bad.join('; ') + '.' : 'Font gốc làm được mọi kiểu chưa có.';
+    } catch (error) { if (run === feasibilityRun) note.textContent = 'Chưa kiểm trước được: ' + error.message; }
+  }
+  $('family-base-weight').addEventListener('change', checkFeasibility);
   function updateFamilyCount() {
     $('family-selection-count').textContent = picker.querySelectorAll('input:checked').length + ' / ' + familyStyles.length + ' kiểu';
   }
   picker.addEventListener('change', updateFamilyCount);
   for (const [id, condition] of [['family-select-all', () => true],['family-select-none', () => false],['family-select-upright', input => !input.value.endsWith(' Italic')]]) $(id).addEventListener('click', () => {
     if (familyRunning) return;
-    picker.querySelectorAll('input').forEach(input => { input.checked = !input.dataset.occupied && condition(input); }); updateFamilyCount();
+    picker.querySelectorAll('input').forEach(input => { input.checked = !input.dataset.occupied && !input.dataset.infeasible && condition(input); }); updateFamilyCount();
   });
   $('collection-family-open').addEventListener('click', () => {
     if (working || familyRunning) return;
@@ -635,6 +662,7 @@ export function setupFontCollection(getCurrentFont, vietnamize, assess) {
     });
     updateFamilyCount();
     familyDialog.hidden = false;
+    checkFeasibility();
     $('family-title').focus();
     familyDialog.scrollIntoView({ block: 'start', behavior: 'smooth' });
   });
