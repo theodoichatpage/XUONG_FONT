@@ -2,7 +2,7 @@ import {assessFont,makeQualitySVG} from './font-quality.js';
 import {vietnameseCheckCharacters} from './font-coverage.js';
 const labels={present:'Có glyph',missing:'Thiếu glyph',blank:'Glyph rỗng',components:'Có thành phần ghép; chưa xác minh vị trí dấu'};
 const statuses={fail:'Lỗi',warning:'Cần xem lại',pass:'Đã kiểm',manual:'Duyệt bằng mắt',info:'Thông tin'};
-export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,onMarks,onRepair,onAIRepair,standalone=false}={}){
+export function createFontCheckPanel(root,{getCurrent,beforeCheck,onSelect,onOpen,onInspect,onMarks,onRepair,onAIRepair,standalone=false}={}){
   let results=[],running=false,filter='all';
   const ns='http://www.w3.org/2000/svg';
   if(standalone)root.classList.add('checker-showcase');
@@ -223,7 +223,8 @@ export function createFontCheckPanel(root,{getCurrent,onSelect,onOpen,onInspect,
     renderCoverage();renderProof();if(standalone)onSelect?.(r);
   }
   $('font').addEventListener('change',render);$('filter').addEventListener('change',()=>{filter=$('filter').value;renderCoverage();});$('sample').addEventListener('input',renderProof);
-  currentButton?.addEventListener('click',async()=>{const record=getCurrent();if(!record){$('status').textContent='Chưa có file xuất để kiểm. Mở hoặc dựng font, đợi xuất xong rồi kiểm lại.';return;}await run([record]);});
+  // Sửa theo quy tắc skill trước (trình sửa), rồi kiểm file xuất mới khi font dựng lại xong.
+  currentButton?.addEventListener('click',async()=>{if(!running&&beforeCheck?.())return;const record=getCurrent();if(!record){$('status').textContent='Chưa có file xuất để kiểm. Mở hoặc dựng font, đợi xuất xong rồi kiểm lại.';return;}await run([record]);});
   root.querySelector('[data-action=open]').addEventListener('click',async()=>{const r=selected();if(r)await onOpen?.(r);});
   root.querySelector('[data-action=marks]')?.addEventListener('click',()=>onMarks(selected()));
   root.querySelector('[data-action=repair]')?.addEventListener('click',async()=>{

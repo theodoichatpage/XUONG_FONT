@@ -942,7 +942,7 @@ function scheduleFont() {
       download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
       currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
-      if (repairRecheckPending) { repairRecheckPending = false; await editorFontCheck.run([currentFontExport], { propose: false }); }
+      if (repairRecheckPending) { const options = repairRecheckPending === true ? { propose: false } : repairRecheckPending; repairRecheckPending = false; await editorFontCheck.run([currentFontExport], options); }
     } catch (error) {
       if (turn === revision) $('missing').textContent = 'Không xuất được font · ' + error.message;
     }
@@ -1472,7 +1472,7 @@ $('apply-mark-spacing').addEventListener('click', () => {
   status('Đã chỉnh dấu cho ' + lastMarkChange.length + ' chữ. Thân chữ và khoảng cách giữa các chữ được giữ nguyên.');
 });
 $('undo-mark-spacing').addEventListener('click', () => {
-  for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) glyphs.set(char, before);
+  for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) { if (before) glyphs.set(char, before); else glyphs.delete(char); }
   lastMarkChange = []; repairRecheckPending = true; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });
 
@@ -1519,8 +1519,43 @@ async function openQualityFont(result) {
   if (isQualityEditorSource(result)) { $('open-font-workspace').click(); return; }
   if (await fontCollection.editRecord(result.record)) editorFontCheck.setResults([result]);
 }
+// Nút "Tự động kiểm tra và đề xuất sửa": trước khi kiểm file, đối chiếu bộ chữ với quy tắc skill (cùng phép đo lập
+// chuẩn) và dựng lại theo quy tắc những chữ có dấu do Xưởng ghép bị lệch chuẩn, ghép thêm chữ có dấu còn thiếu.
+// Nét lấy từ ảnh, nét gốc của font và chữ đã khóa không bị đổi. Hoàn tác bằng nút Hoàn tác chỉnh dấu.
+function fixByRules() {
+  if (busy || loading) return false;
+  if (!['A', 'E', 'O', 'a', 'e', 'o'].some(char => glyphs.get(char)?.d)) return false;
+  const real = glyph => glyph && (glyph.locked || glyph.origin === 'direct' || ['Ảnh mẫu', 'Ảnh làm sạch', 'Font gốc'].includes(glyph.source));
+  const slant = measureSlant(glyphs), before = auditMarks(glyphs, { slant });
+  const snapshot = new Map(glyphs), next = new Map(glyphs);
+  const hasMarkSamples = [...toneSamples.keys()].some(mark => glyphs.get(mark)?.d && !glyphs.get(mark).nativeSize);
+  if (!hasMarkSamples) {
+    const { marks, stem } = deriveMarkSamples(glyphs);
+    for (const [mark, glyph] of marks) if (!real(glyphs.get(mark)) && !glyphs.get(mark)?.d) next.set(mark, glyph);
+    for (const glyph of deriveBarredD(next, stem)) if (!glyphs.get(glyph.char)?.d) next.set(glyph.char, glyph);
+  }
+  const failing = new Set((before?.issues || []).map(issue => issue.char).filter(char => glyphs.get(char)?.d && !real(glyphs.get(char))));
+  const generated = composeVietnamese(next, char => failing.has(char), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') });
+  for (const glyph of generated) next.set(glyph.char, glyph);
+  glyphs = new ProtectedGlyphMap(next);
+  const changed = [...glyphs.keys()].filter(char => snapshot.get(char) !== glyphs.get(char)).map(char => ({ char, before: snapshot.get(char), after: glyphs.get(char) }));
+  const after = auditMarks(glyphs, { slant: measureSlant(glyphs) });
+  const rebuilt = changed.filter(item => item.before && failing.has(item.char)).map(item => item.char);
+  const added = changed.filter(item => !item.before).map(item => item.char).filter(char => charset.includes(char));
+  if (changed.length) { lastMarkChange = changed; $('undo-mark-spacing').disabled = false; }
+  status('Sửa theo quy tắc skill: '
+    + (rebuilt.length ? 'dựng lại ' + rebuilt.length + ' chữ có dấu do Xưởng ghép bị lệch chuẩn (' + rebuilt.join(' ') + ')' : 'không có chữ do Xưởng ghép cần dựng lại')
+    + (added.length ? ', ghép thêm ' + added.length + ' chữ còn thiếu (' + added.slice(0, 30).join(' ') + (added.length > 30 ? ' …' : '') + ')' : '') + '.'
+    + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')
+    + auditMessage(after)
+    + ' Nét lấy từ ảnh và chữ đã khóa giữ nguyên; lệch chuẩn ở các chữ đó cần sửa ảnh hoặc chỉnh tay.'
+    + (changed.length ? ' Bấm Hoàn tác chỉnh dấu nếu muốn quay lại.' : '') + ' Đang kiểm file font…');
+  repairRecheckPending = { propose: true };
+  refresh();
+  return true;
+}
 const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
-  getCurrent: () => currentFontExport, onSelect: renderRuleQuality, onOpen: openQualityFont, onInspect: inspectQualityText,
+  getCurrent: () => currentFontExport, beforeCheck: fixByRules, onSelect: renderRuleQuality, onOpen: openQualityFont, onInspect: inspectQualityText,
   onMarks: result => {
     if (!isQualityEditorSource(result)) { status('Hãy bấm Mở font này để chỉnh sửa trước khi chỉnh dấu.'); return; }
     $('open-mark-spacing').click();

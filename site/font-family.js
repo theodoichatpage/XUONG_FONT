@@ -134,8 +134,7 @@ const shapeOf = polygons => {
   return [simple.length, Math.min(positive, simple.length - positive)].join(':');
 };
 // Mũi nhọn bị cắt để khỏi đâm xuyên nét để lại một đoạn bằng (lòng A, khe M thành đường ngang). Thu đoạn đó về một điểm
-// để góc vẫn nhọn: giữ đầu mút nằm trên cạnh đứng/ngang (thân M vẫn thẳng), cạnh xiên đổi góc rất nhẹ; hai cạnh đều xiên
-// thì nhọn ở giữa đoạn cắt.
+// để góc vẫn nhọn: đỉnh ở giữa đoạn cắt, hai cạnh mỗi bên nghiêng thêm nửa đoạn.
 function repoint(result, source, amount) {
   // Cạnh thường của bản thu mảnh song song với một cạnh gốc và cách nó đúng độ thu; đoạn cắt mũi nhọn thì không.
   const distance = Math.abs(amount) * 16, edges = source.flatMap(polygon => polygon.map((a, i) => [a, polygon[(i + 1) % polygon.length]]));
@@ -151,15 +150,12 @@ function repoint(result, source, amount) {
   });
   const near = (p, q) => Math.hypot(p.X - q.X, p.Y - q.Y) < 32;
   const isCut = (a, b) => cuts.some(([p, q]) => (near(a, p) && near(b, q)) || (near(a, q) && near(b, p)));
-  const straight = (a, b) => Math.min(Math.abs(b.X - a.X), Math.abs(b.Y - a.Y)) < .02 * Math.hypot(b.X - a.X, b.Y - a.Y);
   return result.map(polygon => {
     const out = polygon.slice();
     for (let i = 0; i < out.length && out.length > 3; i++) {
       const a = out[i], b = out[(i + 1) % out.length];
       if (!isCut(a, b)) continue;
-      const before = out[(i - 1 + out.length) % out.length], after = out[(i + 2) % out.length];
-      const keepA = straight(before, a), keepB = straight(b, after);
-      const tip = keepA && !keepB ? a : keepB && !keepA ? b : { X: Math.round((a.X + b.X) / 2), Y: Math.round((a.Y + b.Y) / 2) };
+      const tip = { X: Math.round((a.X + b.X) / 2), Y: Math.round((a.Y + b.Y) / 2) };
       out.splice(i, 1, tip);
       out.splice((i + 1) % out.length, 1);
       if (i >= out.length) break;
@@ -178,7 +174,7 @@ const topology = value => shapeOf(contours(value));
 // Thu mảnh: mỗi mũi nhọn (góc lõm hẹp) đi sâu theo đúng đường song song, chỉ dừng lại khi phần nét còn lại phía trước
 // mỏng hơn 60% thành nét gốc (theo tỷ lệ nét thân), và không sâu quá 6 lần độ thu (tránh khe dài ở chỗ nối móc số 6). Không cắt mọi
 // mũi ở 2 lần độ thu rồi kéo về một điểm: như vậy cạnh xiên của M, A bị kéo lệch, nét thành hình nêm, dày mỏng không đều.
-function truncateSpikes(source, amount, stemRatio, newStem = 0) {
+function truncateSpikes(source, amount, stemRatio, newStem = 0, capHeight = 0) {
   const d = Math.abs(amount) * 16, stemWidth = newStem * 16;
   const high = offsetPolygons(source, amount, 1000), low = offsetPolygons(source, amount, 2);
   const missing = clip(CL.ClipType.ctDifference, low, high);
@@ -187,7 +183,9 @@ function truncateSpikes(source, amount, stemRatio, newStem = 0) {
   const restored = [];
   let pierced = false;
   for (const polygon of source) {
-    const sign = Math.sign(CL.Clipper.Area(polygon));
+    // Góc lõm xét theo phía vật liệu: contour ngoài thuận chiều (diện tích dương), lòng chữ ngược chiều, nên dùng cùng một dấu
+    // cho cả hai (đỉnh lòng chữ A là góc lõm của vật liệu dù là góc lồi của lòng).
+    const sign = 1;
     polygon.forEach((vertex, i) => {
       const prev = polygon[(i - 1 + polygon.length) % polygon.length], next = polygon[(i + 1) % polygon.length];
       const ax = prev.X - vertex.X, ay = prev.Y - vertex.Y, cx = next.X - vertex.X, cy = next.Y - vertex.Y;
@@ -210,14 +208,15 @@ function truncateSpikes(source, amount, stemRatio, newStem = 0) {
         const t = ((p.X - vertex.X) * fy - (p.Y - vertex.Y) * fx) / den, u = ((p.X - vertex.X) * by - (p.Y - vertex.Y) * bx) / den;
         if (t > 1 && u >= 0 && u <= 1) exit = Math.min(exit, t);
       }
-      // Thành nét còn lại phía trước mũi nhọn giữ ít nhất 60% thành nét gốc (theo tỷ lệ nét thân mới/cũ).
-      const minWall = .6 * exit * stemRatio;
+      // Thành nét phía trước mũi nhọn co theo đúng tỷ lệ nét thân mới/cũ (đo Bebas Neue Thin→Bold: phần đặc trên khe M
+      // ≈ 1.6–1.8 nét thân, trên lòng A ≈ 1.2–1.4, dưới khe V ≈ 1.2 ở mọi độ đậm).
+      const minWall = exit * stemRatio;
       const depth = Math.max(d, Math.min(exit - d - minWall, 6 * d));
       if (depth >= tip) return;
-      // Cắt vì nét phía trước sẽ mỏng/thủng (không phải chỉ vì giới hạn 6 lần), và đoạn bằng để lại rộng quá 20% nét
-      // thân đã thu (mắt thấy được), mới là đổi kiểu chữ: kiểu này không đạt.
+      // Mũi bị cắt để lại đoạn bằng, sau đó thu về điểm giữa (hai cạnh mỗi bên nghiêng thêm nửa đoạn). Đoạn bằng rộng quá
+      // nửa nét thân đã thu thì cạnh xiên lệch thấy rõ (nét hình nêm): font không làm được độ đậm này.
       const flat = 2 * (tip - depth) * Math.tan(half);
-      if (exit - d - minWall < tip && flat > .2 * stemWidth) pierced = true;
+      if (exit - d - minWall < tip && flat > .5 * stemWidth) pierced = true;
       // Dải dọc theo mũi nhọn, từ độ sâu cho phép tới quá đầu mũi; chỉ trả lại phần vật liệu đã bị mũi nhọn lấy đi.
       const width = (tip - depth) * Math.tan(half) + 32, far = Math.max(tip, exit) + d, nx = -by, ny = bx;
       const strip = [[depth, width], [depth, -width], [far, -width], [far, width]]
@@ -227,16 +226,27 @@ function truncateSpikes(source, amount, stemRatio, newStem = 0) {
     });
   }
   // Nới phần trả lại ¼ đơn vị để dính liền với nét (cạnh chung trùng khít dễ bị làm tròn hở).
-  const result = restored.length ? clip(CL.ClipType.ctUnion, high, offsetPolygons(restored, .25, 2)) : high;
+  const joined = restored.length ? clip(CL.ClipType.ctUnion, high, offsetPolygons(restored, .25, 2)) : high;
+  // Thu đoạn bằng chỗ cắt về điểm giữa để góc vẫn nhọn (không còn "đường ngang" ở khe M, đỉnh lòng A).
+  const pointed = restored.length ? repoint(joined, source, amount) : joined;
+  const result = shapeOf(pointed) === shapeOf(joined) ? pointed : joined;
   result.cut = pierced;
+  truncateSpikes.lastCut = pierced;
   return result;
 }
-function reweigh(path, amount, stemRatio = 1, newStem = 0) {
+function reweigh(path, amount, stemRatio = 1, newStem = 0, capHeight = 0) {
   const source = prepared(path), before = shapeOf(source);
   if (amount < 0) {
     // compromised: phải cắt mũi góc hẹp (hoặc phải bo tròn) mới không thủng nét, tức kiểu chữ đã khác bản gốc.
     const mark = output => Object.assign(output, { compromised: true });
-    const trimmed = truncateSpikes(source, amount, stemRatio, newStem);
+    // Thu mảnh mạnh làm đầu nét nhọn (đuôi cờ số 5) đứt thành mẩu rời: bỏ mẩu nhỏ hơn bình phương nét thân mới, đầu nét
+    // chỉ ngắn lại một chút, không làm cả kiểu thất bại.
+    const islands = polygons => newStem ? polygons.filter(polygon => !(CL.Clipper.Orientation(polygon) && polygons.length > 1
+      && Math.abs(CL.Clipper.Area(polygon)) < (newStem * 16) ** 2)) : polygons;
+    const spiked = truncateSpikes(source, amount, stemRatio, newStem, capHeight);
+    const cut = truncateSpikes.lastCut;
+    const trimmed = islands(spiked);
+    trimmed.cut = cut;
     if (shapeOf(trimmed) === before) return trimmed.cut ? mark(toPath(trimmed, amount)) : toPath(trimmed, amount);
     const low = offsetPolygons(source, amount, 2);
     if (shapeOf(low) === before) {
@@ -345,6 +355,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
   const family = record.family || source.getEnglishName('preferredFamily') || source.getEnglishName('fontFamily') || record.name.replace(/(?:[ -]+Regular)$/i, '').trim();
   const upm = source.unitsPerEm;
   const stemGlyph = [source.charToGlyph('l'), source.charToGlyph('I')].find(glyph => glyph?.index && glyph.path.commands.length);
+  const capGlyph = source.charToGlyph('H'), capHeight = capGlyph?.index ? capGlyph.getBoundingBox().y2 : (source.ascender || upm) * .7;
   const sourceStem = stemGlyph ? outline.stemWidth(outline.flatten(stemGlyph.path.toPathData(3))) || null : null;
   // cmap is authoritative: multiple code points can share one outline.
   const codePointsByGlyph = new Map();
@@ -388,7 +399,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
       let path = originalPath, advance = old.advanceWidth ?? upm / 2;
       if (amount && originalPath.commands?.length) {
         try {
-          path = reweigh(originalPath, amount, stemRatio, sourceStem ? sourceStem + 2 * amount : 0); advance += amount * 2;
+          path = reweigh(originalPath, amount, stemRatio, sourceStem ? sourceStem + 2 * amount : 0, capHeight); advance += amount * 2;
           if (path.compromised && required && chars.some(char => /[\p{L}\p{N}]/u.test(char) && !isAccented(char))) chars.forEach(char => compromisedChars.add(char));
         }
         catch (error) { if (required && !chars.some(isAccented) && chars.some(char => /[\p{L}\p{N}]/u.test(char))) throw error; keptOriginal.push(i); if (required) chars.forEach(char => keptChars.add(char)); }   // ký hiệu phụ quá mảnh: giữ nét gốc
@@ -420,7 +431,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     // Chuẩn kiểu mảnh: thu mảnh tới mức này mà góc hẹp của chữ cái/số phải cắt bớt mới không thủng nét thì font không
     // đạt kiểu này (nét không còn đều như bản gốc). Không tạo kiểu này; family không cần đủ mọi độ đậm.
     if (compromisedChars.size) throw new Error('Không đạt chuẩn ' + style + ': thu mảnh tới mức này thì góc hẹp của ' + [...compromisedChars].slice(0, 12).join(' ')
-      + ' phải cắt bớt mới không thủng nét, nét không còn đều như bản gốc. Font này không làm được kiểu ' + style + ', bỏ qua kiểu này');
+      + ' phải dời điểm nối quá xa hoặc cắt bớt mới không thủng nét, dáng chữ không còn như bản gốc. Font này không làm được kiểu ' + style + ', bỏ qua kiểu này');
     // Lượt 2: ghép lại chữ có dấu bị dính từ thân và dấu đã làm đậm (thang 1000, trục y lên như trình sửa).
     const recomposed = welded.size ? recomposeWelded(upright, welded, codePointsByGlyph, upm) : new Map();
     for (const i of welded) if (!recomposed.has(i)) throw new Error('Không ghép lại được ' + (codePointsByGlyph.get(i) || []).map(code => String.fromCodePoint(code)).join('/') + ' sau khi đổi độ đậm. Giữ bản gốc; cần thiết kế lại mức đậm này.');

@@ -40,3 +40,7 @@ Mỗi quy tắc có SVG nguyên bản trong `site/references/vector`, cùng thô
 ## Dựng font từ ảnh trên máy, không gọi AI
 
 `tools/image-to-font/image_to_font.py` dựng TTF từ một ảnh chữ mẫu cùng file nội dung chữ (mỗi dòng ảnh một dòng). Script vector hóa bằng Potrace từ pixel gốc và ghép chữ Việt thiếu từ thân chữ cùng dấu có mẫu. Kết quả gồm `report.json` (chữ lấy từ ảnh, chữ ghép, chữ thiếu kèm lý do) và `proof.png`. Dùng khi Gemini lỗi hoặc hết hạn mức, hoặc khi ảnh không được gửi ra ngoài. Chữ ghép và chữ tự tách khỏi chỗ dính là suy luận, cần soát theo [quy tắc thiết kế](design-rules.md). Không gọi bản này là bản sao đã xác minh. Cách chạy xem `tools/image-to-font/README.md`.
+
+## Nút "Tự động kiểm tra và đề xuất sửa" (trình sửa)
+
+Bấm một lần: Xưởng đối chiếu bộ chữ đang làm với quy tắc skill (cùng phép đo lập chuẩn, `site/rule-audit.js`), dựng lại theo quy tắc những chữ có dấu do Xưởng ghép bị lệch chuẩn, ghép thêm chữ có dấu còn thiếu (chưa có dấu mẫu thì dựng dấu mẫu từ nét chữ, chỉ điền ô trống), rồi xuất lại và tự kiểm file như trước. Nét lấy từ ảnh, nét gốc của font và chữ đã khóa không bị đổi; lệch chuẩn ở các chữ đó được báo để sửa ảnh hoặc chỉnh tay. Quay lại bằng nút Hoàn tác chỉnh dấu (chữ mới ghép thêm sẽ bị gỡ). Không thêm nút mới.
