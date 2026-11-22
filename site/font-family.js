@@ -341,7 +341,9 @@ function restoreMarks(path, shift, { top, bottom }) {
 }
 
 export async function createFontFamily(record, chosen, text, onResult, options = {}) {
-  if (record.projectId || record.fromImages) throw new Error('Family từ ảnh cần ảnh riêng của từng Style. Mở Tạo Family từ ảnh để tiếp tục; không sinh Bold bằng offset hoặc Italic bằng shear.');
+  // Kiểu thuộc dự án Family từ ảnh (mỗi Style có ảnh riêng) thì dựng từ ảnh. Font người dùng dựng từ ảnh rồi lưu thành
+  // một file (có nét dò ảnh, chữ AI vẽ) vẫn tạo family bằng nới/thu nét như font khác (người dùng yêu cầu 22/11/2026).
+  if (record.projectId) throw new Error('Kiểu này thuộc dự án Family từ ảnh: mỗi Style cần ảnh riêng. Mở Tạo Family từ ảnh để tiếp tục.');
   const original = await record.blob.arrayBuffer();
   const source = opentype.parse(original);
   const preflight = familyPreflight(source, { baseWeight: options.baseWeight });

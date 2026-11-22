@@ -944,7 +944,7 @@ function scheduleFont() {
       downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
       download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
-      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:!!importedMetrics?.ownFont||[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
+      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
       if (repairRecheckPending) { const options = repairRecheckPending === true ? { propose: false } : repairRecheckPending; repairRecheckPending = false; await editorFontCheck.run([currentFontExport], options); }
     } catch (error) {

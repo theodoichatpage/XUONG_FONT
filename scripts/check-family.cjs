@@ -11,7 +11,7 @@ const parse=b=>opentype.parse(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLen
 (async()=>{
 assert(familyPreflight(parse(fixture())).ready);assert(!familyPreflight(parse(fixture({missing:'Đ'}))).ready);assert(!familyPreflight(parse(fixture({blank:'ệ'}))).ready);assert(!familyPreflight(parse(fixture()),{baseWeight:200}).ready);assert.deepEqual(missingFamilyStyles(['Bold','Regular','Bold'],['Regular']),['Bold']);
 const original=fixture();let results=[];const record={name:'Fixture',family:'Fixture',blob:new Blob([original])};await createFontFamily(record,['Regular','Bold'],'proof',r=>results.push(r),{baseWeight:400,existingStyles:['Regular','Bold']});assert.equal(results.length,0,'occupied slots were overwritten');
-await assert.rejects(createFontFamily({...record,fromImages:true},['Bold'],'',()=>{},{}),/ảnh riêng/);
+await assert.rejects(createFontFamily({...record,projectId:'p1'},['Bold'],'',()=>{},{}),/ảnh riêng/);   // kiểu thuộc dự án Family từ ảnh: dựng từ ảnh; font dựng từ ảnh lưu thành file vẫn tạo family được
 await assert.rejects(createFontFamily({...record,blob:new Blob([fixture({missing:'Đ'})])},['Bold'],'',()=>{},{baseWeight:400}),/Đ/);
 results=[];await createFontFamily(record,['Bold'],'',r=>results.push(r),{baseWeight:400});assert.equal(results.length,1);const exported=parse(new Uint8Array(await results[0].blob.arrayBuffer()));assert.equal(exported.tables.os2.usWeightClass,700);assert(exported.charToGlyph('Đ').path.commands.length);assert.equal(results[0].draft,true);
 await assert.rejects(createFontFamily({...record,blob:new Blob([fixture({hole:true})])},['Black'],'',()=>{},{baseWeight:400}),/lòng chữ/);
