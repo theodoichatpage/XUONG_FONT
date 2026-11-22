@@ -89,3 +89,30 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
   }
   return { changed, factor };
 }
+
+// Dấu nặng theo dấu chấm (chuẩn đo 20 font: cạnh lớn nhất của nặng = 0,88 [0,67–1,0] dấu chấm; không font nào
+// dùng nặng to hơn chấm). Tìm chấm nặng (contour nhỏ nằm dưới đường chân) ở mọi chữ có dấu nặng, kể cả chữ
+// theo ảnh; ngoài khoảng thì co/giãn tại chỗ quanh đỉnh chấm (giữ khoảng hở với thân) về 0,88 dấu chấm.
+export function normalizeDotBelow(glyphs, stem, editable = glyph => !glyph.locked) {
+  const period = glyphs.get('.');
+  if (!period?.d || !(stem > 0)) return { changed: [] };
+  const pb = glyphBounds(period), periodSize = Math.max(pb.width, pb.height), target = .88 * periodSize;
+  const changed = [];
+  for (const [char, g] of glyphs) {
+    if (!g?.d || !editable(g) || !char.normalize('NFD').includes('̣')) continue;
+    const parts = svgpath(g.d).abs().toString().split(/(?=M)/).filter(part => part.trim());
+    let done = false, sizes = [];
+    const d = parts.map(part => {
+      const b = glyphBounds({ d: part });
+      // chấm nặng: nằm hẳn dưới đường chân, cỡ không quá 2,5 nét thân hay 1,6 dấu chấm
+      if (done || !(b.y + b.height <= stem * .25) || Math.max(b.width, b.height) > Math.max(2.5 * stem, 1.6 * periodSize)) return part;
+      const size = Math.max(b.width, b.height), ratio = size / periodSize;
+      done = true; sizes.push(+ratio.toFixed(2));
+      if (ratio >= .67 && ratio <= 1) return part;
+      const k = target / size, cx = b.x + b.width / 2, top = b.y + b.height;
+      return svgpath(part).translate(-cx, -top).scale(k).translate(cx, top).round(1).toString();
+    }).join(' ');
+    if (done && d !== svgpath(g.d).abs().toString().split(/(?=M)/).filter(p => p.trim()).join(' ')) changed.push({ ...g, d, dotBelowFix: sizes[0] });
+  }
+  return { changed };
+}

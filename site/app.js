@@ -4,7 +4,7 @@ import { ask } from './ask.js';
 import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline,fromImage} from './outline-cleanup.js';
-import { normalizeHeights, normalizePunctuation } from './font-heights.js';
+import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { digestReference, readableStyle } from './family-inputs.js';
@@ -1578,6 +1578,9 @@ async function fixByRules() {
     // Cỡ dấu câu theo nét thân (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
     const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of punctFix.changed) next.set(glyph.char, glyph);
+    // Dấu nặng = 0,88 [0,67–1,0] dấu chấm, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
+    const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
+    for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     glyphs = new ProtectedGlyphMap(next);
     // 4. Kerning cặp tiếng Việt. Font Xưởng dựng: tự tính khi xuất. Font mở từ bộ sưu tập: thêm cặp còn thiếu.
     let kerned = 0;
@@ -1601,6 +1604,7 @@ async function fixByRules() {
       letters.length && 'dựng ' + letters.length + ' chữ cái từ bộ phận (' + list(letters.map(g => g.char + '←' + g.derivedFrom)) + ')',
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
+      dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ về 0,88 dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
       punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu theo nét thân (×' + punctFix.factor.toFixed(2) + ': ' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
       kerned && 'kerning ' + kerned + ' cặp tiếng Việt',
