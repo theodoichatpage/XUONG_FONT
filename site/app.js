@@ -20,6 +20,7 @@ import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
+import { redrawFontImage } from './ai-design.js';
 import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -1534,6 +1535,53 @@ async function openQualityFont(result) {
   if (isQualityEditorSource(result)) { $('open-font-workspace').click(); return; }
   if (await fontCollection.editRecord(result.record)) editorFontCheck.setResults([result]);
 }
+// Ký tự không quy tắc nào dựng được (@ & ...): nhờ Gemini vẽ theo đúng nét của chính font, rồi tách nét như ảnh mẫu.
+// Ảnh tham chiếu dựng từ chữ đang có trong font (không lấy font khác). Kết quả là ảnh mẫu mới trong danh sách ảnh,
+// chữ tách ra đánh dấu "AI vẽ" để duyệt; Hoàn tác chỉnh dấu không gỡ phần này (xóa ký tự nếu không dùng).
+const AI_DRAWABLE = '@&#$%*^~_=|\\[]{}<>?!';
+function renderFontSample(map, text) {
+  const canvas = document.createElement('canvas'), scale = .16, pad = 40;
+  const list = [...text].map(char => map.get(char)).filter(g => g?.d);
+  canvas.width = Math.ceil(pad * 2 + list.reduce((w, g) => w + (g.advance || 500) * scale, 0));
+  canvas.height = Math.ceil(1250 * scale + pad * 2);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#000';
+  let x = pad;
+  for (const glyph of list) {
+    ctx.save(); ctx.translate(x, pad + 1000 * scale); ctx.scale(scale, -scale); ctx.fill(new Path2D(glyph.d)); ctx.restore();
+    x += (glyph.advance || 500) * scale;
+  }
+  return canvas;
+}
+async function drawMissingWithAI(missing) {
+  const chars = missing.filter(char => AI_DRAWABLE.includes(char)).slice(0, 9);
+  const key = geminiKey.value.trim();
+  if (!chars.length) return;
+  if (!key || !connectedGeminiModel) { status($('status').textContent + ' Kết nối Gemini để Xưởng nhờ AI vẽ ' + chars.join(' ') + ' theo nét của font.'); return; }
+  const present = [...'ABCDEGHKMNORSabdegkmnorsy0123456789?!'].filter(char => glyphs.get(char)?.d).join('');
+  if (present.length < 6) return;
+  try {
+    status('Hoàn thiện font: đang nhờ Gemini vẽ ' + chars.join(' ') + ' theo nét của font…');
+    const sample = renderFontSample(glyphs, present);
+    const drawn = await redrawFontImage([sample], { mode: 'row', chars }, key, new AbortController().signal);
+    const blob = await new Promise(resolve => drawn.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'ai-' + chars.length + '-ky-tu.png', { type: 'image/png' });
+    const index = references.length;
+    addFiles([file]);
+    for (let i = 0; i < 100 && (activeReference !== index || loading || !source); i++) await new Promise(r => setTimeout(r, 100));
+    if (activeReference !== index || !source) throw new Error('chưa mở được ảnh AI vẽ');
+    $('chars').value = chars.join(' ');
+    crop = null;
+    await trace(false);
+    const made = chars.filter(char => glyphs.get(char)?.d);
+    for (const char of made) { const g = glyphs.get(char); if (!g.aiDrawn) glyphs.set(char, { ...g, aiDrawn: true, approved: false }); }
+    refresh();
+    status('Gemini đã vẽ ' + (made.join(' ') || 'chưa tách được ký tự nào') + ' theo nét của font (ảnh AI ở danh sách ảnh mẫu). Đây là nét AI vẽ: hãy xem ở Thử tiêu đề; không dùng thì xóa ký tự đó.'
+      + (made.length < chars.length ? ' Chưa tách được: ' + chars.filter(c => !made.includes(c)).join(' ') + ' — khoanh từng ký tự trong ảnh AI rồi bấm Thêm một chữ.' : ''));
+  } catch (error) {
+    status('Gemini chưa vẽ được ' + chars.join(' ') + ': ' + error.message + '. Font vẫn giữ nguyên.');
+  }
+}
 // Font do chính người dùng dựng trong Xưởng (không phải nét của nhà thiết kế khác):
 // - file Xưởng xuất mang mô tả "Made with draw-your-font" (src/assemble.js), kể cả khi được Nhập TTF vào Bộ sưu tập;
 // - bản Việt hóa / kiểu family sinh ra (tên XFVN, "Việt hóa") cũng mang dấu đó, nên xét font gốc của nó
@@ -1660,7 +1708,8 @@ async function fixByRules() {
       + auditMessage(after);
     if (!changed.length) {
       status('Hoàn thiện font: không có gì cần sửa theo quy tắc.' + tail + ' Đang kiểm file font…');
-      return false;   // không có bản xem trước: kiểm file luôn
+      if (missing.length) setTimeout(() => drawMissingWithAI(missing), 0);
+      return false;   // kiểm file luôn
     }
     // Người dùng (22/11/2026): bấm Hoàn thiện là áp dụng luôn, không hiện bảng xem trước; Hoàn tác chỉnh dấu quay lại cả lượt.
     glyphs = draft;
@@ -1670,6 +1719,7 @@ async function fixByRules() {
     status('Hoàn thiện font: ' + parts.join('; ') + '.' + tail + ' Bấm Hoàn tác chỉnh dấu để quay lại toàn bộ. Đang kiểm file font…');
     busy = false;
     refresh();
+    drawMissingWithAI(missing);
     return true;
   } finally { busy = false; }
 }
