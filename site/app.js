@@ -4,7 +4,7 @@ import { ask } from './ask.js';
 import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline,fromImage} from './outline-cleanup.js';
-import { normalizeHeights } from './font-heights.js';
+import { normalizeHeights, normalizePunctuation } from './font-heights.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
 import { digestReference, readableStyle } from './family-inputs.js';
@@ -19,7 +19,7 @@ import { segmentImage, makeGlyph, exportFont, MAX_SIDE } from './engine.js';
 import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
-import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -1575,6 +1575,9 @@ async function fixByRules() {
     for (const glyph of generated) next.set(glyph.char, glyph);
     const symbols = deriveSymbols(next).filter(glyph => !real(glyphs.get(glyph.char)) && !(glyphs.get(glyph.char)?.d && glyphs.get(glyph.char).source !== 'Dựng từ nét chữ'));
     for (const glyph of symbols) next.set(glyph.char, glyph);
+    // Cỡ dấu câu theo nét thân (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
+    const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
+    for (const glyph of punctFix.changed) next.set(glyph.char, glyph);
     glyphs = new ProtectedGlyphMap(next);
     // 4. Kerning cặp tiếng Việt. Font Xưởng dựng: tự tính khi xuất. Font mở từ bộ sưu tập: thêm cặp còn thiếu.
     let kerned = 0;
@@ -1598,6 +1601,7 @@ async function fixByRules() {
       letters.length && 'dựng ' + letters.length + ' chữ cái từ bộ phận (' + list(letters.map(g => g.char + '←' + g.derivedFrom)) + ')',
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
+      punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu theo nét thân (×' + punctFix.factor.toFixed(2) + ': ' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
       kerned && 'kerning ' + kerned + ' cặp tiếng Việt',
     ].filter(Boolean);

@@ -39,7 +39,14 @@ function measure(glyphs) {
   if (!dot && glyphs.get('.')?.d) dot = glyphs.get('.').d;
   // Không có chấm i hay dấu chấm: chấm tròn cỡ 1,4 nét thân (trung vị dấu chấm của 20 font đã Việt hóa).
   if (!dot) { const r = .7 * stem; dot = polygon(Array.from({ length: 32 }, (_, k) => [r + r * Math.cos(k * Math.PI / 16), r + r * Math.sin(k * Math.PI / 16)])); }
-  const dotBox = glyphBounds({ d: dot });
+  // Cỡ chấm theo quy tắc skill: rộng 1,0–1,5 nét thân (trung vị 1,2 ở 20 font chuẩn, trừ font đơn cách).
+  // Chấm i trang trí to hơn khoảng này thì dấu câu không theo, mà về 1,2 nét thân.
+  let dotBox = glyphBounds({ d: dot });
+  if (stem > 0 && (dotBox.width > 1.5 * stem || dotBox.width < stem)) {
+    const k = 1.2 * stem / dotBox.width;
+    dot = svgpath(dot).translate(-dotBox.x, -dotBox.y).scale(k).toString();
+    dotBox = glyphBounds({ d: dot });
+  }
   return { stem, capTop, xTop, direction, dot, dotBox, bar: .82 * stem, sb: Math.max(40, Math.round(.45 * stem)) };
 }
 

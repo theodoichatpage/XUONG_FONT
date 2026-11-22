@@ -91,4 +91,4 @@ Dựng từ bộ phận của chữ đã có như nhà thiết kế (n → h m u
 
 ## Hoàn thiện font theo quy tắc
 
-Nút "Hoàn thiện font chữ" chạy: chiều cao (chân phẳng đúng đường chân, đỉnh phẳng cùng nhóm bằng nhau; lệch nhỏ sửa, lệch lớn coi là cố ý), nắn nhẹ nét dò ảnh, bổ sung chữ/dấu/ký tự, kerning cặp tiếng Việt có tính dấu, kiểm file và sửa khoảng dấu. Chỉ áp cho nét dò ảnh và chữ suy luận; font vẽ sẵn giữ nguyên thiết kế. Chi tiết số liệu: `references/xuong-font-workflow.md`.
+Nút "Hoàn thiện font chữ" chạy: chiều cao (chân phẳng đúng đường chân, đỉnh phẳng cùng nhóm bằng nhau; lệch nhỏ sửa, lệch lớn coi là cố ý), cỡ dấu câu theo nét thân (dấu chấm rộng 1,0–1,5 nét thân, ngoài khoảng thì mọi dấu câu co cùng tỉ lệ về 1,2), nắn nhẹ nét dò ảnh, bổ sung chữ/dấu/ký tự, kerning cặp tiếng Việt có tính dấu, kiểm file và sửa khoảng dấu. Chỉ áp cho nét dò ảnh và chữ suy luận; font vẽ sẵn giữ nguyên thiết kế. Chi tiết số liệu: `references/xuong-font-workflow.md`.
