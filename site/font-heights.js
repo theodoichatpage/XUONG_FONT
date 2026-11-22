@@ -61,30 +61,55 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
   let factor = 1;
   if (period?.d) { const w = glyphBounds(period).width; if (w > 1.5 * stem || w < stem) factor = 1.2 * stem / w; }
   else { const h = glyphBounds(comma).height; if (h > 3.5 * stem || h < 2.1 * stem) factor = 2.9 * stem / h; }
-  if (Math.abs(factor - 1) < .03) return { changed: [], factor: 1 };
+  if (Math.abs(factor - 1) < .03) factor = 1;
   const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(part => part.trim());
-  const scalePart = (part, anchorTop) => {
-    const b = glyphBounds({ d: part }), cx = b.x + b.width / 2;
-    const cy = anchorTop ? b.y + b.height : b.y <= stem * .5 && b.y + b.height >= 0 ? Math.max(b.y, 0) : b.y + b.height / 2;
-    return svgpath(part).translate(-cx, -cy).scale(factor).translate(cx, cy).round(1).toString();
+  const anchorOf = (b, top) => top ? b.y + b.height : b.y <= stem * .5 && b.y + b.height >= 0 ? Math.max(b.y, 0) : b.y + b.height / 2;
+  const scalePart = (part, k, top) => {
+    const b = glyphBounds({ d: part }), cx = b.x + b.width / 2, cy = anchorOf(b, top);
+    return svgpath(part).translate(-cx, -cy).scale(k).translate(cx, cy).round(1).toString();
   };
-  const changed = [];
-  for (const char of [...DOT_PUNCTUATION, '!', '?']) {
+  const cur = new Map();
+  const get = char => cur.get(char) ?? glyphs.get(char);
+  // Bước 1: dấu chấm lệch khoảng → mọi dấu câu dựng từ chấm co cùng tỉ lệ (giữ tương quan).
+  if (factor !== 1) for (const char of [...DOT_PUNCTUATION, '!', '?']) {
     const g = glyphs.get(char);
     if (!g?.d || !editable(g)) continue;
     const quote = "'\"‘’“”".includes(char), dotOnly = char === '!' || char === '?';
-    const list = parts(g.d);
-    let d = list.map(part => {
-      if (!dotOnly) return scalePart(part, quote);
+    let d = parts(g.d).map(part => {
+      if (!dotOnly) return scalePart(part, factor, quote);
       const b = glyphBounds({ d: part });   // ! ?: co chấm (contour nhỏ ngồi ở chân) cùng tỉ lệ dấu chấm
-      return b.y <= stem && b.height < 2.2 * stem && b.width < 2.2 * stem ? scalePart(part, false) : part;
+      return b.y <= stem && b.height < 2.2 * stem && b.width < 2.2 * stem ? scalePart(part, factor, false) : part;
     }).join(' ');
     // ! ? cao quá chữ hoa > 8%: co cả ký tự quanh chân về chiều cao chữ hoa.
     const tall = glyphBounds({ d });
     if (dotOnly && capTop && tall.y + tall.height > 1.08 * capTop) d = svgpath(d).scale(capTop / (tall.y + tall.height)).round(1).toString();
-    if (d === g.d) continue;
-    const before = glyphBounds(g), after = glyphBounds({ d }), shift = before.x - after.x;
-    changed.push({ ...g, d: svgpath(d).translate(shift, 0).round(1).toString(),
+    if (d !== g.d) cur.set(char, { ...g, d });
+  }
+  // Bước 2: chấm của : ; ! ? bằng đúng dấu chấm (lệch > 8% thì đưa về), chấm phẩy dưới của ; cao bằng dấu phẩy.
+  const p = get('.'), c = get(',');
+  const pSize = p?.d ? Math.max(glyphBounds(p).width, glyphBounds(p).height) : 0, cHeight = c?.d ? glyphBounds(c).height : 0;
+  if (pSize) for (const char of [':', ';', '!', '?']) {
+    const g = get(char);
+    if (!g?.d || !editable(g)) continue;
+    const d = parts(g.d).map(part => {
+      const b = glyphBounds({ d: part }), size = Math.max(b.width, b.height), aspect = b.height / (b.width || 1);
+      if (size < 2.2 * stem && size < 2 * pSize && aspect > .6 && aspect < 1.7) {
+        const k = pSize / size;
+        return Math.abs(k - 1) > .08 ? scalePart(part, k, false) : part;
+      }
+      if (char === ';' && cHeight && aspect >= 1.7 && b.y < 0 && size < 6 * stem) {
+        const k = cHeight / b.height;   // đuôi phẩy của ; theo dấu phẩy, giữ đỉnh (đầu chấm) tại chỗ
+        return Math.abs(k - 1) > .08 ? scalePart(part, k, true) : part;
+      }
+      return part;
+    }).join(' ');
+    if (d !== parts(g.d).join(' ')) cur.set(char, { ...g, d });
+  }
+  const changed = [];
+  for (const [char, next] of cur) {
+    const g = glyphs.get(char);
+    const before = glyphBounds(g), after = glyphBounds({ d: next.d }), shift = before.x - after.x;
+    changed.push({ ...g, d: svgpath(next.d).translate(shift, 0).round(1).toString(),
       advance: Math.max(1, Math.round(g.advance + (after.width - before.width))), punctuationFix: factor });
   }
   return { changed, factor };

@@ -1605,7 +1605,7 @@ async function fixByRules() {
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
       dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ về 0,88 dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
-      punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu theo nét thân (×' + punctFix.factor.toFixed(2) + ': ' + list(punctFix.changed.map(g => g.char)) + ')',
+      punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo nét thân (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
       kerned && 'kerning ' + kerned + ' cặp tiếng Việt',
     ].filter(Boolean);
