@@ -1,6 +1,7 @@
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
 import { MARK_STANDARDS as STD, STROKE_PER_MEASURED } from './mark-standards.js';
+import { sampleOutline } from './outline-cleanup.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
@@ -264,6 +265,16 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           const height = source.height * scale;
           if (mark === '\u0323') y = bounds.y - gapBelow - height;
           else top += height + gapUpper;
+          // Skill design-rules.md, hàng "Nặng": canh theo khối thân; với y (chữ có đuôi xuống), xem lại vị trí ngang để
+          // tránh đuôi, không ép tâm hình học. Đặt chấm cùng độ sâu như chữ không đuôi (dưới đường chân), rồi dời ngang
+          // ra khỏi đuôi đủ khoảng hở dấu–thân, nhưng vẫn nằm dưới khung chữ.
+          if (mark === '\u0323' && bounds.y < -.1 * body.xHeight) {
+            const w = source.width * scale;
+            const level = ['u', 'v', 'o'].map(c => glyphs.get(c)).find(g => g?.d);   // đáy chữ không đuôi (có vượt dòng)
+            y = (level ? Math.min(0, glyphBounds(level).y) : 0) - gapBelow - height;
+            const right = inkRightIn(plain.d, y - gapBelow, y + height + gapBelow);
+            if (right !== null) x = Math.min(bounds.x + bounds.width - w / 2, Math.max(x, right + gapBelow + w / 2));
+          }
           const shift = body.slant * (y + height / 2 - (bounds.y + bounds.height / 2));   // theo trục nghiêng
           const local = svgpath(sample.d).translate(-source.x - source.width / 2, -source.y).scale(scale).toString();
           // Nặng lấy từ dấu chấm/chấm i của font (đã nghiêng sẵn) nên không nghiêng thêm.
@@ -470,6 +481,21 @@ export function measureSlant(glyphs) {
 }
 // Dấu Xưởng tự dựng (đứng) được nghiêng theo chữ quanh giữa chiều cao của dấu; dấu lấy từ font đã nghiêng sẵn.
 const DOT_BELOW = String.fromCharCode(0x323);
+// Mép phải của nét chữ trong dải ngang [y0, y1] (cắt từng cạnh outline theo dải), null nếu dải trống.
+function inkRightIn(d, y0, y1) {
+  let right = null;
+  const take = value => { right = right === null ? value : Math.max(right, value); };
+  try {
+    for (const contour of sampleOutline(d, .5)) for (let i = 0; i < contour.length; i++) {
+      const a = contour[i], b = contour[(i + 1) % contour.length];
+      const lo = Math.max(y0, Math.min(a[1], b[1])), hi = Math.min(y1, Math.max(a[1], b[1]));
+      if (lo > hi) continue;
+      if (a[1] === b[1]) { take(Math.max(a[0], b[0])); continue; }
+      for (const yy of [lo, hi]) take(a[0] + (b[0] - a[0]) * (yy - a[1]) / (b[1] - a[1]));
+    }
+  } catch { return null; }
+  return right;
+}
 const isDrawn = sample => sample?.nativeSize || sample?.source === 'Dựng từ nét chữ';
 function leanMark(d, sample, slant, height) {
   if (!slant || !isDrawn(sample)) return d;

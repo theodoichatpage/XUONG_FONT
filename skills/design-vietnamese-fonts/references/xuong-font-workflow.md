@@ -43,7 +43,7 @@ Mỗi quy tắc có SVG nguyên bản trong `site/references/vector`, cùng thô
 
 ## Nút "Hoàn thiện font chữ" (trình sửa)
 
-Một lần bấm chạy lần lượt mọi bước theo quy tắc skill, rồi xuất và kiểm file; một lần **Hoàn tác chỉnh dấu** quay lại toàn bộ (kể cả kerning thêm vào font mở từ bộ sưu tập). Không thêm nút mới (thay nút "Tự động kiểm tra và đề xuất sửa").
+Một lần bấm chạy lần lượt mọi bước theo quy tắc skill thành **bản xem trước**: mỗi chữ thay đổi có thẻ Trước/Sau (cùng cỡ, baseline, viewBox) và nút Bỏ chữ này; font chưa đổi cho tới khi bấm **Áp dụng chỉnh dấu** (theo mục "Dựng và chỉnh" của SKILL.md). Sau khi áp dụng, Xưởng kiểm file và tự dời dấu rời quá sát thân (bước được phép áp dụng thẳng); **Hoàn tác chỉnh dấu** quay lại toàn bộ lượt. Không có gì cần sửa thì kiểm file luôn. Không thêm nút mới (thay nút "Tự động kiểm tra và đề xuất sửa").
 
 1. **Chiều cao** (`site/font-heights.js`), chỉ cho nét dò từ ảnh và chữ suy luận, không cho font vẽ sẵn:
    - Chữ đáy phẳng `BDEFHIKLPRTXZhiklmnrxz147` ngồi đúng đường chân của font (trung vị đáy nhóm đó). Lệch > 1% chiều cao chữ hoa thì dời; lệch > 8% coi là cố ý (số kiểu cũ 4 7, chữ trang trí), chỉ báo.
@@ -54,11 +54,11 @@ Một lần bấm chạy lần lượt mọi bước theo quy tắc skill, rồi
 1c. **Dấu nặng theo dấu chấm** (`normalizeDotBelow`): ở mọi chữ có dấu nặng, kể cả chữ theo ảnh, chấm nặng (contour nhỏ nằm hẳn dưới đường chân) có cạnh lớn nhất phải bằng 0,67–1,0 dấu chấm (chuẩn 0,88, theo `mark-standards.md`). Ngoài khoảng thì co/giãn chấm tại chỗ quanh đỉnh chấm (giữ khoảng hở với thân) về 0,88; không đụng nét thân. Chạy sau bước cỡ dấu câu để so với dấu chấm đã chuẩn. Thử: `node .qa/dotbelow-test.mjs`.
 2. **Nét:** nắn nhẹ (mức Nhẹ 0,75) chữ dò từ ảnh chưa nắn, chưa khóa, chưa duyệt; nắn lệch quá giới hạn thì giữ nét gốc.
 3. **Bổ sung:** dấu mẫu và Đ (nếu chưa có), chữ cái gốc từ bộ phận, chữ có dấu (dựng lại chữ lệch chuẩn và chữ có dấu do Xưởng ghép trên chữ gốc vừa sửa), dấu câu và ký tự đặc biệt.
-4. **Kerning tiếng Việt** (`vietnameseKerning` trong `site/font-layout.js`): T V W Y trước nguyên âm thường kể cả khi mang dấu, AV AT AY AW VA TA YA WA LT LV LY LW ƯT ƠT ƯV ƠV PA FA. Chỉ siết, tối đa 0,07 em (cặp hoa 0,06 em), giữ khoảng hở ≥ 14/1000 em đo trên cả dấu; bỏ cặp siết < 6. Font Xưởng dựng: tính mỗi lần xuất. Font mở từ bộ sưu tập: thêm cặp còn thiếu, giữ kerning gốc.
+4. **Kerning tiếng Việt** (`vietnameseKerning` trong `site/font-layout.js`): T V W Y trước nguyên âm thường kể cả khi mang dấu, AV AT AY AW VA TA YA WA LT LV LY LW ƯT ƠT ƯV ƠV PA FA. Chỉ siết, tối đa 0,07 em (cặp hoa 0,06 em), giữ khoảng hở ≥ 14/1000 em đo trên cả dấu; bỏ cặp siết < 6. Font Xưởng dựng: tính mỗi lần xuất. Font mở từ bộ sưu tập (file nhập): **giữ nguyên kerning gốc**, không thêm cặp (SKILL.md: khi sửa dấu trong file nhập giữ nguyên thân chữ, baseline, advance và kerning).
 5. **Kiểm file** rồi tự sửa khoảng dấu–thân (bước Đề xuất sửa an toàn), kiểm lại.
 6. **Báo cáo:** việc đã làm, chữ lệch lớn được giữ, và chữ **cần ảnh mẫu** (Xưởng không tự dựng được).
 
-Nét lấy từ ảnh chỉ bị dời, co dọc ≤ 5% hoặc nắn nhẹ; không vẽ lại hình. Chữ đã khóa, đã duyệt giữ nguyên. Thử bằng `node .qa/derive-symbols-test.mjs arial.ttf pala.ttf` (ký tự và chiều cao) và `node .qa/derive-letters-test.mjs arial.ttf georgia.ttf`.
+Nét lấy từ ảnh chỉ bị dời, co dọc ≤ 5% hoặc nắn nhẹ; không vẽ lại hình. Font toàn chữ hoa: chữ thường thiếu chép từ chữ hoa tương ứng (theo mục Font toàn chữ hoa của mark-standards.md), không dựng từ bộ phận. Chữ đã khóa, đã duyệt giữ nguyên. Thử bằng `node .qa/derive-symbols-test.mjs arial.ttf pala.ttf` (ký tự và chiều cao) và `node .qa/derive-letters-test.mjs arial.ttf georgia.ttf`.
 
 Nút "Đề xuất sửa an toàn" / "AI đối chiếu và đề xuất sửa dấu": với cảnh báo khoảng dấu–thân, Xưởng tính bản dời dấu rời, xuất thử TTF và đo lại; bản nào hết cảnh báo và không gây lỗi mới thì **áp dụng luôn** (không bắt duyệt từng chữ), rồi tự kiểm lại file. Chỉ dời vị trí dấu, không đổi hình nét, kể cả chữ theo ảnh; chữ đã khóa, dấu dính thân hoặc bản sửa không qua kiểm lại thì ghi "Bỏ qua". Quay lại bằng Hoàn tác chỉnh dấu. Cảnh báo (Cần xem lại) không chặn việc xuất font; chỉ lỗi mới chặn.
 

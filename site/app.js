@@ -1461,8 +1461,8 @@ $('open-mark-spacing').addEventListener('click', () => {
   $('mark-spacing-report').textContent = autoMessage;
   $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
 });
-$('close-mark-spacing').addEventListener('click', () => { auditRepairPending=false; markCandidates=[]; $('mark-spacing-tools').hidden = true; });
-for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', () => { auditRepairPending=false; previewMarkSpacing(); });
+$('close-mark-spacing').addEventListener('click', () => { auditRepairPending=false; completionPending=false; markCandidates=[]; $('mark-spacing-tools').hidden = true; });
+for (const id of ['mark-gap','mark-scale','mark-spacing-scope']) $(id).addEventListener('input', () => { auditRepairPending=false; completionPending=false; previewMarkSpacing(); });
 $('apply-mark-spacing').addEventListener('click', () => {
   if (!auditRepairPending) previewMarkSpacing();
   if (!markCandidates.length) return;
@@ -1470,17 +1470,21 @@ $('apply-mark-spacing').addEventListener('click', () => {
   lastMarkChange = markCandidates.slice();
   if (lastMarkChange.some(({char,before}) => glyphs.get(char) !== before)) { status('Bộ chữ đã thay đổi. Hãy đánh giá lại trước khi áp dụng.'); return; }
   for (const {char, after} of lastMarkChange) glyphs.set(char, after);
-  repairRecheckPending = true;
+  const completion = completionPending;
+  completionPending = false; completionRun = completion;
+  // Lượt Hoàn thiện: sau khi áp dụng thì kiểm file và tự dời dấu quá sát thân (gộp vào cùng một lần Hoàn tác).
+  repairRecheckPending = completion ? { propose: true } : true;
+  if (completion) $('mark-spacing-proof').replaceChildren();
   refresh();
   $('mark-gap').value = 0; $('mark-scale').value = 100;
   previewMarkSpacing();
   $('undo-mark-spacing').disabled = false;
-  status('Đã chỉnh dấu cho ' + lastMarkChange.length + ' chữ. Thân chữ và khoảng cách giữa các chữ được giữ nguyên.');
+  status(completion ? 'Đã áp dụng ' + lastMarkChange.length + ' thay đổi của lượt Hoàn thiện font. Đang kiểm file font… Bấm Hoàn tác chỉnh dấu để quay lại toàn bộ.'
+    : 'Đã chỉnh dấu cho ' + lastMarkChange.length + ' chữ. Thân chữ và khoảng cách giữa các chữ được giữ nguyên.');
 });
 $('undo-mark-spacing').addEventListener('click', () => {
   for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) { if (before) glyphs.set(char, before); else glyphs.delete(char); }
-  if (completionKerningUndo && importedMetrics) importedMetrics = { ...importedMetrics, kerning: completionKerningUndo };
-  lastMarkChange = []; completionKerningUndo = null; completionRun = false; repairRecheckPending = true; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
+  lastMarkChange = []; completionRun = false; repairRecheckPending = true; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });
 
 $('rule-search').addEventListener('input', () => {
@@ -1526,9 +1530,9 @@ async function openQualityFont(result) {
   if (isQualityEditorSource(result)) { $('open-font-workspace').click(); return; }
   if (await fontCollection.editRecord(result.record)) editorFontCheck.setResults([result]);
 }
-// Nút "Hoàn thiện font chữ": chạy lần lượt mọi bước sửa theo quy tắc skill rồi kiểm file; một lần Hoàn tác.
-// Chỉ điền ô trống, dời/co dọc ít và nắn nhẹ; chữ đã khóa, đã duyệt giữ nguyên; không vẽ lại hình chữ theo ảnh.
-let completionRun = false, completionKerningUndo = null;
+// Nút "Hoàn thiện font chữ": chạy lần lượt mọi bước sửa theo quy tắc skill, cho xem trước Trước/Sau; bấm Áp dụng
+// chỉnh dấu mới ghi vào bộ chữ rồi kiểm file; một lần Hoàn tác. Chữ đã khóa, đã duyệt giữ nguyên.
+let completionRun = false, completionPending = false;
 async function fixByRules() {
   if (busy || loading || !glyphs.size) return false;
   busy = true;
@@ -1570,7 +1574,9 @@ async function fixByRules() {
     const failing = new Set((before?.issues || []).map(issue => issue.char).filter(char => glyphs.get(char)?.d && !real(glyphs.get(char))));
     const reshaped = new Set([...heights.changed.map(g => g.char), ...cleaned]);
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
-      || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu'),
+      || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu')
+      // ỵ do Xưởng ghép trước khi có luật "nặng tránh đuôi y" (design-rules.md): ghép lại theo luật mới.
+      || (char === 'ỵ' && glyphs.get(char)?.source === 'Ghép dấu'),
       { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }) : [];
     for (const glyph of generated) next.set(glyph.char, glyph);
     const symbols = deriveSymbols(next).filter(glyph => !real(glyphs.get(glyph.char)) && !(glyphs.get(glyph.char)?.d && glyphs.get(glyph.char).source !== 'Dựng từ nét chữ'));
@@ -1581,23 +1587,30 @@ async function fixByRules() {
     // Dấu nặng = 0,88 [0,67–1,0] dấu chấm, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
     const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
-    glyphs = new ProtectedGlyphMap(next);
-    // 4. Kerning cặp tiếng Việt. Font Xưởng dựng: tự tính khi xuất. Font mở từ bộ sưu tập: thêm cặp còn thiếu.
-    let kerned = 0;
-    if (importedMetrics) {
-      const kerning = importedMetrics.kerning ?? [], known = new Set(kerning.map(([a, b]) => a + '|' + b));
-      const extra = vietnameseKerning([...glyphs.values()].filter(g => g?.d)).filter(([a, b]) => !known.has(a + '|' + b));
-      if (extra.length) { completionKerningUndo = kerning; importedMetrics = { ...importedMetrics, kerning: [...kerning, ...extra] }; kerned = extra.length; }
-    } else kerned = vietnameseKerning([...glyphs.values()].filter(g => g?.d)).length;
-    const changed = [...new Set([...snapshot.keys(), ...glyphs.keys()])].filter(char => snapshot.get(char) !== glyphs.get(char))
-      .map(char => ({ char, before: snapshot.get(char), after: glyphs.get(char) }));
-    const after = auditMarks(glyphs, { slant: measureSlant(glyphs) });
+    // Skill SKILL.md "Dựng và chỉnh": xem trước trước/sau, chỉ ghi vào bộ chữ khi áp dụng, giữ hoàn tác.
+    // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
+    const draft = new ProtectedGlyphMap(next);
+    // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
+    // trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning).
+    const kerned = importedMetrics ? 0 : vietnameseKerning([...draft.values()].filter(g => g?.d)).length;
+    const changed = [...new Set([...snapshot.keys(), ...draft.keys()])].filter(char => snapshot.get(char) !== draft.get(char))
+      .map(char => ({ char, before: snapshot.get(char), after: draft.get(char) }));
+    const after = auditMarks(draft, { slant: measureSlant(draft) });
     const rebuilt = changed.filter(item => item.before && failing.has(item.char)).map(item => item.char);
     const special = new Set([...letters, ...symbols].map(g => g.char));
     const added = changed.filter(item => !item.before && !special.has(item.char)).map(item => item.char).filter(char => charset.includes(char));
-    const missing = charset.filter(char => !glyphs.get(char)?.d);
-    if (changed.length || completionKerningUndo) { lastMarkChange = changed; $('undo-mark-spacing').disabled = false; completionRun = true; }
+    const missing = charset.filter(char => !draft.get(char)?.d);
     const list = chars => chars.slice(0, 30).join(' ') + (chars.length > 30 ? ' …' : '');
+    const reasons = new Map();
+    const tag = (chars, text) => { for (const char of chars) reasons.set(char, [...(reasons.get(char) || []), text]); };
+    tag(heights.changed.map(g => g.char), 'chiều cao');
+    tag(cleaned, 'nắn nét');
+    for (const g of letters) tag([g.char], 'dựng từ ' + g.derivedFrom);
+    tag(rebuilt, 'ghép lại dấu');
+    tag(added, 'ghép dấu');
+    tag(symbols.map(g => g.char), 'dựng ký tự');
+    tag(punctFix.changed.map(g => g.char), 'cỡ dấu câu');
+    tag(dotBelow.changed.map(g => g.char), 'cỡ dấu nặng');
     const parts = [
       heights.changed.length && 'chuẩn chiều cao ' + heights.changed.length + ' chữ (' + list(heights.changed.map(g => g.char)) + ')',
       cleaned.length && 'nắn nhẹ nét ' + cleaned.length + ' chữ dò từ ảnh',
@@ -1607,19 +1620,61 @@ async function fixByRules() {
       dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ về 0,88 dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
       punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo nét thân (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
-      kerned && 'kerning ' + kerned + ' cặp tiếng Việt',
     ].filter(Boolean);
-    status('Hoàn thiện font: ' + (parts.length ? parts.join('; ') : 'không có gì cần sửa theo quy tắc') + '.'
-      + (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')
+    const tail = (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')
       + (missing.length ? ' CẦN ẢNH MẪU (Xưởng không tự dựng được): ' + list(missing) + '.' : ' Đủ bộ ký tự.')
+      + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font nhập: giữ nguyên kerning gốc.' : '')
       + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')
-      + auditMessage(after)
-      + ' Chữ đã khóa, đã duyệt giữ nguyên; chữ dựng là suy luận, cần duyệt ở Thử tiêu đề.'
-      + (changed.length || completionKerningUndo ? ' Bấm Hoàn tác chỉnh dấu để quay lại toàn bộ.' : '') + ' Đang kiểm file font…');
-    repairRecheckPending = { propose: true };
+      + auditMessage(after);
+    if (!changed.length) {
+      status('Hoàn thiện font: không có gì cần sửa theo quy tắc.' + tail + ' Đang kiểm file font…');
+      return false;   // không có bản xem trước: kiểm file luôn
+    }
+    // Bản xem trước: mỗi chữ một thẻ Trước/Sau (cùng cỡ, baseline, viewBox), có thể bỏ từng chữ; Áp dụng chỉnh dấu ghi cả lượt.
+    $('open-font-workspace').click();
+    $('mark-spacing-tools').hidden = false;
+    markCandidates = changed;
+    auditRepairPending = true;
+    completionPending = true;
+    renderCompletionProof(changed, reasons);
+    $('apply-mark-spacing').disabled = false;
+    $('mark-spacing-report').textContent = 'Hoàn thiện font — bản xem trước ' + changed.length + ' chữ: ' + parts.join('; ') + '.' + tail
+      + ' Chưa thay đổi font. Bỏ chữ nào không muốn, rồi bấm Áp dụng chỉnh dấu; Xưởng sẽ tự kiểm file và sửa khoảng dấu sau khi áp dụng.';
+    $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
+    status('Hoàn thiện font: đã chuẩn bị ' + changed.length + ' thay đổi theo quy tắc skill. Chưa thay đổi font — xem Trước/Sau rồi bấm Áp dụng chỉnh dấu.');
+    return true;
   } finally { busy = false; }
-  refresh();
-  return true;
+}
+function renderCompletionProof(changes, reasons) {
+  const proof = $('mark-spacing-proof'), ns = 'http://www.w3.org/2000/svg';
+  proof.replaceChildren();
+  const glyphSvg = glyph => {
+    const svg = document.createElementNS(ns, 'svg'), path = document.createElementNS(ns, 'path');
+    svg.setAttribute('viewBox', `-40 -1000 ${Math.max(glyph.advance || 600, 300) + 80} 1300`);   // cùng cỡ, cùng baseline
+    path.setAttribute('d', glyph.d); path.setAttribute('transform', 'scale(1,-1)');
+    svg.append(path); return svg;
+  };
+  for (const { char, before, after } of changes) {
+    const card = document.createElement('div'), title = document.createElement('strong');
+    title.textContent = char + ' · ' + (reasons.get(char) || ['thay đổi']).join(', ');
+    card.append(title);
+    for (const [label, glyph] of [['Trước', before], ['Sau', after]]) {
+      const figure = document.createElement('figure'), caption = document.createElement('figcaption');
+      caption.textContent = label;
+      if (glyph?.d) figure.append(glyphSvg(glyph)); else figure.append(document.createTextNode('(trống)'));
+      figure.append(caption); card.append(figure);
+    }
+    const reject = document.createElement('button');
+    reject.type = 'button'; reject.textContent = 'Bỏ chữ này';
+    reject.addEventListener('click', () => {
+      markCandidates = markCandidates.filter(item => item.char !== char);
+      card.remove();
+      $('apply-mark-spacing').disabled = !markCandidates.length;
+      status('Đã bỏ ' + char + ' khỏi lượt hoàn thiện. Còn ' + markCandidates.length + ' chữ chờ áp dụng.');
+    });
+    card.append(reject);
+    proof.append(card);
+  }
 }
 const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   getCurrent: () => currentFontExport, beforeCheck: fixByRules, onSelect: renderRuleQuality, onOpen: openQualityFont, onInspect: inspectQualityText,

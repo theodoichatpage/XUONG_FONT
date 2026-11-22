@@ -166,6 +166,9 @@ export function deriveLetters(glyphs) {
     9: [rotate('6')],
   };
 
+  // Skill mark-standards.md "Font toàn chữ hoa": ô chữ thường là hình chữ hoa (đỉnh x ≥ 0.9 chiều cao hoa).
+  // Chữ thường còn thiếu chép từ chữ hoa tương ứng, không dựng từ bộ phận (h ← n sẽ ra hình N).
+  if (xTop / capTop > .9) for (const char of 'abcdefghijklmnopqrstuvwxyz') rules[char] = [copy(char.toUpperCase())];
   for (let pass = 0; pass < 3; pass++) {
     let progress = false;
     for (const [char, ways] of Object.entries(rules)) {
