@@ -31,7 +31,9 @@ export async function importFontFile(record) {
     return indexChars.has(a) && indexChars.has(b)
       ? [[indexChars.get(a), indexChars.get(b), Math.round(amount * scale)]] : [];
   });
-  return { glyphs, styleMetrics: { familyName: record.family || font.getEnglishName('preferredFamily') || font.getEnglishName('fontFamily'), styleName: record.style || font.getEnglishName('fontSubfamily') || 'Regular', weight: font.tables.os2?.usWeightClass || 400, italic: !!(font.tables.os2?.fsSelection & 1), angle: Math.abs(font.tables.post?.italicAngle || 12) }, metrics: { ascent: Math.ceil(font.ascender * scale),
+  // File do Xưởng xuất (src/assemble.js ghi mô tả "Made with draw-your-font" vào bảng name): nét là của người dùng tự dựng.
+  const madeByXuong = /draw-your-font/i.test(font.getEnglishName('description') || '');
+  return { glyphs, madeByXuong, styleMetrics: { familyName: record.family || font.getEnglishName('preferredFamily') || font.getEnglishName('fontFamily'), styleName: record.style || font.getEnglishName('fontSubfamily') || 'Regular', weight: font.tables.os2?.usWeightClass || 400, italic: !!(font.tables.os2?.fsSelection & 1), angle: Math.abs(font.tables.post?.italicAngle || 12) }, metrics: { ascent: Math.ceil(font.ascender * scale),
     descent: Math.floor(font.descender * scale), wordSpace: glyphs.get(' ')?.advance, kerning } };
 }
 

@@ -1364,7 +1364,12 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   glyphs = new ProtectedGlyphMap(drafts);
   // Font do chính người dùng dựng từ ảnh trong Xưởng rồi lưu lại (không phải file font của nhà thiết kế khác):
   // fromImages đã từng đúng, hoặc bản lưu từ trình sửa mang tên riêng (không phải bản Việt hóa XFVN của font khác).
-  const ownFont = editOnly && (record.fromImages === true || ('fromImages' in record && !/^XFVN - /.test(record.name) && !/Việt hóa/i.test(record.name)));
+  // Nhận diện bằng dấu Xưởng trong file (mô tả "Made with draw-your-font"), cả khi font được Nhập TTF vào Bộ sưu tập.
+  // Bản Việt hóa (XFVN, "Việt hóa") của font khác cũng mang dấu Xưởng nhưng nét là của nhà thiết kế: chỉ coi là của
+  // người dùng khi font gốc của nó cũng do Xưởng xuất.
+  const vietnamizedCopy = /^XFVN - /.test(record.name) || /Việt hóa/i.test(record.name);
+  const originalOwn = original ? (await importFontFile(original)).madeByXuong : false;
+  const ownFont = editOnly && (record.fromImages === true || (vietnamizedCopy ? originalOwn : imported.madeByXuong || 'fromImages' in record));
   importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}), ...(ownFont ? { ownFont: true } : {}) };
   loadedSourceBlob = record.blob;
   $('name').value = (record.name + (editOnly ? '' : ' Việt hóa')).slice(0, 40);
