@@ -44,7 +44,7 @@ Ví dụ đã làm theo quy trình này: Ẫ đặt ngã quá thấp (đáy 0.94
 - Dùng chỉnh quang học khi tâm hình học không hợp mắt. Không kéo giãn chữ gốc chỉ để chứa dấu.
 - Khi sửa dấu trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning trừ khi nhiệm vụ yêu cầu sửa chúng.
 - Nếu còn cấu trúc component/anchor, sửa tại anchor. Nếu chỉ còn outline, chỉ biến đổi contour đã nhận diện chắc chắn là dấu. Không cắt outline dính thân theo một đường ngang tùy ý.
-- Nếu dấu đã dính thân và không phân tách an toàn, ghi rõ ký tự bị bỏ qua. Chỉ dựng lại từ chữ gốc và dấu mẫu khi có đủ dữ liệu đối chiếu; yêu cầu xem trước trước khi thay hình gốc.
+- Nếu dấu đã dính thân và không phân tách an toàn, ghi rõ ký tự bị bỏ qua. Chỉ dựng lại từ chữ gốc và dấu mẫu khi có đủ dữ liệu đối chiếu; bản dời dấu rời đã qua kiểm lại file xuất được áp dụng thẳng (có hoàn tác); dựng lại hình chữ thì vẫn xem trước.
 - Xem trước trước/sau với cùng cỡ, baseline và viewBox. Chỉ ghi vào bộ chữ khi áp dụng. Giữ khả năng hoàn tác.
 - Phân biệt khoảng hở thân–dấu với khoảng hở dấu–dấu. Di chuyển cả cụm dấu chỉ sửa được loại thứ nhất.
 
@@ -84,3 +84,11 @@ Trả ngắn gọn: ký tự/nhóm đã sửa, phép biến đổi, phần bị 
 Giữ SVG gốc của tác giả làm minh họa chuẩn tham khảo. Không tự vẽ lại mẫu đúng/sai hoặc tự nhận đã có chuyên gia duyệt. Khi chưa đọc được mã gốc, báo người dùng thay vì phỏng dựng mẫu. Có thể hiển thị outline thực tế của font đang kiểm, nhưng gắn nhãn đối tượng kiểm tra, không coi đó là mẫu chuẩn.
 
 Dùng phép đo để báo thiếu mã, metadata, khoảng gần nhất và giao outline. Ghi rõ đường cong được xấp xỉ khi đo; ngưỡng tùy chọn chỉ là bộ lọc rà soát. Không dùng điểm tự chấm để xác nhận chất lượng thẩm mỹ hoặc khả năng bán font. Không dùng đường nét trong SVG tham khảo làm nguyên liệu sinh font đầu ra.
+
+## Chữ cái gốc còn thiếu
+
+Dựng từ bộ phận của chữ đã có như nhà thiết kế (n → h m u r, o + thân → b d p q, o → c e, E → F L, P → R, O → Q C, V → W, 6 ↔ 9, l ↔ I, l → i), chỉ điền ô trống, ghi là suy luận để duyệt. Không tự vẽ chữ không có bộ phận để mượn. Bảng cách dựng và bộ chữ mẫu tối thiểu: `references/xuong-font-workflow.md`.
+
+## Hoàn thiện font theo quy tắc
+
+Nút "Hoàn thiện font chữ" chạy: chiều cao (chân phẳng đúng đường chân, đỉnh phẳng cùng nhóm bằng nhau; lệch nhỏ sửa, lệch lớn coi là cố ý), nắn nhẹ nét dò ảnh, bổ sung chữ/dấu/ký tự, kerning cặp tiếng Việt có tính dấu, kiểm file và sửa khoảng dấu. Chỉ áp cho nét dò ảnh và chữ suy luận; font vẽ sẵn giữ nguyên thiết kế. Chi tiết số liệu: `references/xuong-font-workflow.md`.

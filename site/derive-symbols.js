@@ -1,6 +1,6 @@
 // Dựng dấu câu và ký hiệu còn thiếu từ chính nét chữ đã có (độ dày thân, chấm chữ i, chiều cao chữ hoa
 // và chữ thường). Chỉ điền ô còn trống, luôn đánh dấu "suy luận" để duyệt; không thay chữ lấy từ ảnh.
-// Ký tự hình phức tạp (? @ & $ % *) không tự vẽ: cần ảnh mẫu.
+// $ dựng từ S, % từ vòng tròn dày theo nét thân, { } từ ngoặc, * từ nét thon. Ký tự hình phức tạp (? @ &) không tự vẽ: cần ảnh mẫu.
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
 import { polygon, strokeAlong, outerDirection, measureStem, deriveMarkSamples } from './vietnamese.js';
@@ -87,6 +87,27 @@ export function deriveSymbols(glyphs) {
     '[': () => bracket(false), ']': () => bracket(true),
     '~': () => { const t = deriveMarkSamples(glyphs).marks.get('̃').d, b = glyphBounds({ d: t }); return svgpath(t).translate(-b.x, mid - b.y - b.height / 2).toString(); },
     '^': () => { const t = deriveMarkSamples(glyphs).marks.get('̂').d, b = glyphBounds({ d: t }); return svgpath(t).translate(-b.x, capTop - b.y - b.height).toString(); },
+    '$': () => {
+      const S = glyphs.get('S'); if (!S?.d) throw Error('Cần chữ S.');
+      const b = glyphBounds(S), x = b.x + b.width / 2, t = bar * .8;
+      return { d: S.d + ' ' + orient(rect(x - t / 2, b.y - .1 * capTop, x + t / 2, b.y + b.height + .1 * capTop)), keep: true };
+    },
+    '%': () => {
+      const r = .19 * capTop, w = stem * .78, ring = (cx, cy) => {
+        const pts = k => Array.from({ length: 40 }, (_, i) => { const a = i * Math.PI / 20; return [cx + k * .82 * Math.cos(a), cy + k * Math.sin(a)]; });
+        let outer = polygon(pts(r)), inner = polygon(pts(r - w).reverse());
+        if (outerDirection(outer) !== m.direction) { outer = polygon(pts(r).reverse()); inner = polygon(pts(r - w)); }
+        return outer + ' ' + inner;
+      };
+      const slash = orient(strokeAlong([[.05 * capTop, -.02 * capTop], [.78 * capTop, capTop * 1.02]], stem * .85));
+      return { d: ring(.2 * capTop, capTop - r) + ' ' + ring(.63 * capTop, r) + ' ' + slash, keep: true };
+    },
+    '{': () => brace(false), '}': () => brace(true),
+    '*': () => {
+      const r = .24 * capTop, cy = capTop - r;
+      return Array.from({ length: 6 }, (_, k) => { const a = Math.PI / 2 + k * Math.PI / 3;
+        return strokeAlong([[r, cy], [r + r * Math.cos(a), cy + r * Math.sin(a)]], s => stem * (.55 + .35 * s)); }).join(' ');
+    },
     '#': () => {
       const h = .78 * capTop, w = .62 * capTop, lean = .12 * capTop, th = stem * .82;
       const v = x => strokeAlong([[x, 0], [x + lean, h]], th);
@@ -101,6 +122,16 @@ export function deriveSymbols(glyphs) {
     });
     return strokeAlong(points, s => stem * (.78 + .22 * Math.sin(Math.PI * s)));
   }
+  function brace(right) {
+    // Ngoặc nhọn: hai đầu cong ra ngoài, thân dọc, mũi nhọn ở giữa hướng vào trong.
+    const bottom = -.22 * capTop, top = capTop * 1.04, h = top - bottom, depth = .2 * h;
+    const points = Array.from({ length: 61 }, (_, k) => {
+      const s = k / 60, u = Math.abs(s - .5) * 2;
+      const x = u < .1 ? depth * .45 * u / .1 : depth * .45 + depth * .55 * Math.max(0, (u - .78) / .22) ** 2;
+      return [right ? depth - x : x, top - s * h];
+    });
+    return strokeAlong(points, s => stem * (.7 + .22 * Math.sin(Math.PI * s)));
+  }
   function bracket(right) {
     const bottom = -.22 * capTop, top = capTop * 1.04, arm = 1.6 * stem, th = stem * .9, hb = bar;
     const shape = rect(0, bottom, th, top) + ' ' + rect(0, top - hb, arm, top) + ' ' + rect(0, bottom, arm, bottom + hb);
@@ -111,7 +142,7 @@ export function deriveSymbols(glyphs) {
     const existing = glyphs.get(char);
     if (existing?.d && existing.source !== 'Dựng từ nét chữ') continue;   // chỉ làm lại ký tự do chính bước này dựng
     try {
-      const raw = orient(build());
+      const built = build(), raw = typeof built === 'string' ? orient(built) : built.d;
       const box = glyphBounds({ d: raw });
       const d = svgpath(raw).translate(sb - box.x, 0).round(1).toString();
       const advance = ['–', '—'].includes(char) ? (char === '–' ? 500 : 1000) : Math.ceil(box.width + 2 * sb);

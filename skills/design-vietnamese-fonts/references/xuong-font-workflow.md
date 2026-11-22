@@ -41,6 +41,51 @@ Mỗi quy tắc có SVG nguyên bản trong `site/references/vector`, cùng thô
 
 `tools/image-to-font/image_to_font.py` dựng TTF từ một ảnh chữ mẫu cùng file nội dung chữ (mỗi dòng ảnh một dòng). Script vector hóa bằng Potrace từ pixel gốc và ghép chữ Việt thiếu từ thân chữ cùng dấu có mẫu. Kết quả gồm `report.json` (chữ lấy từ ảnh, chữ ghép, chữ thiếu kèm lý do) và `proof.png`. Dùng khi Gemini lỗi hoặc hết hạn mức, hoặc khi ảnh không được gửi ra ngoài. Chữ ghép và chữ tự tách khỏi chỗ dính là suy luận, cần soát theo [quy tắc thiết kế](design-rules.md). Không gọi bản này là bản sao đã xác minh. Cách chạy xem `tools/image-to-font/README.md`.
 
-## Nút "Tự động kiểm tra và đề xuất sửa" (trình sửa)
+## Nút "Hoàn thiện font chữ" (trình sửa)
 
-Bấm một lần: Xưởng đối chiếu bộ chữ đang làm với quy tắc skill (cùng phép đo lập chuẩn, `site/rule-audit.js`), dựng lại theo quy tắc những chữ có dấu do Xưởng ghép bị lệch chuẩn, ghép thêm chữ có dấu còn thiếu (chưa có dấu mẫu thì dựng dấu mẫu từ nét chữ, chỉ điền ô trống), rồi xuất lại và tự kiểm file như trước. Nét lấy từ ảnh, nét gốc của font và chữ đã khóa không bị đổi; lệch chuẩn ở các chữ đó được báo để sửa ảnh hoặc chỉnh tay. Quay lại bằng nút Hoàn tác chỉnh dấu (chữ mới ghép thêm sẽ bị gỡ). Không thêm nút mới.
+Một lần bấm chạy lần lượt mọi bước theo quy tắc skill, rồi xuất và kiểm file; một lần **Hoàn tác chỉnh dấu** quay lại toàn bộ (kể cả kerning thêm vào font mở từ bộ sưu tập). Không thêm nút mới (thay nút "Tự động kiểm tra và đề xuất sửa").
+
+1. **Chiều cao** (`site/font-heights.js`), chỉ cho nét dò từ ảnh và chữ suy luận, không cho font vẽ sẵn:
+   - Chữ đáy phẳng `BDEFHIKLPRTXZhiklmnrxz147` ngồi đúng đường chân của font (trung vị đáy nhóm đó). Lệch > 1% chiều cao chữ hoa thì dời; lệch > 8% coi là cố ý (số kiểu cũ 4 7, chữ trang trí), chỉ báo.
+   - Đỉnh phẳng cùng nhóm bằng trung vị nhóm: hoa `BDEFHIKLNPRTZ`, x-height `uvwxyz`, đầu chữ thường `bdhkl`. Lệch 1,5–5% thì co giãn dọc quanh chân; > 5% chỉ báo.
+   - Không đụng chữ tròn/nhọn (O C G S A M N U V W Y J o c e s …): chúng được phép vượt dòng. Font vẽ sẵn cũng không đụng: Palatino để chân I E i thấp 29/1000, Calibri thấp 3/1000.
+2. **Nét:** nắn nhẹ (mức Nhẹ 0,75) chữ dò từ ảnh chưa nắn, chưa khóa, chưa duyệt; nắn lệch quá giới hạn thì giữ nét gốc.
+3. **Bổ sung:** dấu mẫu và Đ (nếu chưa có), chữ cái gốc từ bộ phận, chữ có dấu (dựng lại chữ lệch chuẩn và chữ có dấu do Xưởng ghép trên chữ gốc vừa sửa), dấu câu và ký tự đặc biệt.
+4. **Kerning tiếng Việt** (`vietnameseKerning` trong `site/font-layout.js`): T V W Y trước nguyên âm thường kể cả khi mang dấu, AV AT AY AW VA TA YA WA LT LV LY LW ƯT ƠT ƯV ƠV PA FA. Chỉ siết, tối đa 0,07 em (cặp hoa 0,06 em), giữ khoảng hở ≥ 14/1000 em đo trên cả dấu; bỏ cặp siết < 6. Font Xưởng dựng: tính mỗi lần xuất. Font mở từ bộ sưu tập: thêm cặp còn thiếu, giữ kerning gốc.
+5. **Kiểm file** rồi tự sửa khoảng dấu–thân (bước Đề xuất sửa an toàn), kiểm lại.
+6. **Báo cáo:** việc đã làm, chữ lệch lớn được giữ, và chữ **cần ảnh mẫu** (Xưởng không tự dựng được).
+
+Nét lấy từ ảnh chỉ bị dời, co dọc ≤ 5% hoặc nắn nhẹ; không vẽ lại hình. Chữ đã khóa, đã duyệt giữ nguyên. Thử bằng `node .qa/derive-symbols-test.mjs arial.ttf pala.ttf` (ký tự và chiều cao) và `node .qa/derive-letters-test.mjs arial.ttf georgia.ttf`.
+
+Nút "Đề xuất sửa an toàn" / "AI đối chiếu và đề xuất sửa dấu": với cảnh báo khoảng dấu–thân, Xưởng tính bản dời dấu rời, xuất thử TTF và đo lại; bản nào hết cảnh báo và không gây lỗi mới thì **áp dụng luôn** (không bắt duyệt từng chữ), rồi tự kiểm lại file. Chỉ dời vị trí dấu, không đổi hình nét, kể cả chữ theo ảnh; chữ đã khóa, dấu dính thân hoặc bản sửa không qua kiểm lại thì ghi "Bỏ qua". Quay lại bằng Hoàn tác chỉnh dấu. Cảnh báo (Cần xem lại) không chặn việc xuất font; chỉ lỗi mới chặn.
+
+## Dựng chữ cái gốc còn thiếu từ bộ phận (`site/derive-letters.js`)
+
+Chạy trong nút "Hoàn thiện font chữ" và nút dựng dấu mẫu, trước bước ghép chữ có dấu. Chỉ điền ô trống, không thay chữ theo ảnh, nét gốc hay chữ đã khóa. Kết quả ghi nguồn "Dựng từ bộ phận" và `derivedFrom`, luôn là suy luận để duyệt; Hoàn tác chỉnh dấu gỡ được.
+
+| Chữ dựng | Từ bộ phận | Cách |
+|---|---|---|
+| h | n (+ l) | thân trái n thay bằng phần trên của l (hoặc thân cao tới đầu chữ thường) |
+| n ↔ u | u ↔ n | xoay 180°; n còn dựng được từ h (cắt ở đỉnh vòm) |
+| m | n | lặp vòm + thân phải của n, nối tiếp từ thân phải |
+| r | n | thân trái + vai vòm, cắt trước thân phải |
+| b d p q | o + l (hoặc thân rộng bằng nét thân) | ghép thân vào trái/phải lòng o; p q thân xuống chân chữ. Không có o thì xoay/lật từ chữ cùng nhóm |
+| c / C | o / O | khoét hình quạt bên phải ±36° |
+| e | o | khoét quạt dưới phải (−48° tới −6°) + thanh ngang giữa dày 0,8 nét thân |
+| i | l (+ dấu .) | thân l cắt ở x-height, chấm đặt giữa thân, đỉnh chấm ngang đầu chữ thường |
+| l ↔ I | I ↔ l | chép |
+| F, L | E | bỏ thanh dưới / bỏ thanh trên và giữa, giữ thân |
+| E | F + L | ghép thanh dưới của L vào F |
+| R | P | thêm chân chéo từ đáy bụng xuống góc phải, dày 0,95 nét thân |
+| Q | O | thêm đuôi chéo dày 0,9 nét thân |
+| W / w | V / v | hai V chồng nhau, lệch một bề rộng trừ độ dày tay phải |
+| 6 ↔ 9 | 9 ↔ 6 | xoay 180° |
+
+Không dựng (thử xoay W thành M cho ra hình Λ, sai): M, A, G, K, S, X, Z, a, g, k, s… cần ảnh mẫu. Khoảng cách hai bên lấy theo chữ nguồn.
+
+**Bộ chữ mẫu tối thiểu cần ảnh** để Xưởng dựng phần còn lại theo quy tắc:
+- Hoa (20): A B D E G H I J K M N O P S T U V X Y Z → Xưởng dựng C F L Q R W.
+- Thường (14): a f g j k l n o s t v x y z → Xưởng dựng b c d e h i m p q r u w.
+- Số (9): 0 1 2 3 4 5 7 8 và một trong 6/9.
+- Dấu thanh, dấu mũ, Đ, dấu câu và ký tự: tự dựng từ nét chữ nếu không có ảnh (`$` từ S, `%` từ vòng dày 0,78 nét thân, `{ }` từ ngoặc có mũi giữa, `*` sáu nét thon); `? @ &` cần ảnh. Toàn bộ chữ có dấu tiếng Việt được ghép theo chuẩn.
+Font trang trí (mỗi chữ một kiểu riêng) nên có ảnh cho cả chữ dựng được; chữ dựng chỉ là bản nháp. Kiểm bằng `node .qa/derive-letters-test.mjs arial.ttf georgia.ttf` (ảnh so sánh `.qa/derive-letters.png`).

@@ -132,22 +132,49 @@ export function fitLowercaseUStems(glyph) {
   return result;
 }
 
+// Siết cặp chữ theo khoảng trống thật giữa hai hình (5% hàng hẹp nhất), không để hai nét gần hơn `minimum`.
+function tightenPair(leftGlyph, rightGlyph, limit, minimum) {
+  const left = profile(leftGlyph), right = profile(rightGlyph);
+  const bins = new Map(right.rows.map(row => [Math.round(row.y * resolution), row.left]));
+  const gaps = left.rows.flatMap(row => {
+    const edge = bins.get(Math.round(row.y * resolution));
+    return edge === undefined ? [] : [leftGlyph.advance + edge - row.right];
+  }).sort((a, b) => a - b);
+  if (!gaps.length) return 0;
+  const clearance = gaps[Math.floor(gaps.length * .05)];
+  return Math.floor(Math.min(limit, clearance - minimum));
+}
+
+// Cặp tiếng Việt (quy tắc skill): T V W Y đứng trước nguyên âm thường kể cả khi mang dấu (Tố, Vì, Yên, Wà),
+// cặp hoa chéo AV AT AY AW LT LV LY và Ư/Ơ trước T. Chỉ siết, giới hạn 0,07 em, giữ khoảng hở ≥ 14/1000 em
+// đo trên cả dấu, nên dấu không chạm tay chữ T, V.
+export function vietnameseKerning(glyphs) {
+  const byChar = new Map(glyphs.map(glyph => [glyph.char, glyph]));
+  const vowels = [...byChar.keys()].filter(char => /^[aeouy]$/.test(char.normalize('NFD')[0]) && char === char.toLowerCase() && char.length === 1);
+  const list = [];
+  for (const first of 'TVWY') for (const second of vowels) list.push([first, second, 70]);
+  for (const pair of ['AV', 'AT', 'AY', 'AW', 'VA', 'TA', 'YA', 'WA', 'LT', 'LV', 'LY', 'LW', 'ƯT', 'ƠT', 'ƯV', 'ƠV', 'PA', 'FA']) list.push([pair[0], pair[1], 60]);
+  const pairs = [];
+  for (const [first, second, limit] of list) {
+    const a = byChar.get(first), b = byChar.get(second);
+    if (!a?.d || !b?.d) continue;
+    const tighten = tightenPair(a, b, limit, 14);
+    if (tighten >= 6) pairs.push([first, second, -tighten]);
+  }
+  return pairs;
+}
+
 export function fontKerning(glyphs) {
   const byChar = new Map(glyphs.map(glyph => [glyph.char, glyph]));
   const pairs = [];
   for (const [first, second, limit, minimum] of [['o', 'w', 42, 9], ['K', 'i', 30, 12], ['K', 'h', 28, 12]]) {
     const leftGlyph = byChar.get(first), rightGlyph = byChar.get(second);
     if (!leftGlyph || !rightGlyph) continue;
-    const left = profile(leftGlyph), right = profile(rightGlyph);
-    const bins = new Map(right.rows.map(row => [Math.round(row.y * resolution), row.left]));
-    const gaps = left.rows.flatMap(row => {
-      const edge = bins.get(Math.round(row.y * resolution));
-      return edge === undefined ? [] : [leftGlyph.advance + edge - row.right];
-    }).sort((a, b) => a - b);
-    const clearance = gaps[Math.floor(gaps.length * .05)];
-    const tighten = Math.floor(Math.min(limit, clearance - minimum));
+    const tighten = tightenPair(leftGlyph, rightGlyph, limit, minimum);
     if (tighten > 0) pairs.push([first, second, -tighten]);
   }
+  const fixed = new Set(pairs.map(([a, b]) => a + b));
+  for (const pair of vietnameseKerning(glyphs)) if (!fixed.has(pair[0] + pair[1])) pairs.push(pair);
   if (byChar.has('T') && byChar.has('h')) pairs.push(['T', 'h', 24]);
   if (byChar.has('2') && byChar.has('3')) pairs.push(['2', '3', 30]);
   if (byChar.has('P') && byChar.has('H')) pairs.push(['P', 'H', 24]);

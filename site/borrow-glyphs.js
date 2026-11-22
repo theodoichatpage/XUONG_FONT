@@ -8,7 +8,7 @@ import { measureStem } from './vietnamese.js';
 const SCALE = 16;
 
 // Dải đường cong thành đa giác (đơn vị font × 16 để Clipper làm việc với số nguyên).
-function toPolygons(d) {
+export function toPolygons(d) {
   const polygons = [];
   let points = [], x = 0, y = 0, startX = 0, startY = 0;
   const push = (px, py) => points.push({ X: Math.round(px * SCALE), Y: Math.round(py * SCALE) });
