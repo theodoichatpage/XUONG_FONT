@@ -943,7 +943,7 @@ function scheduleFont() {
       downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
       download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
-      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
+      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:!!importedMetrics?.ownFont||[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
       if (repairRecheckPending) { const options = repairRecheckPending === true ? { propose: false } : repairRecheckPending; repairRecheckPending = false; await editorFontCheck.run([currentFontExport], options); }
     } catch (error) {
@@ -1362,7 +1362,10 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   }
   auditRepairPending=false; markCandidates=[];
   glyphs = new ProtectedGlyphMap(drafts);
-  importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}) };
+  // Font do chính người dùng dựng từ ảnh trong Xưởng rồi lưu lại (không phải file font của nhà thiết kế khác):
+  // fromImages đã từng đúng, hoặc bản lưu từ trình sửa mang tên riêng (không phải bản Việt hóa XFVN của font khác).
+  const ownFont = editOnly && (record.fromImages === true || ('fromImages' in record && !/^XFVN - /.test(record.name) && !/Việt hóa/i.test(record.name)));
+  importedMetrics = { ...imported.metrics, sourceRecordId: editOnly ? record.id : undefined, ...(editOnly ? imported.styleMetrics : {}), ...(ownFont ? { ownFont: true } : {}) };
   loadedSourceBlob = record.blob;
   $('name').value = (record.name + (editOnly ? '' : ' Việt hóa')).slice(0, 40);
   $('sample').value = $('sample').defaultValue;
@@ -1545,7 +1548,9 @@ async function fixByRules() {
     const snapshot = new Map(glyphs), next = new Map(glyphs);
     // 1. Chiều cao: chân đúng đường chân, đỉnh cùng nhóm bằng nhau.
     status('Hoàn thiện font: chuẩn hóa chiều cao…'); await pause();
-    const heights = normalizeHeights(next, glyph => editable(glyph) && (fromImage(glyph) || glyph.origin === 'inferred'));
+    const own = !!importedMetrics?.ownFont;   // font người dùng tự dựng, mở lại từ Bộ sưu tập: sửa như nét dò ảnh
+    const ours = glyph => own || glyph.source !== 'Font gốc';
+    const heights = normalizeHeights(next, glyph => editable(glyph) && (own || fromImage(glyph) || glyph.origin === 'inferred'));
     for (const glyph of heights.changed) next.set(glyph.char, glyph);
     // 2. Viền không xù, đường cong không gấp khúc (đo bằng outlineDefects: xù, đoạn ngắn, gần đứng/ngang, gấp khúc).
     // Áp cho mọi nét không phải font vẽ sẵn: dò ảnh, chữ dựng từ bộ phận, ký tự dựng. Thử mức Nhẹ → Vừa → Mạnh,
@@ -1572,7 +1577,7 @@ async function fixByRules() {
         if (best.q.total) rough.push(glyph.char);
       }
     };
-    const smoothable = glyph => glyph?.d && editable(glyph) && glyph.source !== 'Font gốc' && glyph.source !== 'Ghép dấu';
+    const smoothable = glyph => glyph?.d && editable(glyph) && ours(glyph) && glyph.source !== 'Ghép dấu';
     status('Hoàn thiện font: bổ sung chữ, dấu và ký tự…'); await pause();
     // 3. Dấu mẫu, Đ, chữ cái gốc từ bộ phận, chữ có dấu, dấu câu và ký tự đặc biệt.
     const hasVowel = ['A', 'E', 'O', 'a', 'e', 'o'].some(char => next.get(char)?.d);
@@ -1597,10 +1602,10 @@ async function fixByRules() {
     for (const glyph of symbols) next.set(glyph.char, glyph);
     await smooth(symbols.map(g => next.get(g.char)).filter(smoothable));
     // Cỡ dấu câu theo chấm chữ i của chính font (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
-    const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
+    const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && ours(glyph));
     for (const glyph of punctFix.changed) next.set(glyph.char, glyph);
     // Dấu nặng bằng dấu chấm của chính font, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
-    const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
+    const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && ours(glyph));
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
     const draft = new ProtectedGlyphMap(next);
@@ -1615,6 +1620,7 @@ async function fixByRules() {
     const after = auditMarks(draft, { slant: measureSlant(draft) });
     const rebuilt = changed.filter(item => item.before && failing.has(item.char)).map(item => item.char);
     const special = new Set([...letters, ...symbols].map(g => g.char));
+    const newSymbols = changed.filter(item => symbols.some(g => g.char === item.char)).map(item => item.char);
     const added = changed.filter(item => !item.before && !special.has(item.char)).map(item => item.char).filter(char => charset.includes(char));
     const missing = charset.filter(char => !draft.get(char)?.d);
     const list = chars => chars.slice(0, 30).join(' ') + (chars.length > 30 ? ' …' : '');
@@ -1626,11 +1632,12 @@ async function fixByRules() {
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
       dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ bằng dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
       punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo chấm chữ i của font (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
-      symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
+      newSymbols.length && 'dựng ' + newSymbols.length + ' dấu câu, ký tự (' + list(newSymbols) + ')',
     ].filter(Boolean);
     const tail = (rough.length ? ' Còn lỗi viền/đường cong sau khi nắn (cần chỉnh tay hoặc thay ảnh): ' + list([...new Set(rough)]) + '.' : '') + (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')
       + (missing.length ? ' CẦN ẢNH MẪU (Xưởng không tự dựng được): ' + list(missing) + '.' : ' Đủ bộ ký tự.')
-      + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font nhập: giữ nguyên kerning gốc.' : '')
+      + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font mở từ Bộ sưu tập: giữ nguyên kerning đã lưu.' : '')
+      + (importedMetrics && !own ? ' Font của nhà thiết kế khác: chỉ sửa chữ Xưởng ghép/dựng, giữ nguyên nét gốc.' : '')
       + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')
       + auditMessage(after);
     if (!changed.length) {

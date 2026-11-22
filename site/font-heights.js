@@ -69,7 +69,9 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
     if (pieces.length >= 2 && pieces[0].height < ib.height * .35) iDot = pieces[0].width;
   }
   const reference = iDot || stem;
-  if (period?.d) { const w = glyphBounds(period).width; if (Math.abs(w / reference - 1) > .08) factor = reference / w; }
+  // Dấu chấm không được sửa (nét nhà thiết kế, đã khóa/duyệt): giữ nguyên tỉ lệ các dấu câu khác, không co theo chấm i.
+  if (period?.d && !editable(period)) factor = 1;
+  else if (period?.d) { const w = glyphBounds(period).width; if (Math.abs(w / reference - 1) > .08) factor = reference / w; }
   else { const w = glyphBounds(comma).width; if (Math.abs(w / reference - 1) > .25) factor = reference / w; }
   if (Math.abs(factor - 1) < .03) factor = 1;
   const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(part => part.trim());
