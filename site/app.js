@@ -1596,10 +1596,10 @@ async function fixByRules() {
     const symbols = deriveSymbols(next).filter(glyph => !real(glyphs.get(glyph.char)) && !(glyphs.get(glyph.char)?.d && glyphs.get(glyph.char).source !== 'Dựng từ nét chữ'));
     for (const glyph of symbols) next.set(glyph.char, glyph);
     await smooth(symbols.map(g => next.get(g.char)).filter(smoothable));
-    // Cỡ dấu câu theo nét thân (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
+    // Cỡ dấu câu theo chấm chữ i của chính font (cả dấu câu theo ảnh; font vẽ sẵn giữ nguyên).
     const punctFix = normalizePunctuation(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of punctFix.changed) next.set(glyph.char, glyph);
-    // Dấu nặng = 0,88 [0,67–1,0] dấu chấm, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
+    // Dấu nặng bằng dấu chấm của chính font, cả chữ theo ảnh (chỉ co/giãn chấm tại chỗ).
     const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && glyph.source !== 'Font gốc');
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
@@ -1624,8 +1624,8 @@ async function fixByRules() {
       letters.length && 'dựng ' + letters.length + ' chữ cái từ bộ phận (' + list(letters.map(g => g.char + '←' + g.derivedFrom)) + ')',
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',
       added.length && 'ghép thêm ' + added.length + ' chữ có dấu (' + list(added) + ')',
-      dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ về 0,88 dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
-      punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo nét thân (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
+      dotBelow.changed.length && 'chỉnh cỡ dấu nặng ' + dotBelow.changed.length + ' chữ bằng dấu chấm (' + list(dotBelow.changed.map(g => g.char + ' ' + g.dotBelowFix)) + ')',
+      punctFix.changed.length && 'chỉnh cỡ ' + punctFix.changed.length + ' dấu câu' + (punctFix.factor !== 1 ? ' theo chấm chữ i của font (×' + punctFix.factor.toFixed(2) + ')' : '') + ', chấm của : ; ! ? bằng dấu chấm (' + list(punctFix.changed.map(g => g.char)) + ')',
       symbols.length && 'dựng ' + symbols.length + ' dấu câu, ký tự (' + list(symbols.map(g => g.char)) + ')',
     ].filter(Boolean);
     const tail = (rough.length ? ' Còn lỗi viền/đường cong sau khi nắn (cần chỉnh tay hoặc thay ảnh): ' + list([...new Set(rough)]) + '.' : '') + (heights.held.length ? ' Lệch lớn, coi là cố ý nên giữ: ' + list(heights.held) + '.' : '')

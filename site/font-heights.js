@@ -50,17 +50,17 @@ export function normalizeHeights(glyphs, editable = glyph => !glyph.locked) {
   return { changed: [...changed.values()], held };
 }
 
-// Cỡ dấu câu theo nét thân (đo 21 font chuẩn, bỏ font đơn cách): dấu chấm rộng 1,0–1,5 nét thân (trung vị 1,2),
-// dấu phẩy cao 2,1–3,5 nét thân. Dấu chấm lệch khoảng → mọi dấu câu dựng từ chấm (. , : ; ' " ‘ ’ “ ” và chấm của ! ?)
-// co/giãn cùng một tỉ lệ để giữ tương quan; từng contour co quanh chân (nếu chạm đường chân) hoặc quanh tâm.
+// Cỡ dấu câu theo chính font: dấu chấm rộng bằng chấm chữ i (không có chấm i thì bằng nét thân). Dấu chấm lệch mốc
+// > 8% → mọi dấu câu dựng từ chấm (. , : ; ' " ‘ ’ “ ” và chấm của ! ?) co/giãn cùng một tỉ lệ để giữ tương quan;
+// từng contour co quanh chân (nếu chạm đường chân) hoặc quanh tâm. Sau đó chấm của : ; ! ? bằng đúng dấu chấm.
 const DOT_PUNCTUATION = ".,:;'\"‘’“”";
 export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.locked) {
   const capGlyph = ['H', 'E', 'I'].map(c => glyphs.get(c)).find(g => g?.d), capTop = capGlyph ? glyphBounds(capGlyph).y + glyphBounds(capGlyph).height : 0;
   const period = glyphs.get('.'), comma = glyphs.get(',');
   if (!(stem > 0) || !(period?.d || comma?.d)) return { changed: [], factor: 1 };
   let factor = 1;
-  // Chấm chữ i (contour nhỏ trên cùng của i): font chuẩn để dấu chấm rộng ≈ 1,06 × chấm i [0,7–1,3; Impact 0,73] (xuong-font-workflow.md 1b).
-  // Dùng chấm i làm chuẩn khi chính nó đúng cỡ (1,0–1,5 nét thân); chấm i trang trí to thì theo nét thân.
+  // Dấu chấm dựng từ thông số của chính font (yêu cầu người dùng 22/11/2026), không so với font khác:
+  // mốc là chấm chữ i của font (contour nhỏ trên cùng của i); font chưa có chấm i thì mốc là nét thân.
   const iGlyph = glyphs.get('i');
   let iDot = 0;
   if (iGlyph?.d) {
@@ -68,20 +68,9 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
     const ib = glyphBounds(iGlyph);
     if (pieces.length >= 2 && pieces[0].height < ib.height * .35) iDot = pieces[0].width;
   }
-  if (period?.d) {
-    // Đo 16 font chuẩn (.qa/period-measure.mjs): font thường dấu chấm rộng 1,0–1,6 nét thân (trung vị 1,2);
-    // font hẹp (rộng H / cao H < 0,62: Impact 0,60, Bebas Neue 0,44–0,50) dấu chấm chỉ bằng nét thân: 0,73–0,98.
-    // Cao dấu chấm 0,126–0,205 chiều cao chữ hoa ở mọi font. Thứ tự: theo nét thân → theo chiều cao hoa → theo chấm i.
-    const pb = glyphBounds(period), w = pb.width, H = glyphs.get('H');
-    const condensed = !!(H?.d && capTop && glyphBounds(H).width / capTop < .62);
-    const [lo, hi, mid] = condensed ? [.7, 1.05, .95] : [1, 1.6, 1.2];
-    let target = 0;
-    if (w > hi * stem || w < lo * stem) target = mid * stem;
-    else if (capTop && pb.height > .21 * capTop) target = w * .17 * capTop / pb.height;
-    else if (iDot >= stem && iDot <= 1.5 * stem) { const r = w / iDot; if (r > 1.3 || r < .7) target = 1.06 * iDot; }
-    if (target) factor = target / w;
-  }
-  else { const h = glyphBounds(comma).height; if (h > 3.5 * stem || h < 2.1 * stem) factor = 2.9 * stem / h; }
+  const reference = iDot || stem;
+  if (period?.d) { const w = glyphBounds(period).width; if (Math.abs(w / reference - 1) > .08) factor = reference / w; }
+  else { const w = glyphBounds(comma).width; if (Math.abs(w / reference - 1) > .25) factor = reference / w; }
   if (Math.abs(factor - 1) < .03) factor = 1;
   const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(part => part.trim());
   const anchorOf = (b, top) => top ? b.y + b.height : b.y <= stem * .5 && b.y + b.height >= 0 ? Math.max(b.y, 0) : b.y + b.height / 2;
@@ -116,9 +105,7 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
       const b = glyphBounds({ d: part }), size = Math.max(b.width, b.height), aspect = b.height / (b.width || 1);
       if (size < 2.2 * stem && size < 2 * pSize && aspect > .6 && aspect < 1.7) {
         // Đo 18 font chuẩn: chấm của : ; bằng đúng dấu chấm (0,92–1,0); chấm của ! ? 0,74–1,15 (Tahoma, Verdana 0,74).
-        const ratio = size / pSize, loose = char === '!' || char === '?';
-        const off = loose ? ratio < .72 || ratio > 1.18 : Math.abs(ratio - 1) > .08;
-        return off ? scalePart(part, pSize / size, false) : part;
+        return Math.abs(size / pSize - 1) > .08 ? scalePart(part, pSize / size, false) : part;   // chấm bằng dấu chấm của chính font
       }
       if (char === ';' && cHeight && aspect >= 1.7 && b.y < 0 && size < 6 * stem) {
         const k = cHeight / b.height;   // đuôi phẩy của ; theo dấu phẩy, giữ đỉnh (đầu chấm) tại chỗ
@@ -138,13 +125,12 @@ export function normalizePunctuation(glyphs, stem, editable = glyph => !glyph.lo
   return { changed, factor };
 }
 
-// Dấu nặng theo dấu chấm (chuẩn đo 20 font: cạnh lớn nhất của nặng = 0,88 [0,67–1,0] dấu chấm; không font nào
-// dùng nặng to hơn chấm). Tìm chấm nặng (contour nhỏ nằm dưới đường chân) ở mọi chữ có dấu nặng, kể cả chữ
-// theo ảnh; ngoài khoảng thì co/giãn tại chỗ quanh đỉnh chấm (giữ khoảng hở với thân) về 0,88 dấu chấm.
+// Dấu nặng bằng dấu chấm của chính font (yêu cầu người dùng 22/11/2026). Tìm chấm nặng (contour nhỏ nằm dưới đường
+// chân) ở mọi chữ có dấu nặng, kể cả chữ theo ảnh; lệch > 8% thì co/giãn tại chỗ quanh đỉnh chấm (giữ khoảng hở với thân).
 export function normalizeDotBelow(glyphs, stem, editable = glyph => !glyph.locked) {
   const period = glyphs.get('.');
   if (!period?.d || !(stem > 0)) return { changed: [] };
-  const pb = glyphBounds(period), periodSize = Math.max(pb.width, pb.height), target = .88 * periodSize;
+  const pb = glyphBounds(period), periodSize = Math.max(pb.width, pb.height), target = periodSize;   // nặng = dấu chấm của chính font
   const changed = [];
   for (const [char, g] of glyphs) {
     if (!g?.d || !editable(g) || !char.normalize('NFD').includes('̣')) continue;
@@ -156,7 +142,7 @@ export function normalizeDotBelow(glyphs, stem, editable = glyph => !glyph.locke
       if (done || !(b.y + b.height <= stem * .25) || Math.max(b.width, b.height) > Math.max(2.5 * stem, 1.6 * periodSize)) return part;
       const size = Math.max(b.width, b.height), ratio = size / periodSize;
       done = true; sizes.push(+ratio.toFixed(2));
-      if (ratio >= .67 && ratio <= 1) return part;
+      if (Math.abs(ratio - 1) <= .08) return part;
       const k = target / size, cx = b.x + b.width / 2, top = b.y + b.height;
       return svgpath(part).translate(-cx, -top).scale(k).translate(cx, top).round(1).toString();
     }).join(' ');
