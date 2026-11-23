@@ -17,7 +17,8 @@
     "check:outline": "node scripts/check-outline-cleanup.cjs && node scripts/check-outline-ui.cjs",
     "check:marks": "node scripts/check-vietnamese-marks.cjs",
     "audit:rules": "node scripts/audit-rules.cjs",
-    "check:corners": "node scripts/check-sharp-corners.cjs && node scripts/check-sharp-reference.cjs"
+    "check:corners": "node scripts/check-sharp-corners.cjs && node scripts/check-sharp-reference.cjs",
+    "check:rules": "node scripts/check-rules.cjs"
   },
   "dependencies": {
     "clipper-lib": "^6.4.2",

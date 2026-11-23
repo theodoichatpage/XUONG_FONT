@@ -17,6 +17,12 @@ description: Thiết kế, Việt hóa, sửa và kiểm tra font tiếng Việt
 
 Ví dụ đã làm theo quy trình này: Ẫ đặt ngã quá thấp (đáy 0.94–1.00 chiều cao mũ, chuẩn 1.04–1.39) → luật hai tầng không hạ dấu thanh nằm trên mũ/trăng xuống dưới 1.04, thu nhỏ dấu thanh thay vào đó. Ọ nặng quá rộng ở font hẹp (0.29, chuẩn ≤ 0.27) → giới hạn bề rộng nặng theo chữ mang dấu. Bold của font hẹp làm nặng nhỏ hơn nét thân (0.65, chuẩn 0.90–2.44) → nặng không nhỏ hơn 0.9 nét thân dù giới hạn theo độ rộng chữ. Family Bold làm hở dấu–thân còn 0.06 → ghép lại mọi chữ có dấu từ thân đã làm đậm và dấu làm đậm 0.27 lần.
 
+## Bảng quy tắc trong code và bài kiểm trên font thật
+
+Mọi quy tắc đo được nằm trong một bảng duy nhất `site/rule-check.js` (mỗi quy tắc ghi mục skill nó lấy từ): dấu chấm = chấm chữ i; chấm của : ; ! ? = dấu chấm; dấu nặng = dấu chấm; dấu câu đúng chỗ (đường chân, chiều cao chữ hoa); chân/đỉnh phẳng cùng nhóm; râu ơ ư liền thân; viền không xù, cong không gấp khúc; dấu Xưởng ghép theo chuẩn đo; đủ bộ ký tự. Sau **mọi** thao tác dựng (Thêm một chữ, Tách và thêm thủ công, nhận chữ từ dự án Family, Tạo dấu tiếng Việt, Hoàn thiện font chữ) Xưởng sửa những gì sửa được an toàn trên các chữ vừa dựng (`fixRules`) rồi đối chiếu cả bảng và báo "Đối chiếu quy tắc skill: đạt N/M quy tắc. LỆCH: …". Thêm quy tắc mới vào skill thì thêm vào bảng này, không vá riêng từng thao tác.
+
+`npm run check:rules` chạy bảng quy tắc trên font thật — Arial và font của người dùng nếu có trên máy (Sử Việt Kiêu Hùng trong Downloads, UTM Bebas đã cài): dấu câu/dấu nặng đạt sau khi sửa, râu liền thân, kiểu family làm được/không làm được đúng như đã chốt, family giữ râu và cỡ dấu hỏi của font gốc (±12%). Mỗi lỗi người dùng từng gặp thành một điều kiện ở đây. Chạy trước mỗi lần đẩy code.
+
 ## Xác định đầu vào
 
 1. Phân loại: ảnh chữ mẫu, file font, hay một kiểu trong family đang sửa.

@@ -1,0 +1,66 @@
+// Bài kiểm bảng quy tắc skill (site/rule-check.js) trên font thật: Arial (luôn có) và font của người dùng nếu có trên
+// máy (Sử Việt Kiêu Hùng trong Downloads, UTM Bebas đã cài). Mỗi lỗi từng gặp được giữ thành một điều kiện ở đây để
+// sửa code về sau không làm lỗi cũ quay lại.
+// Chạy: npm run check:rules
+const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), esbuild = require('esbuild'), opentype = require('opentype.js'), svgpath = require('svgpath');
+const dir = path.join(__dirname, '../.qa'); fs.mkdirSync(dir, { recursive: true });
+function moduleFor(name, file) {
+  const output = path.join(dir, name + '.cjs');
+  esbuild.buildSync({ entryPoints: [path.join(__dirname, '..', file)], bundle: true, platform: 'node', format: 'cjs', outfile: output, logLevel: 'silent',
+    external: ['wawoff2', 'esm-potrace-wasm'], inject: [path.join(__dirname, 'lib', 'dom-bbox-shim.mjs')] });
+  return require(output);
+}
+const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
+const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
+const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+const home = process.env.USERPROFILE || process.env.HOME || '';
+const fonts = [
+  { name: 'Arial', file: 'C:/Windows/Fonts/arial.ttf' },
+  { name: 'Sử Việt Kiêu Hùng', file: path.join(home, 'Downloads', 'Sử Việt Kiêu Hùng.ttf'),
+    feasible: ['Thin', 'ExtraLight', 'Light', 'Regular', 'Medium'], infeasible: ['SemiBold', 'Bold', 'ExtraBold', 'Black'], family: ['Light', 'Medium'] },
+  { name: 'UTM Bebas', file: path.join(home, 'AppData/Local/Microsoft/Windows/Fonts/UTM Bebas.ttf'),
+    feasible: ['ExtraLight', 'Light', 'Regular', 'Medium', 'SemiBold', 'Bold'], infeasible: ['Thin', 'ExtraBold', 'Black'], family: ['Light'] },
+];
+const chars = [...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:;!?“”‘’\'"ơưƠƯờởữợỏọạụịỵĐđ'];
+function glyphMap(font, source = 'Ảnh mẫu') {
+  const k = 1000 / font.unitsPerEm, map = new Map();
+  for (const char of chars) { const g = font.charToGlyph(char); if (!g?.index || !g.path.commands.length) continue; map.set(char, { char, d: svgpath(g.path.toPathData(3)).scale(k).toString(), advance: g.advanceWidth * k, source }); }
+  return map;
+}
+const status = (result, id) => result.rows.find(r => r.id === id)?.status;
+const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) } });
+(async () => {
+  const done = [];
+  for (const font of fonts) {
+    if (!fs.existsSync(font.file)) { done.push(font.name + ': bỏ qua (không có file trên máy này)'); continue; }
+    const buf = fs.readFileSync(font.file), source = parse(buf);
+    // 1. Coi font như nét dò ảnh: sửa theo bảng quy tắc thì dấu câu, dấu nặng phải đạt (lỗi cũ: dấu phẩy to, nhảy lên đầu).
+    const { map } = fixRules(glyphMap(source), { editable: () => true });
+    const after = checkRules(map, { editable: () => true });
+    for (const id of ['dot-i', 'colon-dots', 'dot-below', 'punct-place']) assert.notEqual(status(after, id), 'fail', font.name + ': sau khi sửa vẫn lệch quy tắc ' + id + ' ' + JSON.stringify(after.rows.find(r => r.id === id)?.issues.slice(0, 4)));
+    // 2. Râu ơ ư nối liền thân ở font gốc.
+    const original = checkRules(glyphMap(source, 'Font gốc'));
+    assert.notEqual(status(original, 'horn'), 'fail', font.name + ': râu rời ở font gốc ' + JSON.stringify(original.rows.find(r => r.id === 'horn')?.issues));
+    if (font.feasible) {
+      // 3. Biết trước kiểu family nào làm được (lỗi cũ: Bold không tạo được nhưng vẫn cho chọn).
+      const verdict = await familyFeasibility(record(font.name, buf));
+      for (const style of font.feasible) assert.equal(verdict.get(style), null, font.name + ' ' + style + ' phải làm được: ' + verdict.get(style));
+      for (const style of font.infeasible) assert.ok(verdict.get(style), font.name + ' ' + style + ' phải bị làm mờ');
+      // 4. Family giữ râu ơ ư (lỗi cũ: mất râu ở Thin/Light) và cỡ dấu hỏi của chính font (lỗi cũ: hỏi 122 thành 189).
+      const hook = f => { const g = f.charToGlyph('ỏ'), o = f.charToGlyph('o'); const top = o.getBoundingBox().y2 * 1000 / f.unitsPerEm;
+        const parts = []; let cur; for (const c of g.path.commands) { if (c.type === 'M') parts.push(cur = []); if ('y' in c) cur.push(c.y * 1000 / f.unitsPerEm); }
+        const above = parts.filter(p => Math.min(...p) > top - 2); return above.length ? Math.max(...above.flat()) - Math.min(...above.flat()) : 0; };
+      const sourceHook = hook(source);
+      await createFontFamily(record(font.name, buf), font.family, 'x', async result => {
+        if (!result.blob) return;
+        const out = parse(Buffer.from(await result.blob.arrayBuffer()));
+        const rows = checkRules(glyphMap(out, 'Font gốc'));
+        assert.notEqual(status(rows, 'horn'), 'fail', font.name + ' ' + result.style + ': râu rời ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
+        const h = hook(out);
+        if (sourceHook) assert.ok(Math.abs(h / sourceHook - 1) <= .12, font.name + ' ' + result.style + ': dấu hỏi cao ' + Math.round(h) + ', font gốc ' + Math.round(sourceHook));
+      });
+    }
+    done.push(font.name + ': đạt');
+  }
+  console.log('PASS: bảng quy tắc skill —', done.join('; '));
+})().catch(error => { console.error(error); process.exit(1); });

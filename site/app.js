@@ -5,6 +5,9 @@ import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
 import {cleanOutline,fromImage,sampleOutline} from './outline-cleanup.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
+import { placePunctuation as placePunctuationIn } from './punctuation-rules.js';
+import { checkRules, ruleMessage, fixRules } from './rule-check.js';
+const placePunctuation = (glyph, map = glyphs) => placePunctuationIn(glyph, map);
 import { outlineDefects } from './outline-quality.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
 import { assessFont, makeQualitySVG, qualityProofs } from './font-quality.js';
@@ -816,61 +819,6 @@ function trimEdgeFragments(area) {
 // VỊ TRÍ theo quy tắc trên thông số của chính font (không đoán đường chân từ ảnh, dễ sai khi chữ lấy từ dự án Family
 // có toạ độ khác): . , : ; ! ? ngồi trên đường chân (dấu phẩy: đầu chấm ngồi trên đường chân, đuôi xuống dưới);
 // ngoặc kép, nháy đơn: đỉnh ngang chiều cao chữ hoa. Đối chiếu lại sau khi đặt: lệch quy tắc thì đặt lại.
-const PUNCT_RULE = { base: '.,:;!?', top: '"\'“”‘’' };
-function punctuationMetrics(map) {
-  const top = chars => { for (const c of chars) { const g = map.get(c); if (g?.d) { const b = glyphBounds(g); return b.y + b.height; } } };
-  return { capTop: top(['H', 'I', 'E', 'T', 'L']) ?? 700, xTop: top(['x', 'z', 'v', 'n', 'u']) ?? 500 };
-}
-// Đối chiếu cỡ theo skill (xuong-font-workflow.md 1b, thông số của chính font): đầu chấm của . , : ; bằng chấm chữ i
-// (không có chấm i thì bằng nét thân). Lệch quá 15% thì co/giãn cả ký tự về đúng mốc, giữ tỉ lệ đầu/đuôi như ảnh.
-function punctuationDot(map) {
-  const i = map.get('i');
-  if (i?.d) {
-    const parts = svgpath(i.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => glyphBounds({ d })).sort((a, b) => b.y - a.y);
-    if (parts.length >= 2 && parts[0].height < glyphBounds(i).height * .35) return parts[0].width;
-  }
-  try { return measureStem(map) || 0; } catch { return 0; }
-}
-function headWidth(glyph) {
-  // Bề ngang phần đầu chấm: phần trên cùng (45% chiều cao) của contour thấp nhất (dấu phẩy, chấm dưới của : ;).
-  const parts = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => ({ d, b: glyphBounds({ d }) })).sort((a, b) => a.b.y - b.b.y);
-  const low = parts[0]; if (!low) return 0;
-  if (glyph.char !== ',' && glyph.char !== ';') return Math.max(low.b.width, low.b.height);
-  const band = low.b.y + low.b.height * .55;
-  let x0 = Infinity, x1 = -Infinity;
-  try { for (const contour of sampleOutline(low.d, .5)) for (const [x, y] of contour) if (y >= band) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); } } catch { return low.b.width; }
-  return x1 > x0 ? x1 - x0 : low.b.width;
-}
-function sizePunctuation(glyph, map = glyphs) {
-  if (!glyph?.d || !'.,:;'.includes(glyph.char)) return glyph;
-  const dot = punctuationDot(map), head = headWidth(glyph);
-  if (!(dot > 0) || !(head > 0) || Math.abs(head / dot - 1) <= .15) return glyph;
-  const k = dot / head, box = glyphBounds(glyph);
-  // Khung chuẩn của ký tự tách tay có thể phóng dấu câu to gấp 3 lần (đầu phẩy 340, chấm i 113): đưa về mốc là việc bình
-  // thường. Chỉ từ chối khi lệch phi lý (> 10 lần): khi đó thứ tách ra không phải dấu câu.
-  if (k > 10 || k < .1) return { ...glyph, punctuationRejected: { head: Math.round(head), dot: Math.round(dot) } };
-  const d = svgpath(glyph.d).translate(-box.x, -box.y).scale(k).translate(box.x, box.y).round(1).toString();
-  return { ...glyph, d, advance: Math.round(glyph.advance - box.width + box.width * k), punctuationSized: Math.round(k * 100) / 100 };
-}
-function placePunctuation(glyph, map = glyphs) {
-  glyph = sizePunctuation(glyph, map);
-  if (!glyph?.d || !punctuation.includes(glyph.char)) return glyph;
-  const { capTop } = punctuationMetrics(map), box = glyphBounds(glyph);
-  let dy = 0;
-  if (PUNCT_RULE.base.includes(glyph.char)) {
-    if (glyph.char === ',' || glyph.char === ';') {
-      // Đầu dấu phẩy là phần trên, rộng nhất: đặt đáy phần đầu (≈ đỉnh − bề rộng) ngay trên đường chân.
-      const head = Math.min(box.height * .55, box.width * 1.1);
-      dy = head - (box.y + box.height);
-    } else dy = -box.y;
-    if (glyph.char === ';') {   // ; : phần phẩy dưới cùng như dấu phẩy, chấm trên giữ khoảng cách vốn có
-      const parts = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => ({ d, b: glyphBounds({ d }) })).sort((a, b) => a.b.y - b.b.y);
-      const low = parts[0]?.b; if (low) { const head = Math.min(low.height * .55, low.width * 1.1); dy = head - (low.y + low.height); }
-    }
-  } else if (PUNCT_RULE.top.includes(glyph.char)) dy = capTop - (box.y + box.height);
-  if (Math.abs(dy) < 2) return glyph;
-  return { ...glyph, d: svgpath(glyph.d).translate(0, dy).round(1).toString(), punctuationPlaced: Math.round(dy) };
-}
 function fitToReferenceScale(glyph) {
   const crop = glyph.reference?.crop, index = glyph.reference?.index;
   if (!crop || index == null || !glyph.d) return placePunctuation(glyph);
@@ -970,7 +918,9 @@ async function trace(single) {
     persistReferences();
     updateComposed();
     refresh();
-    status(`Đã thêm ${traced.size} ký tự từ ảnh mẫu.`);
+    const ruleNote = enforceRules([...traced.keys()]);
+    refresh();
+    status(`Đã thêm ${traced.size} ký tự từ ảnh mẫu.` + ruleNote);
   } catch (error) { status(error.message); }
   finally {
     busy = false;
@@ -1339,7 +1289,8 @@ $('derive-marks').addEventListener('click', () => {
     + (letters.length ? ` Dựng ${letters.length} chữ cái còn thiếu từ bộ phận chữ đã có: ${letters.map(g => g.char + '←' + g.derivedFrom).join(' ')}.` : '')
     + (symbols.length ? ` Dựng thêm ${symbols.length} dấu câu, ký hiệu còn thiếu: ${symbols.map(g => g.char).join(' ')}.` : '')
     + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) }))
-    + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.';
+    + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.'
+    + ruleMessage(checkRules(glyphs), { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'horn', 'marks'] });
   status(message);
   reportDesign(message);
 });
@@ -1744,6 +1695,15 @@ async function drawMissingWithAI(missing) {
     status('Gemini chưa vẽ được ' + chars.join(' ') + ': ' + error.message + '. Font vẫn giữ nguyên.');
   }
 }
+// Sau mỗi thao tác dựng: sửa theo bảng quy tắc (rule-check.js) những chữ vừa dựng, rồi đối chiếu toàn bộ bảng quy tắc.
+// Trả về câu báo kết quả để nối vào dòng trạng thái.
+function enforceRules(chars) {
+  const editable = glyph => glyph && !glyph.locked && !glyph.approved && (importedMetrics?.ownFont || glyph.source !== 'Font gốc');
+  const { map, changed } = fixRules(glyphs, { editable, chars: chars ? new Set(chars) : undefined });
+  if (changed.length) glyphs = new ProtectedGlyphMap(map);
+  const result = checkRules(glyphs, { editable });
+  return (changed.length ? ' Sửa theo quy tắc: ' + changed.join(' ') + '.' : '') + ruleMessage(result, { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'marks'] });
+}
 // Font do chính người dùng dựng trong Xưởng (không phải nét của nhà thiết kế khác):
 // - file Xưởng xuất mang mô tả "Made with draw-your-font" (src/assemble.js), kể cả khi được Nhập TTF vào Bộ sưu tập;
 // - bản Việt hóa / kiểu family sinh ra (tên XFVN, "Việt hóa") cũng mang dấu đó, nên xét font gốc của nó
@@ -1867,7 +1827,7 @@ async function fixByRules() {
       + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font mở từ Bộ sưu tập: giữ nguyên kerning đã lưu.' : '')
       + (importedMetrics && !own ? ' Font của nhà thiết kế khác: chỉ sửa chữ Xưởng ghép/dựng, giữ nguyên nét gốc.' : '')
       + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')
-      + auditMessage(after);
+      + auditMessage(after) + ruleMessage(checkRules(draft, { editable: glyph => glyph && !glyph.locked && (importedMetrics?.ownFont || glyph.source !== 'Font gốc') }), { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'outline'] });
     if (!changed.length) {
       status('Hoàn thiện font: không có gì cần sửa theo quy tắc.' + tail + ' Đang kiểm file font…');
       if (missing.length) setTimeout(() => drawMissingWithAI(missing), 0);
@@ -2060,7 +2020,8 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
       selected=added[0]??replaced[0]??selected;auditRepairPending=false;markCandidates=[];refresh();
       const message='Đã thêm '+added.length+' chữ từ ảnh vào '+($('name').value.trim()||project.name)+(added.length?': '+added.join(' '):'')
         +(replaced.length?'. Thay '+replaced.length+' chữ dựng tạm bằng chữ từ ảnh: '+replaced.join(' '):'')
-        +'. Giữ nguyên các chữ đã có; nhớ bấm Lưu font đang làm trong Bộ sưu tập để cập nhật.';
+        +'. Giữ nguyên các chữ đã có; nhớ bấm Lưu font đang làm trong Bộ sưu tập để cập nhật.'+enforceRules([...added,...replaced]);
+      refresh();
       setTimeout(()=>{status(message);reportDesign(message);},0);
       return;
     }
