@@ -749,15 +749,15 @@ function trimEdgeFragments(area) {
       for (let start = 0; start < source.length; start++) {
         if (!source[start] || seen[start] >= 0) continue;
         const id = comps.length, stack = [start], pixels = []; seen[start] = id;
-        let edge = false, x0 = width, y0 = height, x1 = -1, y1 = -1;
+        let edge = false, edgePixels = 0, x0 = width, y0 = height, x1 = -1, y1 = -1;
         while (stack.length) {
           const p = stack.pop(), x = p % width, y = (p - x) / width; pixels.push(p);
-          if (x <= 2 || y <= 2 || x >= width - 3 || y >= height - 3) edge = true;   // tách nền thích ứng chừa viền 1–2 px
+          if (x <= 2 || y <= 2 || x >= width - 3 || y >= height - 3) { edge = true; edgePixels++; }   // tách nền thích ứng chừa viền 1–2 px
           x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
           for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1])
             if (q >= 0 && source[q] && seen[q] < 0) { seen[q] = id; stack.push(q); }
         }
-        comps.push({ pixels, edge, x0, y0, x1, y1 });
+        comps.push({ pixels, edge, edgePixels, x0, y0, x1, y1 });
       }
       return { comps, seen };
     };
@@ -780,7 +780,10 @@ function trimEdgeFragments(area) {
       // Khoanh sát quá nên cả dấu câu cũng chạm mép: giữ mảng gần tâm vùng khoanh nhất, bỏ các mẩu chạm mép còn lại.
       if (!inside.length && outside.length > 1) {
         const centre = c => { let sx = 0, sy = 0; for (const p of c.pixels) { sx += p % width; sy += Math.floor(p / width); } return Math.hypot(sx / c.pixels.length - width / 2, sy / c.pixels.length - height / 2); };
-        const best = outside.filter(c => c.pixels.length >= 4).sort((a, b) => centre(a) - centre(b))[0];
+        // Mẩu chữ bên cạnh bị mép vùng khoanh cắt ngang theo cả một đoạn dài; dấu câu chỉ chạm mép vài điểm.
+        // Chọn mảng có tỉ lệ điểm chạm mép nhỏ nhất, hòa thì mảng gần tâm.
+        const ratio = c => c.edgePixels / c.pixels.length;
+        const best = outside.filter(c => c.pixels.length >= 4).sort((a, b) => ratio(a) - ratio(b) || centre(a) - centre(b))[0];
         if (best) { inside = [best]; outside = outside.filter(c => c !== best); }
       }
       if (!inside.length) continue;
@@ -843,6 +846,9 @@ function sizePunctuation(glyph, map = glyphs) {
   const dot = punctuationDot(map), head = headWidth(glyph);
   if (!(dot > 0) || !(head > 0) || Math.abs(head / dot - 1) <= .15) return glyph;
   const k = dot / head, box = glyphBounds(glyph);
+  // Khung chuẩn của ký tự tách tay có thể phóng dấu câu to gấp 3 lần (đầu phẩy 340, chấm i 113): đưa về mốc là việc bình
+  // thường. Chỉ từ chối khi lệch phi lý (> 10 lần): khi đó thứ tách ra không phải dấu câu.
+  if (k > 10 || k < .1) return { ...glyph, punctuationRejected: { head: Math.round(head), dot: Math.round(dot) } };
   const d = svgpath(glyph.d).translate(-box.x, -box.y).scale(k).translate(box.x, box.y).round(1).toString();
   return { ...glyph, d, advance: Math.round(glyph.advance - box.width + box.width * k), punctuationSized: Math.round(k * 100) / 100 };
 }
@@ -956,6 +962,8 @@ async function trace(single) {
     // Dấu câu khoanh tay: cỡ và độ cao theo đúng tỉ lệ chữ của chính ảnh này (chữ đã tách từ cùng ảnh), không phóng
     // cho đầy khung như chữ cái (dấu phẩy thành to bằng nửa chữ).
     for (const [char, glyph] of traced) if (punctuation.includes(char)) traced.set(char, fitToReferenceScale(glyph));
+    const rejected = [...traced.values()].filter(glyph => glyph.punctuationRejected).map(glyph => glyph.char + ' (đầu chấm ' + glyph.punctuationRejected.head + ', chấm i ' + glyph.punctuationRejected.dot + ')');
+    if (rejected.length) throw new Error('Nét tách ra cho ' + rejected.join(' ') + ' không khớp quy tắc dấu câu (đầu chấm phải bằng chấm chữ i của font; nét tách ra lệch quá 10 lần), có lẽ đã lấy nhầm mẩu chữ bên cạnh. Chưa lưu. Hãy khoanh rộng hơn, bao trọn dấu câu.');
     for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
