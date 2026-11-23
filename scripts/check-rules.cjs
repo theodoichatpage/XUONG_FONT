@@ -12,6 +12,8 @@ function moduleFor(name, file) {
 }
 const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
 const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
+const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
 const fonts = [
@@ -41,6 +43,23 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     // 2. Râu ơ ư nối liền thân ở font gốc.
     const original = checkRules(glyphMap(source, 'Font gốc'));
     assert.notEqual(status(original, 'horn'), 'fail', font.name + ': râu rời ở font gốc ' + JSON.stringify(original.rows.find(r => r.id === 'horn')?.issues));
+    // 2b. Font dựng từ ảnh: chữ có dấu còn thiếu ghép bằng dấu người dùng vẽ trong chữ có dấu đã có (dấu hỏi ở ỏ ghép
+    // cho ủ, ở…), không dùng dấu font khác; loại dấu ảnh không có thì dựng từ nét chữ (lỗi cũ: để trống).
+    if (font.feasible) {
+      const image = glyphMap(source); for (const g of image.values()) g.origin = 'direct';
+      for (const c of [...'abcdefghijklmnopqrstuvwxyzAOUEI']) { const g = source.charToGlyph(c); if (g?.index) image.set(c, { char: c, d: svgpath(g.path.toPathData(3)).scale(1000 / source.unitsPerEm).toString(), advance: g.advanceWidth * 1000 / source.unitsPerEm, source: 'Ảnh mẫu', origin: 'direct' }); }
+      for (const c of ['ủ', 'ở', 'ợ', 'ạ', 'ụ', 'ị', 'ỵ']) image.delete(c);
+      for (const [mark, sample] of marksFromImageLetters(image)) image.set(mark, sample);
+      const hookSample = image.get('̉');
+      assert.ok(hookSample?.fromLetter, font.name + ': phải lấy dấu hỏi từ chữ có dấu trong ảnh');
+      const missingMarks = [...toneSamples.keys()].filter(m => !image.get(m)?.d);
+      if (missingMarks.length) { const { marks } = deriveMarkSamples(image); for (const m of missingMarks) if (marks.get(m)) image.set(m, marks.get(m)); }
+      const made = new Map(composeVietnamese(image, () => false, { requireReferenceMarks: true }).map(g => [g.char, g]));
+      for (const c of ['ủ', 'ở', 'ạ', 'ụ']) assert.ok(made.get(c)?.d, font.name + ': chưa ghép được ' + c + ' cho font dựng từ ảnh');
+      const markH = d => { const ps = svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(x => glyphBounds({ d: x })).sort((a, b) => b.y - a.y); return ps[0]?.height || 0; };
+      const want = glyphBounds({ d: hookSample.d }).height, got = markH(made.get('ủ').d);
+      assert.ok(Math.abs(got / want - 1) <= .12, font.name + ': dấu hỏi ghép vào ủ cao ' + Math.round(got) + ', dấu hỏi vẽ trong ảnh ' + Math.round(want));
+    }
     if (font.feasible) {
       // 3. Biết trước kiểu family nào làm được (lỗi cũ: Bold không tạo được nhưng vẫn cho chọn).
       const verdict = await familyFeasibility(record(font.name, buf));

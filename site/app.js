@@ -24,7 +24,7 @@ import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
-import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters } from './vietnamese.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -1262,7 +1262,10 @@ $('derive-marks').addEventListener('click', () => {
   if (!['A', 'E', 'O', 'a', 'e', 'o'].some(char => glyphs.get(char)?.d)) return status('Cần có chữ nguyên âm gốc trước, ví dụ A, E, O hoặc a, e, o.');
   const { marks, stem } = deriveMarkSamples(glyphs);
   const next = new Map(glyphs);
-  const madeMarks = [...marks].filter(([mark]) => !real(glyphs.get(mark)));
+  // Dấu người dùng vẽ trong chữ có dấu lấy từ ảnh được dùng trước; chỉ loại dấu ảnh chưa có mới dựng từ nét.
+  const fromLetters = marksFromImageLetters(glyphs);
+  for (const [mark, sample] of fromLetters) if (!glyphs.get(mark)?.locked) next.set(mark, sample);
+  const madeMarks = [...marks].filter(([mark]) => !real(glyphs.get(mark)) && !fromLetters.has(mark));
   for (const [mark, glyph] of madeMarks) next.set(mark, glyph);
   const barred = deriveBarredD(next, stem).filter(glyph => !real(glyphs.get(glyph.char)));
   for (const glyph of barred) next.set(glyph.char, glyph);
@@ -1769,11 +1772,22 @@ async function fixByRules() {
     status('Hoàn thiện font: bổ sung chữ, dấu và ký tự…'); await pause();
     // 3. Dấu mẫu, Đ, chữ cái gốc từ bộ phận, chữ có dấu, dấu câu và ký tự đặc biệt.
     const hasVowel = ['A', 'E', 'O', 'a', 'e', 'o'].some(char => next.get(char)?.d);
-    const hasMarkSamples = [...toneSamples.keys()].some(mark => glyphs.get(mark)?.d && !glyphs.get(mark).nativeSize);
-    if (hasVowel && !hasMarkSamples) {
-      const { marks, stem } = deriveMarkSamples(next);
-      for (const [mark, glyph] of marks) if (!real(glyphs.get(mark)) && !glyphs.get(mark)?.d) next.set(mark, glyph);
-      for (const glyph of deriveBarredD(next, stem)) if (!glyphs.get(glyph.char)?.d) next.set(glyph.char, glyph);
+    // Dấu mẫu của chính font, theo thứ tự: dấu người dùng vẽ trong chữ có dấu lấy từ ảnh (ẩ, ỏ, ê…) → dấu Xưởng dựng từ
+    // nét của font theo quy tắc skill (chỉ loại dấu ảnh chưa có). Không dùng dấu, chữ của font khác.
+    const markChanged = new Set();
+    if (hasVowel) {
+      for (const [mark, sample] of marksFromImageLetters(next)) {
+        const current = next.get(mark);
+        if (current?.locked || current?.fromLetter === sample.fromLetter && current?.d === sample.d) continue;
+        if (current?.d && current.source !== 'Dựng từ nét chữ' && !current.fromLetter) continue;   // dấu mẫu từ bảng dấu, font gốc: giữ
+        next.set(mark, sample); markChanged.add(mark);
+      }
+      const missing = [...toneSamples.keys()].filter(mark => !next.get(mark)?.d);
+      if (missing.length) {
+        const { marks, stem } = deriveMarkSamples(next);
+        for (const mark of missing) if (marks.get(mark)) { next.set(mark, marks.get(mark)); markChanged.add(mark); }
+        for (const glyph of deriveBarredD(next, stem)) if (!glyphs.get(glyph.char)?.d) next.set(glyph.char, glyph);
+      }
     }
     const letters = deriveLetters(next).filter(glyph => charset.includes(glyph.char) && !real(glyphs.get(glyph.char)));
     for (const glyph of letters) next.set(glyph.char, glyph);
@@ -1783,7 +1797,9 @@ async function fixByRules() {
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
       || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu')
       // ỵ do Xưởng ghép trước khi có luật "nặng tránh đuôi y" (design-rules.md): ghép lại theo luật mới.
-      || (char === 'ỵ' && glyphs.get(char)?.source === 'Ghép dấu'),
+      || (char === 'ỵ' && glyphs.get(char)?.source === 'Ghép dấu')
+      // Dấu mẫu vừa đổi (lấy từ chữ trong ảnh thay cho dấu dựng): ghép lại các chữ Xưởng ghép bằng dấu đó.
+      || (glyphs.get(char)?.source === 'Ghép dấu' && [...char.normalize('NFD')].some(mark => markChanged.has(mark))),
       { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }) : [];
     for (const glyph of generated) next.set(glyph.char, glyph);
     const symbols = deriveSymbols(next).filter(glyph => !real(glyphs.get(glyph.char)) && !(glyphs.get(glyph.char)?.d && glyphs.get(glyph.char).source !== 'Dựng từ nét chữ'));
@@ -1814,6 +1830,7 @@ async function fixByRules() {
     const list = chars => chars.slice(0, 30).join(' ') + (chars.length > 30 ? ' …' : '');
     const parts = [
       heights.changed.length && 'chuẩn chiều cao ' + heights.changed.length + ' chữ (' + list(heights.changed.map(g => g.char)) + ')',
+      markChanged.size && 'dấu mẫu của chính font: ' + [...markChanged].map(m => (next.get(m)?.fromLetter ? 'lấy từ ' + next.get(m).fromLetter : 'dựng từ nét') + ' (' + toneSamples.get(m) + ')').join(', '),
       cleaned.length && 'làm mượt viền và đường cong ' + cleaned.length + ' chữ (' + list(cleaned) + ')',
       letters.length && 'dựng ' + letters.length + ' chữ cái từ bộ phận (' + list(letters.map(g => g.char + '←' + g.derivedFrom)) + ')',
       rebuilt.length && 'dựng lại ' + rebuilt.length + ' chữ có dấu lệch chuẩn (' + list(rebuilt) + ')',

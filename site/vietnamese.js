@@ -56,7 +56,7 @@ function placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, b
   const source = glyphBounds(sample);
   if (!(source.width > 0 && source.height > 0)) return null;
   const key = { '́': 'acute', '̀': 'grave', '̉': 'hook', '̃': 'tilde' }[tone];
-  const ownSize = sample.nativeSize || sample.source === 'Font gốc';
+  const ownSize = sample.nativeSize || sample.source === 'Font gốc' || !!sample.fromLetter;   // dấu tách từ chữ có dấu trong ảnh: giữ cỡ người dùng vẽ
   const standalone = ownSize ? source.height : STD.height[key][0] * body.xHeight * (isCapital ? STD.capHeightRatio : 1);
   // Đỉnh cả cụm không vượt mức font chuyên nghiệp dùng: chữ hoa 1.0 em, chữ thường 0.9 em.
   // Vượt thì thu dấu thanh (tối đa còn 65%), rồi hạ dấu sát mũ/trăng hơn (tối đa 25% chiều cao mũ).
@@ -162,7 +162,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     const base = useHornedSample ? horned : useStructured ? structuredChar : root;
     if (useHornedSample) marks.splice(marks.indexOf(horn), 1);
     if (useStructured) marks.splice(marks.indexOf(structural), 1);
-    if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||sample.source==='Ảnh mẫu'||sample.source==='Font gốc');})) continue;
+    // Font dựng từ ảnh: chỉ ghép bằng dấu của chính font — dấu tách từ ảnh, dấu của font gốc, hoặc dấu Xưởng dựng từ nét
+    // của chính font (Dựng từ nét chữ). Không dùng hình dấu mặc định (khi chưa có dấu mẫu nào).
+    if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||['Ảnh mẫu','Ảnh làm sạch','Font gốc','Dựng từ nét chữ'].includes(sample.source));})) continue;
     // Hai tầng dấu (ấ ầ ẩ ẫ, ắ ằ ẳ ẵ và chữ hoa): xếp theo cách đo được ở 20 font đã Việt hóa,
     // giữ nguyên mũ/trăng như ở â/ă, dấu thanh lệch cạnh mũ thay vì chồng thẳng lên trên.
     const tone = marks.find(mark => TWO_TIER[mark]);
@@ -254,7 +256,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
           }
           if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }
           const targetHeight = mark === '\u0309' ? 122 : mark === '\u0323' ? 80 : 95;
-          const ownSize = sample.nativeSize || sample.source === 'Font gốc';   // dấu lấy từ chính font: giữ cỡ gốc
+          const ownSize = sample.nativeSize || sample.source === 'Font gốc' || !!sample.fromLetter;   // dấu lấy từ chính font, kể cả dấu tách từ chữ có dấu trong ảnh: giữ cỡ gốc
           // Nặng không rộng quá khoảng font chuẩn dùng so với chữ mang dấu (ọ ≤ 0.38, Ọ ≤ 0.267 độ rộng chữ):
           // chữ hẹp (font mono, Black) sẽ có nặng nhỏ lại thay vì to bằng dấu chấm.
           const dotLimit = mark === '̣' ? (isCap ? .26 : .36) * bounds.width / source.width : Infinity;
@@ -754,4 +756,36 @@ export function sameDirection(markD, bodyD) {
   if (outerDirection(markD) === outerDirection(bodyD)) return markD;
   const points = svgpath(markD).abs().segments.filter(([c]) => c === 'M' || c === 'L').map(([, x, y]) => [x, y]);
   return polygon(points.reverse());
+}
+
+// Dấu mẫu lấy từ chính chữ có dấu đã tách từ ảnh (người dùng vẽ, ví dụ hỏi ở ẩ/ỏ, mũ ở ê): tách phần dấu (contour nằm hẳn
+// trên đỉnh hoặc dưới chân chữ gốc cùng ảnh) làm mẫu để ghép các chữ còn thiếu, thay cho dấu Xưởng dựng. Ưu tiên chữ
+// chỉ có một dấu, chữ gốc a o e u i y. Trả về Map dấu → mẫu (chưa ghi vào bộ chữ).
+export function marksFromImageLetters(glyphs) {
+  const fromImage = g => g?.d && (g.origin === 'direct' || g.source === 'Ảnh mẫu' || g.source === 'Ảnh làm sạch');
+  const rank = char => { const i = 'aoeuiynAOEUIYN'.indexOf(char.normalize('NFD')[0]); return i < 0 ? 99 : i; };
+  const out = new Map();
+  for (const mark of toneSamples.keys()) {
+    if (mark === '\u031b') continue;   // râu liền thân, không tách
+    const donors = [...glyphs.values()].filter(g => {
+      if (!fromImage(g) || [...g.char].length !== 1) return false;
+      const [root, ...marks] = g.char.normalize('NFD');
+      return marks.length === 1 && marks[0] === mark && glyphs.get(root)?.d;
+    }).sort((a, b) => rank(a.char) - rank(b.char));
+    for (const donor of donors) {
+      const root = glyphs.get(donor.char.normalize('NFD')[0]), rootBox = glyphBounds(root);
+      const contours = [];
+      for (const segment of svgpath(donor.d).abs().unshort().unarc().segments) { if (segment[0] === 'M') contours.push([]); contours.at(-1)?.push(segment.join(' ')); }
+      // Chữ gốc i có chấm, chữ có dấu thanh thì không: so theo đỉnh thân thật (bỏ chấm i).
+      const bodyTop = root.char === 'i' ? rootBox.y + rootBox.height * .7 : rootBox.y + rootBox.height;
+      const parts = contours.map(c => c.join(' ')).filter(d => {
+        const box = glyphBounds({ d });
+        return mark === '\u0323' ? box.y + box.height < rootBox.y + 2 : box.y >= bodyTop - 8 && box.height < rootBox.height * .6;
+      });
+      if (!parts.length) continue;
+      out.set(mark, { char: mark, d: parts.join(' '), advance: donor.advance, source: 'Ảnh mẫu', origin: 'direct', fromLetter: donor.char, approved: false, locked: false });
+      break;
+    }
+  }
+  return out;
 }

@@ -102,6 +102,11 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 ## Nguồn hình cho dấu
 
+**Nguyên tắc (người dùng 23/11/2026):** dấu luôn lấy từ chính font đang làm, không lấy dấu hay chữ của font khác đưa vào bộ font mới. Áp như nhau cho font dựng từ ảnh và font nước ngoài cần Việt hóa. Thứ tự:
+
+- **Font dựng từ ảnh:** dấu người dùng vẽ trong chữ có dấu đã tách từ ảnh (hỏi ở ỏ/ả, mũ ở ê, nặng ở ọ… — `marksFromImageLetters`, giữ cỡ người vẽ) → dấu từ ảnh bảng dấu → loại dấu ảnh chưa có thì **dựng từ nét của chính font** theo quy tắc trang này (độ dày theo nét thân, độ thon/đầu nét theo kiểu nét, cỡ/khoảng hở/hai tầng theo tỉ lệ chuẩn tính trên x-height và chữ o của chính font). Không dùng hình dấu mặc định. Dấu mẫu đổi thì các chữ Xưởng đã ghép bằng dấu đó được ghép lại.
+- **Font nước ngoài cần Việt hóa:** dấu của nhà thiết kế có trong chữ Latin của font (á à ã â ă…) dùng trước; dấu font chưa có (hỏi, nặng, râu, trăng…) dựng từ nét của chính font theo quy tắc trang này.
+
 - **Dấu font đã có:** dùng trước, lấy từ chữ Latin do nhà thiết kế vẽ theo thứ tự cố định (ã õ ñ ũ..., chữ hoa Ã Õ Ñ Ũ...). Không lấy mẫu từ khối chữ tiếng Việt U+1EA0–1EF9 hay ơ ư: trong font đã Việt hóa rồi mở lại, các chữ đó có thể do công cụ ghép, và lấy chúng làm mẫu làm dấu cùng loại khác nhau giữa các chữ (ễ khác Ữ). Chữ hoa dùng dấu hoa tách từ Á, À, Ã... của chính font, không đặt dấu chữ thường lên chữ hoa.
 - **Chữ hai dấu (Ộ, Ấ, ặ...):** nếu font đã có Ô, Â, Ê, Ă, Ơ, Ư do nhà thiết kế vẽ, dùng làm gốc và chỉ thêm dấu thanh. Không vẽ lại mũ/trăng/râu.
 - **Dấu nặng:** dấu chấm thật của font → chấm chữ i → dấu chấm do Xưởng tự dựng → chấm tròn. Dấu chấm tự dựng có thể chỉ là hình thay thế (ví dụ ô vuông), nên không dùng làm mẫu khi font đã có chấm i.
