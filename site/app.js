@@ -809,25 +809,46 @@ function trimEdgeFragments(area) {
     return area;
   } catch (error) { console.warn('trimEdgeFragments', error); return area; }
 }
-// Đơn vị font trên mỗi điểm ảnh và đường chân chữ của chính ảnh mẫu, đo từ các chữ đã tách từ ảnh đó.
+// Dấu câu tách từ ảnh: CỠ theo tỉ lệ chữ của chính ảnh đó (đơn vị font/điểm ảnh đo từ các chữ đã tách cùng ảnh),
+// VỊ TRÍ theo quy tắc trên thông số của chính font (không đoán đường chân từ ảnh, dễ sai khi chữ lấy từ dự án Family
+// có toạ độ khác): . , : ; ! ? ngồi trên đường chân (dấu phẩy: đầu chấm ngồi trên đường chân, đuôi xuống dưới);
+// ngoặc kép, nháy đơn: đỉnh ngang chiều cao chữ hoa. Đối chiếu lại sau khi đặt: lệch quy tắc thì đặt lại.
+const PUNCT_RULE = { base: '.,:;!?', top: '"\'“”‘’' };
+function punctuationMetrics(map) {
+  const top = chars => { for (const c of chars) { const g = map.get(c); if (g?.d) { const b = glyphBounds(g); return b.y + b.height; } } };
+  return { capTop: top(['H', 'I', 'E', 'T', 'L']) ?? 700, xTop: top(['x', 'z', 'v', 'n', 'u']) ?? 500 };
+}
+function placePunctuation(glyph, map = glyphs) {
+  if (!glyph?.d || !punctuation.includes(glyph.char)) return glyph;
+  const { capTop } = punctuationMetrics(map), box = glyphBounds(glyph);
+  let dy = 0;
+  if (PUNCT_RULE.base.includes(glyph.char)) {
+    if (glyph.char === ',' || glyph.char === ';') {
+      // Đầu dấu phẩy là phần trên, rộng nhất: đặt đáy phần đầu (≈ đỉnh − bề rộng) ngay trên đường chân.
+      const head = Math.min(box.height * .55, box.width * 1.1);
+      dy = head - (box.y + box.height);
+    } else dy = -box.y;
+    if (glyph.char === ';') {   // ; : phần phẩy dưới cùng như dấu phẩy, chấm trên giữ khoảng cách vốn có
+      const parts = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => ({ d, b: glyphBounds({ d }) })).sort((a, b) => a.b.y - b.b.y);
+      const low = parts[0]?.b; if (low) { const head = Math.min(low.height * .55, low.width * 1.1); dy = head - (low.y + low.height); }
+    }
+  } else if (PUNCT_RULE.top.includes(glyph.char)) dy = capTop - (box.y + box.height);
+  if (Math.abs(dy) < 2) return glyph;
+  return { ...glyph, d: svgpath(glyph.d).translate(0, dy).round(1).toString(), punctuationPlaced: Math.round(dy) };
+}
 function fitToReferenceScale(glyph) {
   const crop = glyph.reference?.crop, index = glyph.reference?.index;
-  if (!crop || index == null || !glyph.d) return glyph;
+  if (!crop || index == null || !glyph.d) return placePunctuation(glyph);
   const median = list => { const v = [...list].sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
-  const peers = [...glyphs.values()].filter(g => g?.d && g.reference?.index === index && g.reference.crop && /^[\p{L}\p{N}]$/u.test(g.char));
-  if (peers.length < 3) return glyph;
+  // Chỉ chữ tách tay từ chính ảnh này (toạ độ crop tính theo ảnh gốc); chữ nhận từ dự án Family có toạ độ khác.
+  const peers = [...glyphs.values()].filter(g => g?.d && g.reference?.index === index && g.reference.crop && !g.sourceImageId && /^[\p{L}\p{N}]$/u.test(g.char));
+  if (peers.length < 3) return placePunctuation(glyph);
   const unit = median(peers.map(g => glyphBounds(g).height / g.reference.crop.h));
-  // Đường chân: đáy các chữ không có phần xuống (a c e m n o r s u v w x z, số) cùng dòng với dấu câu.
-  const flat = peers.filter(g => /^[acemnorsuvwxz0-9]$/u.test(g.char.normalize('NFD')[0].toLowerCase()) && !/[\u0323]/u.test(g.char.normalize('NFD')));
-  const lineHeight = median(flat.map(g => g.reference.crop.h)) || crop.h;
-  const sameLine = flat.filter(g => Math.abs(g.reference.crop.y + g.reference.crop.h - (crop.y + crop.h)) < 1.6 * lineHeight);
-  if (!sameLine.length || !(unit > 0)) return glyph;
-  const baseline = median(sameLine.map(g => g.reference.crop.y + g.reference.crop.h));
-  const box = glyphBounds(glyph), height = crop.h * unit, bottom = (baseline - (crop.y + crop.h)) * unit, k = height / box.height;
-  if (!(k > 0) || !Number.isFinite(bottom)) return glyph;
+  const box = glyphBounds(glyph), k = crop.h * unit / box.height;
+  if (!(k > 0) || k > 3 || k < .2) return placePunctuation(glyph);
   const lsb = Math.max(20, Math.round(box.x));
-  const d = svgpath(glyph.d).translate(-box.x, -box.y).scale(k).translate(lsb, bottom).round(1).toString();
-  return { ...glyph, d, advance: Math.round(2 * lsb + box.width * k), referenceScale: { unit: Math.round(unit * 1000) / 1000, baseline } };
+  const d = svgpath(glyph.d).translate(-box.x, -box.y).scale(k).translate(lsb, 0).round(1).toString();
+  return placePunctuation({ ...glyph, d, advance: Math.round(2 * lsb + box.width * k), referenceScale: { unit: Math.round(unit * 1000) / 1000 } });
 }
 async function trace(single) {
   if (busy || loading) return;
@@ -1996,8 +2017,8 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
       const added=[],replaced=[];
       for(const g of style.glyphs){
         const existing=glyphs.get(g.char),fromImage=g.origin==='direct'||g.source==='Ảnh mẫu';
-        if(!existing){glyphs.set(g.char,withReference(g));added.push(g.char);}
-        else if(fromImage&&existing.origin==='inferred'&&!existing.locked&&!existing.approved){glyphs.set(g.char,withReference(g));replaced.push(g.char);}
+        if(!existing){glyphs.set(g.char,placePunctuation(withReference(g)));added.push(g.char);}
+        else if(fromImage&&existing.origin==='inferred'&&!existing.locked&&!existing.approved){glyphs.set(g.char,placePunctuation(withReference(g)));replaced.push(g.char);}
       }
       selected=added[0]??replaced[0]??selected;auditRepairPending=false;markCandidates=[];refresh();
       const message='Đã thêm '+added.length+' chữ từ ảnh vào '+($('name').value.trim()||project.name)+(added.length?': '+added.join(' '):'')
@@ -2007,7 +2028,7 @@ const familyWorkspace = setupFamilyWorkspace($('family-image-workspace'), {
       return;
     }
     $('name').value=project.name+(style.id==='Regular'?'':' '+style.id);
-    glyphs=new ProtectedGlyphMap(style.glyphs.map(g=>[g.char,withReference(g)]));
+    { const loaded=new Map(style.glyphs.map(g=>[g.char,withReference(g)])); for(const [c,g] of loaded) if(punctuation.includes(c)) loaded.set(c,placePunctuation(g,loaded)); glyphs=new ProtectedGlyphMap(loaded); }
     importedMetrics={familyName:project.name,styleName:style.name,weight:style.weight,italic:style.italic,angle:style.metrics?.angle??0,
       ascent:ASCENT,descent:DESCENT,kerning:style.metrics?.kerning??[],wordSpace:style.metrics?.wordSpace??300,sourceProjectId:project.id};
     loadedSourceBlob=undefined;selected=glyphs.has('i')?'i':style.glyphs[0]?.char;
