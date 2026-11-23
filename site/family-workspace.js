@@ -125,7 +125,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     for(const file of batch)project.images.push({id:crypto.randomUUID(),name:file.name||'Ảnh dán',blob:file,styleId:'',confirmed:false});
     await persist('Đã nhập '+batch.length+' ảnh');render();
   }
-  $('new').onclick=()=>run(async()=>{project=createFamilyProject($('name').value);styleId='Regular';await persist('Đã tạo Family 16 vị trí');render();});
+  $('new').onclick=()=>run(async()=>{project=createFamilyProject($('name').value);styleId='Regular';await persist('Đã tạo Family ' + project.styles.length + ' vị trí');render();});
   $('projects').onchange=()=>run(async()=>{if(!$('projects').value)return;project=await loadFamilyProject($('projects').value);styleId='Regular';render();void showProof();});
   $('name').onchange=()=>run(async()=>{if(!project)return;project.name=$('name').value.trim()||project.name;await persist('Đã đổi tên Family');render();});
   $('save').onclick=()=>run(()=>persist('Đã lưu bản nháp Family'));

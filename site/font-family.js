@@ -4,6 +4,7 @@ import svg2ttf from 'svg2ttf';
 import { familyWeights, familyStyles } from './family-styles.js';
 import { familyPreflight, missingFamilyStyles } from './family-validation.js';
 import { charset, composeVietnamese } from './vietnamese.js';
+import { importAccentSamples } from './font-import.js';
 import { auditMarks, auditMessage } from './rule-audit.js';
 import svgpath from 'svgpath';
 import outline from '../scripts/lib/outline-metrics.cjs';
@@ -30,7 +31,74 @@ function fromD(d, upm) {
 // Ghép lại chữ có dấu sau khi đổi độ đậm, từ thân chữ đã đổi độ đậm và dấu của nhà thiết kế.
 // upright[i].light: bản chữ có dấu chỉ đổi độ đậm 0.27 lần (bề dày dấu tăng chậm hơn thân: skill "Bề dày theo độ đậm"),
 // dùng làm nguồn hình dấu; dấu được đặt lại theo chuẩn đo (khoảng hở, hai tầng) như Tạo dấu tiếng Việt.
-function recomposeWelded(upright, targetsIndex, codePointsByGlyph, upm) {
+// Ghép lại giữ đúng bố cục dấu của chính font (người dùng 22/11/2026: hệ dấu xây từ thông số font gốc): tách glyph
+// gốc thành thân (cả râu, gạch Đ, chấm i có sẵn) và dấu rời; thân đổi độ đậm đầy đủ, dấu lấy từ bản đổi độ đậm nhẹ,
+// đặt lại theo đúng khoảng cách tới đỉnh/chân thân và lệch ngang như glyph gốc. Không dùng cỡ/khoảng hở của font khác.
+function splitMarks(path, capHeight, reference) {
+  const parts = [];
+  for (const command of path.commands) { if (command.type === 'M') parts.push([]); parts.at(-1)?.push(command); }
+  const boxOf = cmds => { const xs = [], ys = []; for (const c of cmds) for (const [x, y] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) if (Number.isFinite(c[x])) { xs.push(c[x]); ys.push(c[y]); }
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; };
+  const boxes = parts.map(boxOf), low = .3 * capHeight;
+  // Chiều contour: dấu là contour ngoài (cùng chiều contour lớn nhất); lòng chữ (e, o) ngược chiều, thuộc thân.
+  const area = cmds => { let a = 0; const pts = cmds.filter(c => Number.isFinite(c.x)); for (let k = 0; k < pts.length; k++) { const p = pts[k], q = pts[(k + 1) % pts.length]; a += p.x * q.y - q.x * p.y; } return a / 2; };
+  const areas = parts.map(area), main = areas.reduce((m, a) => Math.abs(a) > Math.abs(m) ? a : m, 0);
+  const anchor = boxes.filter(b => b.y0 < low);
+  if (!anchor.length) return null;
+  // Đỉnh thân tính từ các contour chạm vùng chân; contour vẽ chồng lên thân (râu ơ ư vẽ thành contour riêng) bắt đầu
+  // thấp hơn đỉnh thân nên thuộc thân, không phải dấu.
+  const anchorTop = Math.max(...anchor.map(b => b.y1));
+  const body = [], marks = [];
+  // Dấu trên: contour ngoài nằm hẳn trên vùng chân (y0 ≥ 0.3 chiều cao hoa), kể cả hỏi của ở (thấp hơn đầu râu).
+  // Dấu dưới (nặng): contour ngoài nằm hẳn dưới đường chân.
+  // Bản đổi độ đậm nhẹ: râu vẽ chồng đã hợp vào thân nên nhận dấu theo vị trí dấu của glyph gốc (reference).
+  // Theo độ cao: contour ngoài nằm từ đáy dấu trên thấp nhất của glyph gốc trở lên là dấu trên; nằm dưới đỉnh dấu dưới
+  // là nặng (dấu mảnh có thể vỡ thành vài mẩu: lấy hết).
+  if (reference) {
+    const ups = reference.marks.filter(m => m.upper), downs = reference.marks.filter(m => !m.upper);
+    const upFrom = ups.length ? Math.min(...ups.map(m => m.b.y0)) - 15 : Infinity, downTo = downs.length ? Math.max(...downs.map(m => m.b.y1)) + 15 : -Infinity;
+    parts.forEach((cmds, k) => { const b = boxes[k], outer = Math.sign(areas[k]) === Math.sign(main);
+      (outer && b.y0 >= upFrom ? marks.push({ cmds, b, upper: true }) : outer && b.y1 <= downTo && b.y1 <= 2 ? marks.push({ cmds, b, upper: false }) : body.push(cmds)); });
+  }
+  else parts.forEach((cmds, k) => { const b = boxes[k], outer = Math.sign(areas[k]) === Math.sign(main);
+    (outer && b.y0 >= anchorTop - 2 ? marks.push({ cmds, b, upper: true }) : outer && b.y1 <= 2 && parts.length > 1 && Math.abs(areas[k]) < Math.abs(main) * .2 ? marks.push({ cmds, b, upper: false }) : body.push(cmds)); });
+  if (!marks.length) return null;
+  const bodyPath = new opentype.Path(); bodyPath.commands = body.flat().map(c => ({ ...c }));
+  const bb = boxOf(body.flat());
+  return { body: bodyPath, marks, top: bb.y1, bottom: bb.y0, cx: (bb.x0 + bb.x1) / 2 };
+}
+function recomposeOwn(entry, bodyWeigh, capHeight, markWeigh) {
+  const original = splitMarks(entry.original, capHeight);
+  // Không có dấu rời (Ơ Ư: râu vẽ chồng thành contour riêng làm đổi phép đếm): đổi độ đậm cả glyph như chữ thường.
+  if (!original) { const whole = bodyWeigh(entry.original); return whole?.commands?.length ? whole : null; }
+  let light = splitMarks(entry.light, capHeight, original);
+  // Bản đổi độ đậm nhẹ mất dấu (dấu mảnh tan khi thu): lấy dấu của glyph gốc, đổi độ đậm riêng phần dấu (0.27 lần),
+  // đặt theo thân gốc. Nặng là chấm đặc: giữ nguyên.
+  if (!light?.marks.length) {
+    const marks = original.marks.map(mark => {
+      if (!mark.upper || !markWeigh) return mark;
+      const path = new opentype.Path(); path.commands = mark.cmds.map(c => ({ ...c }));
+      try { const thin = markWeigh(path); if (thin?.commands?.length) return { ...mark, cmds: thin.commands }; } catch { /* giữ dấu gốc */ }
+      return mark;
+    });
+    light = { ...original, marks };
+  }
+  const body = bodyWeigh(original.body);
+  if (!body?.commands?.length) return null;
+  const box = body.getBoundingBox(), cx = (box.x1 + box.x2) / 2;
+  const out = new opentype.Path(); out.commands = body.commands.map(c => ({ ...c }));
+  for (const mark of light.marks) {
+    const dy = mark.upper ? box.y2 - light.top : box.y1 - light.bottom, dx = cx - light.cx;
+    for (const c of mark.cmds) { const n = { ...c }; for (const [x, y] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) if (Number.isFinite(n[x])) { n[x] += dx; n[y] += dy; } out.commands.push(n); }
+  }
+  return out;
+}
+function recomposeWelded(upright, targetsIndex, codePointsByGlyph, upm, bodyWeigh, capHeight, markWeigh) {
+  const own = new Map();
+  if (bodyWeigh) for (const i of targetsIndex) {
+    const entry = upright[i];
+    try { const path = entry?.original && entry.light ? recomposeOwn(entry, bodyWeigh, capHeight, markWeigh) : null; if (path) own.set(i, { path, advance: entry.advance }); else if (globalThis.process?.env?.DEBUG_FAMILY) console.log('own null', i); } catch (error) { if (globalThis.process?.env?.DEBUG_FAMILY) console.log('own throw', i, error.message); }
+  }
   const glyphs = new Map(), indexOf = new Map(), targets = new Set();
   upright.forEach(({ path, light, advance }, i) => {
     for (const code of codePointsByGlyph.get(i) || []) {
@@ -40,9 +108,12 @@ function recomposeWelded(upright, targetsIndex, codePointsByGlyph, upm) {
       if (shape.commands.length || char === ' ') glyphs.set(char, { char, d: shape.commands.length ? toD(shape, upm) : '', advance: advance * 1000 / upm, source: 'Font gốc' });
     }
   });
-  const out = new Map();
-  for (const glyph of composeVietnamese(glyphs, char => targets.has(char))) {
-    if (!targets.has(glyph.char) || !glyph.d) continue;
+  // Dấu lấy từ chính font gốc (đã đổi độ đậm), kể cả dấu chỉ có ở chữ tiếng Việt (hỏi ở ỏ, nặng ở ọ): không dựng
+  // dấu theo cỡ của font khác (hỏi Sử Việt Kiêu Hùng cao 122 bị dựng thành 189 theo chuẩn 0.35 x-height).
+  importAccentSamples(glyphs, { vietnamese: true });
+  const out = new Map(own);
+  for (const glyph of composeVietnamese(glyphs, char => targets.has(char) && !own.has(indexOf.get(char)))) {
+    if (!targets.has(glyph.char) || !glyph.d || own.has(indexOf.get(glyph.char))) continue;
     out.set(indexOf.get(glyph.char), { path: fromD(glyph.d, upm), advance: glyph.advance * upm / 1000 });
   }
   return out;
@@ -269,6 +340,27 @@ function reopenSlits(result, source, amount) {
   }
   return channels.length ? clip(CL.ClipType.ctDifference, result, channels) : null;
 }
+// Thu mảnh làm đứt phần nối mảnh hơn 2 lần độ thu (cổ râu ơ ư, móc nhỏ): nối lại bằng chính phần nét gốc ở chỗ cổ,
+// giữ nguyên độ dày gốc tại đó (nét nối vốn đã mảnh), thay vì để mẩu rời bị bỏ (mất râu).
+function reconnect(result, source, amount) {
+  const big = p => Math.abs(CL.Clipper.Area(p)) > 36 * 256;
+  const outers = list => CL.Clipper.SimplifyPolygons(list, CL.PolyFillType.pftNonZero).filter(p => CL.Clipper.Orientation(p) && big(p));
+  const before = outers(source).length, now = outers(result);
+  if (now.length <= before) return result;
+  let out = result;
+  for (const piece of now.slice().sort((a, b) => Math.abs(CL.Clipper.Area(a)) - Math.abs(CL.Clipper.Area(b))).slice(0, now.length - before)) {
+    const rest = now.filter(p => p !== piece);
+    // Vùng nối = nét gốc nằm gần cả mẩu rời lẫn phần còn lại; nới dần tầm với tới khi nối được (cổ râu có thể dài).
+    for (const k of [2.5, 5, 8, 12]) {
+      const reach = Math.abs(amount) * k;
+      const neck = clip(CL.ClipType.ctIntersection, clip(CL.ClipType.ctIntersection, source, offsetPolygons([piece], reach, 2)), offsetPolygons(rest, reach, 2));
+      if (!neck.length) continue;
+      const joined = clip(CL.ClipType.ctUnion, out, neck);
+      if (outers(joined).length < outers(out).length) { out = joined; break; }
+    }
+  }
+  return out;
+}
 function reweigh(path, amount, stemRatio = 1, newStem = 0, capHeight = 0) {
   // Hạt bụi dò ảnh (< 6×6 đơn vị) bỏ trước khi đổi độ đậm, kẻo làm đậm phóng nó thành chấm thật.
   const source = prepared(path).filter(p => Math.abs(CL.Clipper.Area(p)) > 36 * 256), before = shapeOf(source);
@@ -279,7 +371,7 @@ function reweigh(path, amount, stemRatio = 1, newStem = 0, capHeight = 0) {
     // chỉ ngắn lại một chút, không làm cả kiểu thất bại.
     const islands = polygons => newStem ? polygons.filter(polygon => !(CL.Clipper.Orientation(polygon) && polygons.length > 1
       && Math.abs(CL.Clipper.Area(polygon)) < (newStem * 16) ** 2)) : polygons;
-    const spiked = truncateSpikes(source, amount, stemRatio, newStem, capHeight);
+    const spiked = reconnect(truncateSpikes(source, amount, stemRatio, newStem, capHeight), source, amount);
     const cut = truncateSpikes.lastCut;
     const trimmed = islands(spiked);
     trimmed.cut = cut;
@@ -499,7 +591,7 @@ export async function createFontFamily(record, chosen, text, onResult, options =
         } catch { light = originalPath; }
         if (!chars.every(char => /^[ơưƠƯ]$/.test(char))) welded.add(i);
       }
-      upright.push({ path, light, advance });
+      upright.push({ path, light, advance, original: originalPath });
       if (i % 40 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     }
     // Chuẩn kiểu mảnh: thu mảnh tới mức này mà góc hẹp của chữ cái/số phải cắt bớt mới không thủng nét thì font không
@@ -507,7 +599,8 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     if (compromisedChars.size) throw new Error('Không đạt chuẩn ' + style + ': thu mảnh tới mức này thì góc hẹp của ' + [...compromisedChars].slice(0, 12).join(' ')
       + ' phải dời điểm nối quá xa hoặc cắt bớt mới không thủng nét, dáng chữ không còn như bản gốc. Font này không làm được kiểu ' + style + ', bỏ qua kiểu này');
     // Lượt 2: ghép lại chữ có dấu bị dính từ thân và dấu đã làm đậm (thang 1000, trục y lên như trình sửa).
-    const recomposed = welded.size ? recomposeWelded(upright, welded, codePointsByGlyph, upm) : new Map();
+    const bodyWeigh = body => reweigh(body, amount, stemRatio, sourceStem ? sourceStem + 2 * amount : 0, capHeight);
+    const recomposed = welded.size ? recomposeWelded(upright, welded, codePointsByGlyph, upm, bodyWeigh, capHeight, mark => reweigh(mark, amount * .27)) : new Map();
     for (const i of welded) if (!recomposed.has(i)) throw new Error('Không ghép lại được ' + (codePointsByGlyph.get(i) || []).map(code => String.fromCodePoint(code)).join('/') + ' sau khi đổi độ đậm. Giữ bản gốc; cần thiết kế lại mức đậm này.');
     // Tự đối chiếu quy tắc skill trên kiểu vừa sinh (dạng đứng, thang 1000): mọi chữ đều do Xưởng biến đổi nên chấm hết.
     const auditMap = new Map();
@@ -568,4 +661,4 @@ export async function createFontFamily(record, chosen, text, onResult, options =
     }
   }
 }
-export const __familyTest = { reweigh: (...a) => reweigh(...a), topology: v => topology(v), contours: p => contours(p) };   // chỉ cho script chẩn đoán .qa
+export const __familyTest = { reweigh: (...a) => reweigh(...a), topology: v => topology(v), contours: p => contours(p), splitMarks: (...a) => splitMarks(...a), recomposeOwn: (...a) => recomposeOwn(...a), reconnect: (...a) => reconnect(...a), truncateSpikes: (...a) => truncateSpikes(...a), prepared: p => prepared(p), offsetPolygons: (...a) => offsetPolygons(...a), clip: (...a) => clip(...a) };   // chỉ cho script chẩn đoán .qa

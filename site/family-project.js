@@ -21,7 +21,10 @@ export function replaceProjectGlyph(style,glyph,{unlock=false}={}) {
   style.glyphs=style.glyphs.filter(g=>g.char!==glyph.char).concat(next); style.verification=undefined;style.status=styleStatus(style);return true;
 }
 export function validateProject(project) {
-  if(project?.format!==projectFormat||typeof project.name!=='string'||project.name.length>100||!Array.isArray(project.styles)||project.styles.length!==16||!Array.isArray(project.images)||project.images.length>100)throw Error('Dự án Family không hợp lệ.');
+  // Mẫu family nay có 18 vị trí (9 độ đậm × đứng/nghiêng). Dự án lưu theo mẫu 16 vị trí cũ được bổ sung vị trí còn thiếu
+  // thay vì báo "không hợp lệ" (lỗi cũ: mọi dự án mới bị chặn vì vẫn so với 16).
+  if(Array.isArray(project?.styles))for(const {style,weight,italic} of familyStyles)if(!project.styles.some(s=>s.id===style))project.styles.push({id:style,name:style,weight,italic,glyphs:[],profile:{},status:'Chưa dựng',history:[]});
+  if(project?.format!==projectFormat||typeof project.name!=='string'||project.name.length>100||!Array.isArray(project.styles)||project.styles.length!==familyStyles.length||!Array.isArray(project.images)||project.images.length>100)throw Error('Dự án Family không hợp lệ.');
   const slots=new Set();
   for(const style of project.styles){
     const expected=familyStyles.find(s=>s.style===style.id);

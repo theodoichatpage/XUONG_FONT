@@ -20,7 +20,7 @@ const p=glyph.placement,s=z/p.scale,x=pad*z-p.lsb*s,y=pad*z+(p.baseline-p.source
 drawPath(glyph.d,bx,[s,0,0,-s,x,y]);GlobalFonts.register(ttf,family);cx.font=(1000*s)+'px "'+family+'"';cx.textBaseline='alphabetic';cx.fillStyle='#000';cx.fillText(glyph.char,x,y);
 return {a,b,c,vector:metrics.compareSilhouettes(mask(a),mask(b),w,h),font:metrics.compareSilhouettes(mask(a),mask(c),w,h)};}
 (async()=>{
-const project=projects.createFamilyProject('QA preservation');assert.equal(project.styles.length,16);assert.equal(new Set(project.styles.map(s=>s.id)).size,16);
+const project=projects.createFamilyProject('QA preservation');assert.equal(project.styles.length,18);assert.equal(new Set(project.styles.map(s=>s.id)).size,18);projects.validateProject(project);const legacy=projects.createFamilyProject('QA cũ');legacy.styles=legacy.styles.slice(0,16);projects.validateProject(legacy);assert.equal(legacy.styles.length,18);
 const style=project.styles.find(s=>s.id==='ExtraLight');projects.replaceProjectGlyph(style,{char:'i',d:'M0 0L1 1Z',advance:10});style.glyphs[0].locked=true;assert.equal(projects.replaceProjectGlyph(style,{char:'i',d:'M0 0L5 1Z',advance:10}),false);assert.equal(style.glyphs[0].d,'M0 0L1 1Z');assert.equal(projects.styleStatus(style),'Cần bổ sung');
 const empty=new Uint8Array(100);assert.equal(metrics.compareSilhouettes(empty,empty,10,10).pass,false);
 const ring=new Uint8Array(100),solid=new Uint8Array(100);for(let y=2;y<8;y++)for(let x=2;x<8;x++){solid[y*10+x]=1;if(x===2||x===7||y===2||y===7)ring[y*10+x]=1;}assert.equal(metrics.compareSilhouettes(ring,solid,10,10).referenceHoles.count,1);assert.equal(metrics.compareSilhouettes(ring,solid,10,10).pass,false);

@@ -37,7 +37,7 @@ export async function importFontFile(record) {
     descent: Math.floor(font.descender * scale), wordSpace: glyphs.get(' ')?.advance, kerning } };
 }
 
-export function importAccentSamples(glyphs) {
+export function importAccentSamples(glyphs, { vietnamese = false } = {}) {
   for (const mark of toneSamples.keys()) {
     if (glyphs.has(mark)) continue;
     // Mẫu dấu lấy từ chữ thường Latin do nhà thiết kế vẽ (ã õ ñ ũ...), theo thứ tự cố định; bỏ khối chữ tiếng Việt
@@ -45,7 +45,7 @@ export function importAccentSamples(glyphs) {
     const rank = glyph => { const root = glyph.char.normalize('NFD')[0], i = 'aoeuiynAOEUIYN'.indexOf(root); return i < 0 ? 99 : i; };
     const donor = [...glyphs.values()].filter(glyph => {
       const code = glyph.char.codePointAt(0);
-      if (code >= 0x1EA0 && code <= 0x1EF9) return false;
+      if (!vietnamese && code >= 0x1EA0 && code <= 0x1EF9) return false;   // vietnamese: font của chính người dùng khi tạo family
       const [root, ...marks] = glyph.char.normalize('NFD');
       return marks.length === 1 && marks[0] === mark && glyphs.has(root);
     }).sort((a, b) => rank(a) - rank(b) || a.char.codePointAt(0) - b.char.codePointAt(0))[0];
