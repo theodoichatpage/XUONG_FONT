@@ -92,3 +92,9 @@ Không dựng (thử xoay W thành M cho ra hình Λ, sai): M, A, G, K, S, X, Z,
 - Số (9): 0 1 2 3 4 5 7 8 và một trong 6/9.
 - Dấu thanh, dấu mũ, Đ, dấu câu và ký tự: tự dựng từ nét chữ nếu không có ảnh (`$` từ S, `%` từ vòng dày 0,78 nét thân, `{ }` từ ngoặc có mũi giữa, `*` sáu nét thon); `? @ &` cần ảnh. Toàn bộ chữ có dấu tiếng Việt được ghép theo chuẩn.
 Font trang trí (mỗi chữ một kiểu riêng) nên có ảnh cho cả chữ dựng được; chữ dựng chỉ là bản nháp. Kiểm bằng `node .qa/derive-letters-test.mjs arial.ttf georgia.ttf` (ảnh so sánh `.qa/derive-letters.png`).
+
+## Tách thủ công một ký tự (Thêm một chữ)
+
+- Vùng khoanh lẹm vào chữ bên cạnh: mẩu nét chạm mép vùng khoanh (trong 2 px, vì tách nền thích ứng chừa viền) bị xóa trắng trước khi tách nét; chỉ giữ phần nằm trọn trong vùng. Mẩu dính sát dấu câu qua vài điểm ảnh mờ thì bào mòn dần 1–3 px cho tới khi tách được. Khoanh sát tới mức cả dấu câu cũng chạm mép thì giữ mảng gần tâm vùng khoanh nhất.
+- **Dấu câu khoanh tay** lấy cỡ và độ cao theo đúng tỉ lệ chữ của chính ảnh đó (đơn vị font/điểm ảnh và đường chân đo từ các chữ đã tách từ cùng ảnh, cùng dòng), không phóng cho đầy khung như chữ cái — trước đây dấu phẩy thành to bằng nửa chữ. Cần ít nhất 3 chữ đã tách từ ảnh đó.
+- Trong luồng dựng theo nội dung gõ: từ nào không cắt được đúng số ký tự (chữ nghiêng dính nhau) thì cả từ bị bỏ, kể cả dấu câu dính theo; dùng Thêm một chữ cho các ký tự đó.

@@ -738,6 +738,97 @@ function updateComposed() {
 }
 
 
+function trimEdgeFragments(area) {
+  // Mẩu nét chữ bên cạnh lọt vào vùng khoanh thường dính sát dấu câu qua vài điểm ảnh mờ: bào mòn dần (1–3 px) cho
+  // tới khi tách được phần nằm trọn trong vùng (dấu câu) khỏi phần chạm mép (mẩu chữ bên cạnh). Trả về vùng mới bao
+  // phần bên trong và danh sách điểm ảnh của mẩu chạm mép để xóa trắng trước khi tách nét.
+  try {
+    const { ink, width } = segmentation(), height = ink.length / width;
+    const label = source => {
+      const seen = new Int32Array(source.length).fill(-1), comps = [];
+      for (let start = 0; start < source.length; start++) {
+        if (!source[start] || seen[start] >= 0) continue;
+        const id = comps.length, stack = [start], pixels = []; seen[start] = id;
+        let edge = false, x0 = width, y0 = height, x1 = -1, y1 = -1;
+        while (stack.length) {
+          const p = stack.pop(), x = p % width, y = (p - x) / width; pixels.push(p);
+          if (x <= 2 || y <= 2 || x >= width - 3 || y >= height - 3) edge = true;   // tách nền thích ứng chừa viền 1–2 px
+          x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+          for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1])
+            if (q >= 0 && source[q] && seen[q] < 0) { seen[q] = id; stack.push(q); }
+        }
+        comps.push({ pixels, edge, x0, y0, x1, y1 });
+      }
+      return { comps, seen };
+    };
+    for (const r of [0, 1, 2, 3]) {
+      let eroded = ink;
+      if (r) {
+        eroded = new Uint8Array(ink.length);
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+          let keep = 1;
+          for (let dy = -r; dy <= r && keep; dy++) for (let dx = -r; dx <= r; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+            if (!ink[yy * width + xx]) { keep = 0; break; }
+          }
+          eroded[y * width + x] = keep && ink[y * width + x] ? 1 : 0;
+        }
+      }
+      const { comps } = label(eroded);
+      let inside = comps.filter(c => !c.edge && c.pixels.length >= 4), outside = comps.filter(c => c.edge);
+      // Khoanh sát quá nên cả dấu câu cũng chạm mép: giữ mảng gần tâm vùng khoanh nhất, bỏ các mẩu chạm mép còn lại.
+      if (!inside.length && outside.length > 1) {
+        const centre = c => { let sx = 0, sy = 0; for (const p of c.pixels) { sx += p % width; sy += Math.floor(p / width); } return Math.hypot(sx / c.pixels.length - width / 2, sy / c.pixels.length - height / 2); };
+        const best = outside.filter(c => c.pixels.length >= 4).sort((a, b) => centre(a) - centre(b))[0];
+        if (best) { inside = [best]; outside = outside.filter(c => c !== best); }
+      }
+      if (!inside.length) continue;
+      if (!outside.length) return area;
+      // Điểm ảnh gốc thuộc mẩu chạm mép: điểm mực gần mẩu đó (≤ r+1) hơn là gần phần bên trong.
+      const owner = new Int8Array(ink.length);   // 1 = bên trong, 2 = mẩu mép
+      const grow = (list, tag) => { for (const c of list) for (const p of c.pixels) owner[p] = tag; };
+      grow(inside, 1); grow(outside, 2);
+      for (let pass = 0; pass <= r + 1; pass++) {
+        const next = owner.slice();
+        for (let p = 0; p < ink.length; p++) {
+          if (!ink[p] || owner[p]) continue;
+          const x = p % width;
+          for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, p - width, p + width]) if (q >= 0 && q < ink.length && owner[q]) { next[p] = owner[q]; break; }
+        }
+        owner.set(next);
+      }
+      const erase = [];
+      for (let p = 0; p < ink.length; p++) if (ink[p] && owner[p] !== 1) erase.push(p);
+      const u = { x0: Math.min(...inside.map(c => c.x0)) - r, y0: Math.min(...inside.map(c => c.y0)) - r, x1: Math.max(...inside.map(c => c.x1)) + r, y1: Math.max(...inside.map(c => c.y1)) + r };
+      const m = 2, x0 = Math.max(0, u.x0 - m), y0 = Math.max(0, u.y0 - m);
+      const next = { x: area.x + x0, y: area.y + y0, w: Math.min(width, u.x1 + m + 1) - x0, h: Math.min(height, u.y1 + m + 1) - y0 };
+      next.erase = erase.map(p => ({ x: area.x + p % width, y: area.y + Math.floor(p / width) }));
+      return next;
+    }
+    return area;
+  } catch (error) { console.warn('trimEdgeFragments', error); return area; }
+}
+// Đơn vị font trên mỗi điểm ảnh và đường chân chữ của chính ảnh mẫu, đo từ các chữ đã tách từ ảnh đó.
+function fitToReferenceScale(glyph) {
+  const crop = glyph.reference?.crop, index = glyph.reference?.index;
+  if (!crop || index == null || !glyph.d) return glyph;
+  const median = list => { const v = [...list].sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+  const peers = [...glyphs.values()].filter(g => g?.d && g.reference?.index === index && g.reference.crop && /^[\p{L}\p{N}]$/u.test(g.char));
+  if (peers.length < 3) return glyph;
+  const unit = median(peers.map(g => glyphBounds(g).height / g.reference.crop.h));
+  // Đường chân: đáy các chữ không có phần xuống (a c e m n o r s u v w x z, số) cùng dòng với dấu câu.
+  const flat = peers.filter(g => /^[acemnorsuvwxz0-9]$/u.test(g.char.normalize('NFD')[0].toLowerCase()) && !/[\u0323]/u.test(g.char.normalize('NFD')));
+  const lineHeight = median(flat.map(g => g.reference.crop.h)) || crop.h;
+  const sameLine = flat.filter(g => Math.abs(g.reference.crop.y + g.reference.crop.h - (crop.y + crop.h)) < 1.6 * lineHeight);
+  if (!sameLine.length || !(unit > 0)) return glyph;
+  const baseline = median(sameLine.map(g => g.reference.crop.y + g.reference.crop.h));
+  const box = glyphBounds(glyph), height = crop.h * unit, bottom = (baseline - (crop.y + crop.h)) * unit, k = height / box.height;
+  if (!(k > 0) || !Number.isFinite(bottom)) return glyph;
+  const lsb = Math.max(20, Math.round(box.x));
+  const d = svgpath(glyph.d).translate(-box.x, -box.y).scale(k).translate(lsb, bottom).round(1).toString();
+  return { ...glyph, d, advance: Math.round(2 * lsb + box.width * k), referenceScale: { unit: Math.round(unit * 1000) / 1000, baseline } };
+}
 async function trace(single) {
   if (busy || loading) return;
   const text = $('chars').value.normalize('NFC').trim();
@@ -750,11 +841,20 @@ async function trace(single) {
   $('trace').disabled = $('single').disabled = true;
   renderReferences();
   try {
-    const area = selection();
+    let area = selection();
+    // Khoanh một ký tự mà vùng chọn chạm phải góc chữ bên cạnh (dấu phẩy sát chữ ó): bỏ các mẩu nét chạm mép vùng
+    // chọn, chỉ giữ phần nằm trọn bên trong. Không còn gì bên trong thì giữ nguyên vùng chọn.
+    if (single) { const trimmed = trimEdgeFragments(area); if (trimmed !== area) { area = trimmed; crop = { x: trimmed.x, y: trimmed.y, w: trimmed.w, h: trimmed.h }; } }
     const image = document.createElement('canvas');
     image.width = area.w;
     image.height = area.h;
     image.getContext('2d').putImageData(source, -area.x, -area.y);
+    if (area.erase?.length) {   // xóa trắng mẩu chữ bên cạnh lọt vào vùng khoanh
+      const g = image.getContext('2d'), data = g.getImageData(0, 0, area.w, area.h);
+      const paper = $('polarity').value === 'light' ? 0 : 255;
+      for (const { x, y } of area.erase) { const xx = x - area.x, yy = y - area.y; if (xx < 0 || yy < 0 || xx >= area.w || yy >= area.h) continue; const k = (yy * area.w + xx) * 4; data.data[k] = data.data[k + 1] = data.data[k + 2] = paper; }
+      g.putImageData(data, 0, 0);
+    }
     const rect = { x0: 0, y0: 0, x1: image.width, y1: image.height };
     const mask = wordInk(image, rect, {polarity: $('polarity').value, threshold: Number($('threshold').value)});
     const tone = chars.length === 1 && toneSamples.has(chars[0]);
@@ -781,6 +881,7 @@ async function trace(single) {
       for (const glyph of tone ? word : alignReferenceGlyphs(groups)) traced.set(glyph.char, glyph);
     } else {
       const { ink, blobs, width } = segmentation();
+      for (const { x, y } of area.erase || []) { const xx = x - area.x, yy = y - area.y; if (xx >= 0 && yy >= 0 && xx < width && yy < ink.length / width) ink[yy * width + xx] = 0; }
       const boxes = single ? inkBounds(ink, width) : blobs;
       if (boxes.length !== chars.length) {
         throw new Error(`Tìm được ${boxes.length} cụm nét, bạn nhập ${chars.length} ký tự. Hãy khoanh từng từ hoặc chọn một chữ.`);
@@ -802,6 +903,9 @@ async function trace(single) {
     if (replacements.length && !(await ask(`Thay nét ảnh mẫu của ${replacements.join(', ')}?`, { ok: 'Thay nét' }))) {
       return status('Đã hủy thay nét.');
     }
+    // Dấu câu khoanh tay: cỡ và độ cao theo đúng tỉ lệ chữ của chính ảnh này (chữ đã tách từ cùng ảnh), không phóng
+    // cho đầy khung như chữ cái (dấu phẩy thành to bằng nửa chữ).
+    for (const [char, glyph] of traced) if (punctuation.includes(char)) traced.set(char, fitToReferenceScale(glyph));
     for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
