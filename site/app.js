@@ -779,14 +779,16 @@ function trimEdgeFragments(area) {
         }
       }
       const { comps } = label(eroded);
-      let inside = comps.filter(c => !c.edge && c.pixels.length >= 4), outside = comps.filter(c => c.edge);
+      // Hạt nhiễu nhỏ (dưới 15% mảng lớn nhất) không phải ký tự: không được chọn làm dấu câu (lỗi cũ: chọn hạt 9 đơn vị).
+      const biggest = Math.max(0, ...comps.map(c => c.pixels.length)), solid = c => c.pixels.length >= Math.max(4, .15 * biggest);
+      let inside = comps.filter(c => !c.edge && solid(c)), outside = comps.filter(c => c.edge || !solid(c));
       // Khoanh sát quá nên cả dấu câu cũng chạm mép: giữ mảng gần tâm vùng khoanh nhất, bỏ các mẩu chạm mép còn lại.
-      if (!inside.length && outside.length > 1) {
+      if (!inside.length && outside.filter(solid).length >= 1 && outside.length > 1) {
         const centre = c => { let sx = 0, sy = 0; for (const p of c.pixels) { sx += p % width; sy += Math.floor(p / width); } return Math.hypot(sx / c.pixels.length - width / 2, sy / c.pixels.length - height / 2); };
         // Mẩu chữ bên cạnh bị mép vùng khoanh cắt ngang theo cả một đoạn dài; dấu câu chỉ chạm mép vài điểm.
         // Chọn mảng có tỉ lệ điểm chạm mép nhỏ nhất, hòa thì mảng gần tâm.
         const ratio = c => c.edgePixels / c.pixels.length;
-        const best = outside.filter(c => c.pixels.length >= 4).sort((a, b) => ratio(a) - ratio(b) || centre(a) - centre(b))[0];
+        const best = outside.filter(solid).sort((a, b) => ratio(a) - ratio(b) || centre(a) - centre(b))[0];
         if (best) { inside = [best]; outside = outside.filter(c => c !== best); }
       }
       if (!inside.length) continue;
@@ -910,8 +912,13 @@ async function trace(single) {
     // Dấu câu khoanh tay: cỡ và độ cao theo đúng tỉ lệ chữ của chính ảnh này (chữ đã tách từ cùng ảnh), không phóng
     // cho đầy khung như chữ cái (dấu phẩy thành to bằng nửa chữ).
     for (const [char, glyph] of traced) if (punctuation.includes(char)) traced.set(char, fitToReferenceScale(glyph));
+    // Dấu phẩy phải có đuôi: khung khoanh cắt mất đuôi thì nét tách ra chỉ là một chấm (cao chưa tới 1,2 lần rộng).
+    for (const [char, glyph] of traced) if ((char === ',' || char === ';') && glyph.d) {
+      const low = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => glyphBounds({ d })).sort((a, b) => a.y - b.y)[0];
+      if (low && low.height < 1.2 * low.width) throw new Error('Chưa lưu ' + char + ': nét tách ra chỉ có phần đầu chấm, mất đuôi dấu phẩy, vì vùng khoanh cắt ngang đuôi. Hãy khoanh rộng hơn xuống phía dưới, bao trọn cả đuôi; lẹm sang chữ bên cạnh cũng được.');
+    }
     const rejected = [...traced.values()].filter(glyph => glyph.punctuationRejected).map(glyph => glyph.char + ' (đầu chấm ' + glyph.punctuationRejected.head + ', chấm i ' + glyph.punctuationRejected.dot + ')');
-    if (rejected.length) throw new Error('Nét tách ra cho ' + rejected.join(' ') + ' không khớp quy tắc dấu câu (đầu chấm phải bằng chấm chữ i của font; nét tách ra lệch quá 10 lần), có lẽ đã lấy nhầm mẩu chữ bên cạnh. Chưa lưu. Hãy khoanh rộng hơn, bao trọn dấu câu.');
+    if (rejected.length) throw new Error('Chưa lưu ' + rejected.join(' ') + ': nét tách ra lệch quá 10 lần so với chấm chữ i của font, tức là vùng khoanh chưa lấy trọn dấu câu (có thể chỉ được một mẩu nhỏ hoặc nhầm sang chữ bên cạnh). Hãy khoanh rộng hơn một chút, bao trọn cả đầu và đuôi dấu câu; lẹm sang chữ bên cạnh cũng được, Xưởng sẽ tự bỏ phần đó.');
     for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
