@@ -43,8 +43,8 @@
   <div id="font-workspace" class="workspace" role="tabpanel" aria-labelledby="open-font-workspace">
     <details id="family-image-workspace" class="panel family-image-workspace"></details>
     <section class="panel source" aria-labelledby="source-title">
-      <div class="panel-title"><h2 id="source-title">Ảnh mẫu và dựng chữ</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
-      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn, kéo hoặc dán ảnh (Ctrl+V)</strong><small id="filename">PNG, JPG, WebP</small></label>
+      <div class="panel-title"><h2 id="source-title">Ảnh mẫu</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
+      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Thêm ảnh mẫu · kéo thả hoặc Ctrl+V</strong><small id="filename">PNG, JPG, WebP</small></label>
       <input id="file" type="file" multiple accept="image/png,image/jpeg,image/webp" class="visually-hidden">
       <p id="reference-storage" class="help" role="status" aria-live="polite"></p>
       <div id="references" class="reference-list" hidden>
@@ -72,16 +72,16 @@
         </div>
         <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
         <section class="layout-text" aria-labelledby="layout-text-title">
-          <label id="layout-text-title" for="layout-text">Nội dung chữ trong ảnh <small>(dựng không cần Gemini)</small></label>
+          <label id="layout-text-title" for="layout-text">Nội dung chữ trong ảnh <small>(đúng thứ tự từng dòng)</small></label>
           <textarea id="layout-text" rows="4" spellcheck="false" placeholder="Gõ đúng chữ có trong ảnh, mỗi dòng ảnh một dòng, đủ dấu"></textarea>
           <label for="layout-style">Kiểu chữ trong ảnh</label>
           <select id="layout-style"></select>
-          <p class="help">Khi ô này có nội dung, Xưởng tự tách từng chữ trên máy rồi dựng nét từ ảnh gốc, không gửi ảnh cho AI và không cần khóa Gemini. Mỗi ảnh chỉ nên có một kiểu chữ, nền sạch, chữ cao từ khoảng 60 px.</p>
+          <p class="help">Nhập đúng nội dung để dựng trực tiếp từ ảnh, không cần Gemini. Mỗi ảnh một kiểu chữ.</p>
         </section>
       </div>
       <section id="image-style-confirmation" class="image-style-confirmation" hidden aria-label="Xác nhận kiểu chữ trong ảnh"><h3>Xác nhận kiểu chữ trong ảnh</h3><p class="help">Tên bộ font và AI đang nhận khác kiểu chữ. Chọn kiểu đúng dưới ảnh rồi bấm lại <strong>Tạo bộ font</strong> ở trên. Không cần nhập tên hoặc tải ảnh lại.</p><div id="image-style-cards" class="fp-images"></div></section>
-      <section class="manual-trace" aria-labelledby="manual-trace-title">
-        <h3 id="manual-trace-title">Tách chữ thủ công</h3>
+      <details class="manual-trace workspace-tools">
+        <summary id="manual-trace-title">Tách chữ thủ công</summary>
         <div class="field-row">
           <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
           <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
@@ -92,13 +92,14 @@
           <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
           <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
         </form>
-      </section>
+      </details>
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="glyph-toolbar">
         <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
-        <div class="tool-row"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
+        <div class="tool-row glyph-main-actions"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button></div>
+        <details class="workspace-tools glyph-more-tools"><summary>Công cụ chỉnh sửa</summary><div class="tool-row"><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div></details>
         <div class="selection-row">
           <label for="glyph-filter">Lọc ký tự</label>
           <select id="glyph-filter"><option value="all">Tất cả</option><option value="recent">Vừa tạo</option><option value="missing">Còn thiếu</option><option value="review">Cần xem</option></select>
@@ -147,9 +148,9 @@
     </section>
     <div class="workspace-side">
       <section class="panel proof" aria-labelledby="proof-title">
-        <div class="panel-title"><h2 id="proof-title">Thử tiêu đề</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
-        <div class="tool-row" role="group" aria-label="Chế độ xem font">
-          <button id="show-title-proof" type="button" aria-pressed="true">Thử tiêu đề</button>
+        <div class="panel-title"><h2 id="proof-title">Xem kết quả</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
+        <div class="tool-row proof-tabs" role="group" aria-label="Chế độ xem font">
+          <button id="show-title-proof" type="button" aria-pressed="true">Xem câu chữ</button>
           <button id="show-glyph-proof" type="button" aria-pressed="false">Soát ký tự</button>
         </div>
         <div id="title-proof">

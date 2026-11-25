@@ -413,3 +413,55 @@ dialog::backdrop{background:#221a17bd}
 .glyph-proof-context svg { display:block; width:100%; height:76px; fill:currentColor }
 #glyph-proof-results { margin:10px 0; padding-inline-start:20px; font-size:13px }
 #glyph-filter-status { margin:0 }
+
+
+/* Simplified editor: quiet secondary controls, stable columns, one scroller per pane. */
+#font-workspace { gap:14px }
+#font-workspace .panel { border-radius:12px }
+#font-workspace .panel-title { margin-bottom:14px }
+#font-workspace h2 { font-size:24px }
+#font-workspace .workspace-tools { margin:10px 0 0; padding:10px 0; border-top:1px solid var(--line) }
+#font-workspace .workspace-tools>summary { font-size:14px; color:var(--muted); padding:2px 0 }
+#font-workspace .workspace-tools[open]>summary { margin-bottom:10px; color:var(--red) }
+#font-workspace .workspace-tools .tool-row { gap:6px }
+#font-workspace .workspace-tools button { font-size:13px; padding:7px 9px }
+#font-workspace .glyph-toolbar { border-bottom:0; padding-bottom:10px }
+#font-workspace .glyph-main-actions { gap:8px }
+#font-workspace .selection-row { margin-top:10px }
+#font-workspace .selection-row:has(>#glyph-filter) { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px 12px }
+#font-workspace #glyph-filter { margin:0 }
+#font-workspace #glyph-filter-status { grid-column:1/-1 }
+#font-workspace #glyph-filter-status:empty { display:none }
+#font-workspace .glyph-legend { margin:6px 0 12px; gap:14px }
+#font-workspace .glyph-group { margin:16px 0 8px }
+#font-workspace .glyph-grid { gap:7px }
+#font-workspace .glyph { height:58px; border-color:#e2d9cd }
+#font-workspace .layout-text { margin-top:14px }
+#font-workspace #layout-text { min-height:84px; max-height:180px; resize:vertical }
+#font-workspace .layout-text .help { margin-top:8px }
+#font-workspace .source .source-image-wrap { background:#fff; border-radius:8px; overflow:hidden }
+#font-workspace .source .inline { margin-top:6px }
+#font-workspace .reference-controls { margin:6px 0 10px }
+#font-workspace .proof-tabs { display:flex; gap:0; padding-bottom:12px; border-bottom:1px solid var(--line); margin-bottom:12px }
+#font-workspace .proof-tabs button { flex:1; border-radius:0; border:0; border-bottom:2px solid transparent; font-size:14px; color:var(--muted) }
+#font-workspace .proof-tabs [aria-pressed=true] { background:transparent; border-bottom-color:var(--red); color:var(--red) }
+#font-workspace .proof-fields { max-width:none }
+#font-workspace .glyph-view-figure { aspect-ratio:1; max-width:100%; margin:auto }
+#font-workspace #ai-scan-result.tool-popover { position:static; box-shadow:none; max-height:220px; overflow:auto }
+#font-workspace .font-check-panel .check-toolbar>.help { margin-top:10px }
+@media(min-width:1200px) and (min-height:520px){
+  #font-workspace { grid-template-columns:minmax(280px,.9fr) minmax(360px,1.35fr) minmax(320px,1fr) }
+}
+@media(min-width:1024px) and (min-height:520px){
+  #font-workspace>.source { padding:16px; overflow:auto }
+  #font-workspace>.glyph-panel { padding:16px }
+  #font-workspace>.workspace-side { height:100%; overflow:auto; gap:12px; scrollbar-gutter:stable }
+  #font-workspace>.workspace-side>.proof { height:auto; min-height:0; flex:none; overflow:visible; padding:16px }
+  #font-workspace>.workspace-side>.quality-workbench { height:auto; min-height:0; max-height:none; flex:none; overflow:visible; padding:16px }
+  #font-workspace #preview { min-height:220px; max-height:38vh; overflow:hidden; flex:none; padding:20px 14px }
+  #font-workspace .source #image { max-height:240px }
+}
+@media(max-width:720px){
+  #font-workspace .glyph-main-actions button { flex:1 }
+  #font-workspace .panel-title h2 { font-size:22px }
+}
