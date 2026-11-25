@@ -12,7 +12,7 @@ function moduleFor(name, file) {
 }
 const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
 const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
-const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody, strokeContrast } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
 const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
@@ -143,5 +143,29 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     }
   }
   done.push('đầu râu theo nét của font (giọt nước, vuốt nhọn, cắt bằng): đạt');
+  // 8. Font chân vát sắc (Migra, bản dùng cá nhân trong Downloads; không đưa vào repo). Lỗi cũ: o của Migra có trục nét
+  // nghiêng nên phép đo cắt giữa ra tương phản 0.99 (nét đều) thay vì 0.29; râu là dải cong mảnh, dài, không thanh–đậm.
+  const migraDir = path.join(home, 'Downloads', 'Migra - Free for Personal Use');
+  for (const file of ['Migra-Extralight.ttf', 'Migra-Extrabold.ttf'].map(f => path.join(migraDir, f))) {
+    if (!fs.existsSync(file)) continue;
+    const name = path.basename(file), map = glyphMap(parse(fs.readFileSync(file)), 'Font gốc');
+    const contrast = strokeContrast(map), stem = measureStem(map);
+    assert.ok(contrast < .5, name + ': tương phản đo ra ' + contrast.toFixed(2) + ', Migra là font thanh–đậm');
+    const ends = hornEnds(map, stem, Math.max(.2, Math.min(1, 1.1 * contrast - .1)));
+    assert.equal(ends.terminal, 'blade', name + ': đầu râu phải là lưỡi vát, đo được ' + ends.terminal);
+    assert.ok(!ends.round && ends.footRatio < .5 && ends.endRatio === 1, name + ': râu lưỡi vát phải chân mảnh, đầu dày, không bo tròn');
+    for (const c of [...'ơưƠƯờởữợ']) map.delete(c);
+    const { marks } = deriveMarkSamples(map); for (const [m, g] of marks) if (!map.get(m)) map.set(m, g);
+    const made = new Map(composeVietnamese(map, () => false).map(g => [g.char, g]));
+    const rows = checkRules(new Map([...map, ...made]));
+    assert.notEqual(status(rows, 'horn'), 'fail', name + ': râu rời thân ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
+    const xH = glyphBounds(map.get('x')).height;
+    for (const [char, root] of [['ư', 'u'], ['Ư', 'U']]) {
+      const g = glyphBounds(made.get(char)), r = glyphBounds(map.get(root)), reach = (g.x + g.width - r.x - r.width) / r.width, tip = (g.y + g.height - r.y - r.height) / xH;
+      const [rMin, , rMax] = MARK_RANGES['rau_' + root + '.reach'], [tMin, , tMax] = MARK_RANGES['rau_' + root + '.tip'];
+      assert.ok(reach <= rMax && tip <= tMax, name + ' ' + char + ': râu dài/cao quá chuẩn (vươn ' + reach.toFixed(2) + ' ≤ ' + rMax + ', cao ' + tip.toFixed(2) + ' ≤ ' + tMax + ')');
+    }
+    done.push(name + ': râu lưỡi vát đạt');
+  }
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });

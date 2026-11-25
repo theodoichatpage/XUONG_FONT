@@ -26,6 +26,15 @@ const shift = (polys, dx, dy) => polys.map(p => p.map(q => ({ X: q.X + Math.roun
 const toD = polys => polys.map(p => 'M' + p.map(q => (q.X / S).toFixed(1) + ' ' + (q.Y / S).toFixed(1)).join(' L') + ' Z').join(' ');
 const boxOf = poly => { const xs = poly.map(q => q.X / S), ys = poly.map(q => q.Y / S); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; };
 
+// Mép phải xa nhất của đa giác (đơn vị Clipper) ở độ cao y (đơn vị font).
+function rightAt(polys, y) {
+  let best = null;
+  for (const p of polys) for (let k = 0; k < p.length; k++) {
+    const a = p[k], c = p[(k + 1) % p.length], ay = a.Y / S, cy = c.Y / S;
+    if ((ay <= y) !== (cy <= y)) { const x = a.X / S + (y - ay) / (cy - ay) * (c.X - a.X) / S; if (best === null || x > best) best = x; }
+  }
+  return best;
+}
 const signedArea = poly => poly.reduce((sum, q, i) => { const r = poly[(i + 1) % poly.length]; return sum + q.X * r.Y - r.X * q.Y; }, 0);
 // Chiều của contour lớn nhất trong đường viền gốc (trước khi Clipper chuẩn hóa chiều).
 function outerSign(d) {
@@ -44,12 +53,13 @@ function outerSign(d) {
 // donor: chữ có râu tách từ ảnh; root: chữ gốc cùng ảnh; stem: nét thân; topRightEdge(d, bounds, root, stem) → { edge }.
 // Trả về { d, anchor: { dx, dy } } (dx: mép trái râu so với mép phải vùng trên của chữ gốc; dy: đáy râu so với đỉnh thân)
 // hoặc null nếu không tách được.
-export function hornFromLetter(donor, root, stem, topRightEdge) {
+// align: { dx, dy } canh sẵn (tay chữ r so với thân i canh theo mép phải thân, vì r có cờ đầu thân chìa sang trái).
+export function hornFromLetter(donor, root, stem, topRightEdge, align = null) {
   if (!donor?.d || !root?.d || !stem) return null;
   try {
     const db = glyphBounds(donor), rb = glyphBounds(root);
     // Chữ có râu và chữ gốc cùng ảnh, cùng tỉ lệ: canh theo mép trái và đáy (râu chỉ ở trên, bên phải).
-    const dx = db.x - rb.x, dy = db.y - rb.y;
+    const dx = align ? align.dx : db.x - rb.x, dy = align ? align.dy : db.y - rb.y;
     const donorPolys = toPolygons(donor.d), rootPolys = shift(toPolygons(root.d), dx, dy);
     const top = rb.y + rb.height + dy, right = rb.x + rb.width + dx;
     // Bỏ mảnh vụn dọc mép thân (hai lần tách cùng một chữ lệch nhau vài điểm ảnh).
@@ -103,7 +113,12 @@ export function strokeTerminal(glyphs, stem, topRightEdge) {
     const parts = svgpath(i.d).abs().toString().split(/(?=M)/).filter(p => p.trim()).map(d => ({ d, b: glyphBounds({ d }) }));
     const body = parts.sort((a, b) => b.b.height - a.b.height)[0];
     if (!body) return null;
-    const arm = hornFromLetter(r, { char: 'ı', d: body.d }, stem, topRightEdge);
+    // Canh r với thân i theo mép phải thân ở tầm thấp (chỉ có thân, chưa tới tay r): r của Migra có cờ đầu thân chìa sang
+    // trái, canh theo mép trái khung chữ thì trừ lệch và lấy nhầm gần cả chữ r làm tay.
+    const lowY = .3 * body.b.height + body.b.y;
+    const er = rightAt(toPolygons(r.d), lowY), ei = rightAt(toPolygons(body.d), lowY);
+    const align = er !== null && ei !== null ? { dx: er - ei, dy: glyphBounds(r).y - body.b.y } : null;
+    const arm = hornFromLetter(r, { char: 'ı', d: body.d }, stem, topRightEdge, align);
     if (!arm) return null;
     const polys = toPolygons(arm.d), b = glyphBounds({ d: arm.d });
     if (b.width < .6 * stem) return null;
@@ -129,5 +144,40 @@ export function strokeTerminal(glyphs, stem, topRightEdge) {
     if (!ball.length) return { terminal: 'plain', middle };
     const d = toD(ball), bb = glyphBounds({ d });
     return { terminal, middle, ball: { d: svgpath(d).translate(-(bb.x + bb.width / 2), -(bb.y + bb.height / 2)).round(1).toString(), width: bb.width, height: bb.height } };
+  } catch { return null; }
+}
+
+// Cờ vát ở đầu thân chữ l (font có chân vát nhọn như Migra): phần l nằm bên trái mép trái thân, ở 45% trên. Nét này
+// chân dày, cạnh thẳng, đầu nhọn — đúng kiểu nét của font. Lật ngang để chìa sang phải làm râu. Trả về { d, height,
+// width } (đáy-trái ở gốc tọa độ, chỗ nối thân ở cạnh trái) hoặc null nếu l không có cờ vát.
+export function flagFromL(glyphs, stem) {
+  const l = glyphs.get('l');
+  if (!l?.d || !stem) return null;
+  try {
+    const polys = toPolygons(l.d), b = glyphBounds(l), top = b.y + b.height;
+    const leftAt = y => {
+      let best = null;
+      for (const p of polys) for (let k = 0; k < p.length; k++) {
+        const a = p[k], c = p[(k + 1) % p.length], ay = a.Y / S, cy = c.Y / S;
+        if ((ay <= y) !== (cy <= y)) { const x = a.X / S + (y - ay) / (cy - ay) * (c.X - a.X) / S; if (best === null || x < best) best = x; }
+      }
+      return best;
+    };
+    const stemLeft = leftAt(b.y + b.height * .5);
+    if (stemLeft === null) return null;
+    const zone = [[{ X: -1e5 * S, Y: Math.round((top - .45 * b.height) * S) }, { X: Math.round((stemLeft - .02 * stem) * S), Y: Math.round((top - .45 * b.height) * S) },
+      { X: Math.round((stemLeft - .02 * stem) * S), Y: 1e5 * S }, { X: -1e5 * S, Y: 1e5 * S }]];
+    const pieces = run(ClipperLib.ClipType.ctIntersection, polys, zone).filter(p => Math.abs(C.Area(p)) > (.2 * stem * S) ** 2);
+    if (!pieces.length) return null;
+    const flag = pieces.sort((p, q) => Math.abs(C.Area(q)) - Math.abs(C.Area(p)))[0];
+    const fb = boxOf(flag);
+    // Cờ phải đủ lớn (chìa ít nhất 0.8 nét thân) và nhọn: bề dày đo dọc ở đầu (10% gần mũi) dưới 0.4 bề dày ở chân.
+    if (fb.x1 - fb.x0 < .8 * stem) return null;
+    const thick = x => { const ys = []; for (let k = 0; k < flag.length; k++) { const a = flag[k], c = flag[(k + 1) % flag.length], ax = a.X / S, cx = c.X / S; if ((ax <= x) !== (cx <= x)) ys.push(a.Y / S + (x - ax) / (cx - ax) * (c.Y - a.Y) / S); } return ys.length >= 2 ? Math.max(...ys) - Math.min(...ys) : 0; };
+    const footT = thick(fb.x1 - .05 * (fb.x1 - fb.x0)), tipT = thick(fb.x0 + .1 * (fb.x1 - fb.x0));
+    if (!(footT > 0) || tipT > .4 * footT) return null;
+    // Lật ngang (mũi chìa sang phải), chân (chỗ nối thân) về cạnh trái, đáy về 0.
+    const d = svgpath(toD([flag])).translate(-fb.x1, -fb.y0).scale(-1, 1).round(1).toString();
+    return { d, width: fb.x1 - fb.x0, height: fb.y1 - fb.y0, foot: footT };
   } catch { return null; }
 }

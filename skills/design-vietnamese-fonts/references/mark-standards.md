@@ -87,7 +87,7 @@ Không dùng một tỷ lệ cố định với nét thân (ví dụ 0,82): như
 
 ## Nét đều hay nét thanh-đậm
 
-Phân tích trước khi dựng dấu. **Độ tương phản** = nét ngang mảnh nhất ở đỉnh/đáy chữ o (đo dọc ở giữa) chia nét đứng dày nhất hai bên (đo ngang ở giữa).
+Phân tích trước khi dựng dấu. **Độ tương phản** = bề dày mảnh nhất chia dày nhất của nét chữ o, **đo theo pháp tuyến của nét** (khoảng cách từ mỗi điểm viền trong tới viền ngoài), không chỉ cắt dọc/ngang ở giữa. Font có trục nét nghiêng (Migra: chỗ mảnh nhất ở góc ~−57°, đỉnh o lại dày hơn hai bên) cắt ở giữa sẽ đo nhầm thành nét đều (Migra Extralight 0.99, đo đúng 0.29; lỗi 25/11/2026). Đo theo pháp tuyến cho cùng số với bảng dưới: Times 0.32, Arial 0.80, Segoe UI 0.82, Courier 0.98, Palatino 0.32, Verdana 0.83.
 
 | Nhóm | Độ tương phản | Ví dụ |
 | --- | --- | --- |
@@ -145,13 +145,13 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của chính font** (quy tắc Hòa hợp, design-rules.md mục 7), không chọn giữa vài hình có sẵn. Đầu nét đo trên **nét kết thúc tự do của chính font**, không đoán theo loại font.
 
-1. **Đầu tay chữ r** (nét mọc từ thân rồi kết thúc tự do, gần râu nhất). Tay r = chữ r trừ thân chữ i không chấm. Đo bề dày dọc theo tay: phần đầu (70–92% chiều dài) dày hơn 1.35 lần giữa tay → **giọt nước**; đầu (95%) mảnh dưới 0.45 lần và phần đầu dưới 0.8 lần giữa tay → **vuốt nhọn**; còn lại → **thường**. Đo được: Times, Georgia, Palatino, Comic Sans, Monotype Corsiva, Askino là giọt nước; Arial, Arial Bold, Calibri, Segoe UI, Verdana, Tahoma, Courier, Segoe Print, Gabriola là thường. Chữ nghiêng có r dính nét với thân (Times Italic, Segoe Script) không tách được tay r: chuyển sang bước 2.
+1. **Đầu tay chữ r** (nét mọc từ thân rồi kết thúc tự do, gần râu nhất). Tay r = chữ r trừ thân chữ i không chấm, **canh theo mép phải thân ở 30% chiều cao** (không canh mép trái khung chữ: r của Migra có cờ đầu thân chìa sang trái, canh khung thì lấy nhầm gần cả chữ r). Đo bề dày dọc theo tay: phần đầu (70–92% chiều dài) dày hơn 1.35 lần giữa tay → **giọt nước**; đầu (95%) mảnh dưới 0.45 lần và phần đầu dưới 0.8 lần giữa tay → **mũi vát sắc** (nét mảnh kết thúc bằng mũi nhọn cạnh thẳng); còn lại → **thường**. Đo được: Times, Georgia, Palatino, Comic Sans, Monotype Corsiva, Askino là giọt nước; Migra (Extralight, Extrabold) là mũi vát sắc; Arial, Arial Bold, Calibri, Segoe UI, Verdana, Tahoma, Courier, Segoe Print, Gabriola là thường. Chữ nghiêng có r dính nét với thân (Times Italic, Segoe Script) không tách được tay r: chuyển sang bước 2.
 2. **Đầu thân `l`, chỉ khi l là một nét đơn:** cách mỗi đầu một bề dày, mặt cắt còn 0.8–1.25 lần giữa thân (không vòng nét, không chân serif). Ở độ sâu 0.15 bề dày mặt cắt dưới 0.85 và ở 0.5 bề dày trên 0.85 ở **cả hai** đầu → **đầu tròn** (Comic Sans, Segoe Print, MV Boli). l của chữ viết là vòng nét hoặc vuốt nhọn dần: **không** được coi là đầu tròn (lỗi 25/11/2026: font chữ viết đầu nhọn bị râu bo tròn vì chỉ đo mặt cắt ngang của l và chỉ có hai kiểu tròn/vuông).
 3. Không đo được thì đầu **cắt bằng** như râu font chuẩn.
 
 **Râu dựng theo đầu nét:**
 - Giọt nước: thân râu dựng theo chuẩn đo (vươn, cao, nối như mục Râu ơ ư), đầu râu gắn **đúng giọt nước lấy từ đầu tay r** của font, lật dọc cho bầu giọt ở trên (ở r giọt nước rủ xuống cuối tay ngang, râu thì vươn lên). Đỉnh giọt chạm độ cao đầu râu chuẩn.
-- Vuốt nhọn: râu thon dần, đầu còn 0.3 bề dày chân.
+- Mũi vát sắc: râu **lưỡi vát** — chân mảnh bằng nét mảnh của font (max(0.25, thon) × bề dày, thon theo độ tương phản), dày dần tới đầu bằng nét đậm (0.9 nét thân), đầu **cắt phẳng góc sắc**; không bo tròn, không thon thành sợi. Râu lưỡi vát ngắn và thấp hơn: 0.75 lần trung vị độ vươn và độ cao đầu râu (vẫn trong khoảng chuẩn), vì đầu dày đã đủ nặng; dài theo trung vị thì thành nét kéo dài (người dùng 25/11/2026, Migra Extralight: râu cũ là dải cong mảnh, dài, đều nét).
 - Đầu tròn: bo tròn. Thường: cắt bằng.
 - **Độ thon theo độ tương phản** như sắc/huyền (mục Nét đều hay nét thanh-đậm): thon = 1.1 × tương phản − 0.1; font thanh-đậm (thon < 0.6) có đầu râu bằng max(0.35, thon) × bề dày chân; font nét đều và sans thường giữ 0.82 như râu font chuẩn.
 - Chữ nghiêng: râu và giọt nước nghiêng theo chữ (mục Chữ nghiêng).
@@ -159,7 +159,7 @@ Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của
 
 **Giới hạn còn lại:** chữ viết **nối nét** (u, o có nét nối chìa lên bên phải như Segoe Script) thì râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ. Dấu hỏi, ngã dựng chưa áp đầu nét giọt nước/vuốt nhọn (chỉ áp độ thon theo tương phản).
 
-Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
+Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn), mục 8 (Migra Extralight/Extrabold nếu có trong Downloads — bản dùng cá nhân, không đưa vào repo: tương phản < 0.5, râu lưỡi vát chân mảnh đầu dày, liền thân, vươn và cao không quá chuẩn) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
 
 ## Hai tầng: dấu thanh nằm trên mũ/trăng
 

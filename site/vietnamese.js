@@ -247,9 +247,13 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
               const ballUp = ends.ball ? .7 * ends.ball.height : 0;
               // Độ vươn tính từ mép phải thân; chữ viết có nét nối chìa sang phải (u, o của Segoe Script) thì khung chữ rộng
               // hơn thân nhiều: râu không vươn quá 0.45 độ rộng chữ tính từ chỗ nối.
-              const hw = Math.min(right + reach - (edge - inset), .45 * bounds.width + inset), hh = Math.max(.6 * stem, bodyTop + tip - attachY - ballUp);
+              // Râu lưỡi vát (font đầu nét vát sắc như Migra) ngắn và thấp hơn: 0.75 lần trung vị độ vươn và độ cao đầu râu
+              // (vẫn trong khoảng chuẩn), vì đầu dày cắt phẳng đã đủ nặng; dài theo trung vị thì thành nét kéo dài (người
+              // dùng 25/11/2026).
+              const short = ends.terminal === 'blade' ? .75 : 1;
+              const hw = Math.min(right + short * reach - (edge - inset), .45 * bounds.width + inset), hh = Math.max(.6 * stem, bodyTop + short * tip - attachY - ballUp);
               const lean = d => body.slant ? svgpath(d).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : d;
-              const shape = hornShape(hw, hh, .9 * stem, ends.round, ends.endRatio);
+              const shape = hornShape(hw, hh, .9 * stem, ends.round, ends.endRatio, ends.footRatio ?? 1);
               let horn = sameDirection(lean(shape), original.d);
               if (ends.ball) {
                 // Giọt nước lấy nguyên từ đầu tay r. Ở r giọt nước rủ xuống cuối tay ngang; râu vươn lên nên lật dọc cho
@@ -453,27 +457,26 @@ function stemThickness(d) {
 // Độ tương phản nét: nét ngang mảnh nhất ở đỉnh/đáy chữ o chia nét đứng dày nhất ở hai bên.
 // Nét đều (Courier, Poppins) ≈ 0.9–1; sans thường 0.7–0.85; nét thanh-đậm (Times, Palatino) 0.2–0.35.
 export function strokeContrast(glyphs) {
+  // Độ tương phản = bề dày mảnh nhất / dày nhất của nét o, đo theo pháp tuyến của nét (khoảng cách từ mỗi điểm viền
+  // trong tới viền ngoài), không chỉ cắt dọc/ngang ở giữa: font có trục nét nghiêng (Migra, chỗ mảnh nhất ở góc ~−57°)
+  // cắt ở giữa sẽ đo nhầm thành nét đều (Migra Extralight 0.99, đúng là 0.29). Kết quả khớp bảng chuẩn: Times 0.32,
+  // Arial 0.80, Segoe 0.82, Courier 0.98, Palatino 0.32.
   const glyph = glyphs.get('o') || glyphs.get('O');
   if (!glyph?.d) return .8;
-  const contours = flattenOutline(glyph.d);
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const c of contours) for (const [x, y] of c) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  const cross = (axis, at) => {
-    const hits = [];
-    for (const c of contours) for (let i = 0; i < c.length; i++) {
-      const a = c[i], b = c[(i + 1) % c.length], u = axis ? 1 : 0, v = 1 - u;
-      if ((a[u] <= at) !== (b[u] <= at)) hits.push(a[v] + (at - a[u]) / (b[u] - a[u]) * (b[v] - a[v]));
-    }
-    hits.sort((p, q) => p - q);
-    const spans = []; for (let i = 0; i + 1 < hits.length; i += 2) spans.push(hits[i + 1] - hits[i]);
-    return spans;
+  const contours = flattenOutline(glyph.d).filter(c => c.length >= 3);
+  const area = c => c.reduce((sum, p, i) => { const q = c[(i + 1) % c.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+  const [outer, inner] = [...contours].sort((a, b) => Math.abs(area(b)) - Math.abs(area(a)));
+  if (!outer || !inner) return .8;
+  const segment = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length));
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
   };
   let thin = Infinity, thick = 0;
-  for (let k = -3; k <= 3; k++) {
-    const vertical = cross(0, (x0 + x1) / 2 + k * (x1 - x0) * .02);       // đo dọc ở giữa: nét ngang trên và dưới
-    if (vertical.length >= 2) thin = Math.min(thin, ...vertical);
-    const horizontal = cross(1, (y0 + y1) / 2 + k * (y1 - y0) * .02);     // đo ngang ở giữa: nét đứng hai bên
-    if (horizontal.length >= 2) thick = Math.max(thick, ...horizontal);
+  for (const p of inner) {
+    let d = Infinity;
+    for (let i = 0; i < outer.length; i++) d = Math.min(d, segment(p, outer[i], outer[(i + 1) % outer.length]));
+    thin = Math.min(thin, d); thick = Math.max(thick, d);
   }
   return Number.isFinite(thin) && thick > 0 ? Math.max(.1, Math.min(1, thin / thick)) : .8;
 }
@@ -693,9 +696,12 @@ export function deriveMarkSamples(glyphs) {
 export function hornEnds(glyphs, stem, taper) {
   const term = strokeTerminal(glyphs, stem, topRightEdge);
   const round = !term?.ball && term?.terminal !== 'taper' && roundTerminals(glyphs);
-  // Đầu râu / chân râu: vuốt nhọn 0.3; thanh-đậm theo độ thon sắc/huyền (≥ 0.35); nét thường 0.82 như râu font chuẩn.
-  const endRatio = term?.terminal === 'taper' ? .3 : taper < .6 ? Math.max(.35, taper) : .82;
-  return { terminal: term?.terminal || (round ? 'round' : 'plain'), round, endRatio, ball: term?.ball || null };
+  // Tay r kết thúc bằng mũi vát sắc (Migra): râu kiểu lưỡi vát — chân mảnh bằng nét mảnh của font (theo độ tương phản),
+  // dày dần tới đầu bằng nét đậm, đầu cắt phẳng góc sắc; không thon thành sợi, không bo tròn.
+  if (term?.terminal === 'taper') return { terminal: 'blade', round: false, footRatio: Math.max(.25, taper), endRatio: 1, ball: null };
+  // Đầu râu / chân râu: thanh-đậm theo độ thon sắc/huyền (≥ 0.35); nét thường 0.82 như râu font chuẩn.
+  const endRatio = taper < .6 ? Math.max(.35, taper) : .82;
+  return { terminal: term?.terminal || (round ? 'round' : 'plain'), round, footRatio: 1, endRatio, ball: term?.ball || null };
 }
 
 // Tâm đầu râu (điểm cuối đường tâm) của hornShape cùng tham số: chỗ gắn giọt nước.
@@ -704,7 +710,7 @@ export function hornTip(width, height, thickness, round = false, endRatio = .82)
   return [Math.max(.6 * thickness, width - .45 * thickness), Math.max(.3 * height, height - (round ? end / 2 : 0))];
 }
 
-export function hornShape(width, height, thickness, round = false, endRatio = .82) {
+export function hornShape(width, height, thickness, round = false, endRatio = .82, footRatio = 1) {
   // Đường tâm râu: đi ngang ra rồi cong lên, tới đầu thì dựng đứng. Đầu râu theo kiểu đầu nét của bộ chữ:
   // font đầu vuông (Poppins, Arial, Segoe...) cắt phẳng ngang như râu font chuyên nghiệp; font đầu tròn thì bo tròn.
   // Đỉnh ngoài của đầu râu chạm đúng chiều cao yêu cầu, nên chữ đậm (nét dày) có đường tâm thấp hơn tương ứng.
@@ -715,7 +721,7 @@ export function hornShape(width, height, thickness, round = false, endRatio = .8
   const left = [], right = [];
   points.forEach((point, i) => {
     const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (1 - (1 - endRatio) * i / 24) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (footRatio + (endRatio - footRatio) * Math.pow(i / 24, footRatio < 1 ? 1.4 : 1)) / 2;
     left.push([point[0] - dy / length * half, point[1] + dx / length * half]);
     right.push([point[0] + dy / length * half, point[1] - dx / length * half]);
   });

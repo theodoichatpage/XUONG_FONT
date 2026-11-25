@@ -25,8 +25,9 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 | Cỡ, rộng, dày, hở từng dấu theo x-height, chữ o, nét thân | mark-standards bảng dấu | Có; check:marks |
 | Chữ hoa: dấu 97%, hở 0.105 x-height | mark-standards Chữ hoa | Có; check:marks |
 | Hai tầng dấu (ấ ầ ẩ ẫ ắ…) | mark-standards Hai tầng | Có; check:marks |
+| Độ tương phản đo theo pháp tuyến nét o (đúng cả font trục nét nghiêng như Migra) | mark-standards Nét đều hay thanh-đậm | Có (25/11/2026); check:rules mục 8, check:marks |
 | Độ thon theo độ tương phản (sắc/huyền, mũ, ngã, hỏi, râu) | mark-standards Nét đều hay thanh-đậm | Có |
-| Đầu nét: râu theo đầu tay r (giọt nước, vuốt nhọn) và đầu l (tròn, nét đơn) | mark-standards Kiểu đầu nét | Có (25/11/2026); check:rules mục 7 |
+| Đầu nét: râu theo đầu tay r (giọt nước; mũi vát sắc → râu lưỡi vát chân mảnh đầu dày cắt phẳng, ngắn 0.75 trung vị) và đầu l (tròn, nét đơn) | mark-standards Kiểu đầu nét | Có (25/11/2026); check:rules mục 7, 8 |
 | Râu: độ vươn, độ cao đầu, chỗ nối, advance lấn lề phải | mark-standards Râu ơ ư | Có; check:rules, compare-horn-spacing |
 | Nặng tránh đuôi y; ị phân biệt chấm i và nặng | design-rules mục 9, bảng chi tiết | Có |
 | Chữ nghiêng: dấu nghiêng theo chữ, dịch theo trục | mark-standards Chữ nghiêng | Có |
