@@ -395,6 +395,16 @@ dialog::backdrop{background:#221a17bd}
 #title-proof { display:flex; flex-direction:column; flex:1; min-height:0 }
 .proof [aria-pressed=true] { background:#f2e9da; border-color:var(--red); color:var(--red) }
 #glyph-proof { margin-top:12px }
+/* Xem ký tự: hành vi theo Glyphs View của trang Migra (Pangram Pangram), màu của Xưởng. Ô được rê chuột/chọn đổi màu
+   trong .2s như ô glyph của trang đó (transition background-color, color var(--duration-default) = .2s). */
+.glyph { transition:background-color .2s, color .2s }
+
+.glyph.inspecting { background:var(--ink); color:var(--panel) }
+.glyph.inspecting svg { fill:var(--panel) }
+.glyph-view-head { display:flex; justify-content:space-between; align-items:baseline; margin:10px 0 6px; font-size:13px; font-weight:600 }
+.glyph-view-unicode { color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums }
+.glyph-view-figure { position:relative; aspect-ratio:1; width:100%; margin:0; background:var(--ink); border-radius:12px; overflow:hidden }
+.glyph-view-figure canvas { position:absolute; top:0; left:0; width:100%; height:100% }
 .glyph-proof-vector,.glyph-proof-context { background:#f2e9da; border:1px solid var(--line); border-radius:9px; padding:8px; color:var(--red); text-align:center }
 .glyph-proof-vector svg { display:block; width:100%; height:230px; fill:currentColor }
 .glyph-proof-vector .help { margin:4px 0 0 }
