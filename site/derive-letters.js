@@ -1,5 +1,5 @@
 // Dựng chữ cái gốc còn thiếu từ bộ phận của chữ đã có, như nhà thiết kế làm:
-// n ↔ h, n ↔ u, n → m r, o + thân → b d p q, o → c e, E → F L, F + L → E, P → R, O → Q C, V → W, v → w, 6 ↔ 9, l ↔ I, l → i.
+// n ↔ h, n ↔ u, n → m r, o + thân → b d p q, o → c e, E → F L, F + L → E, P → R, O → Q C, V → W, v → w, 6 ↔ 9, l → i.
 // Chỉ điền ô trống (hoặc làm lại chữ do chính bước này dựng); luôn là "suy luận" để duyệt.
 // Chữ không có bộ phận để mượn (A G K S X Z a g k s …) vẫn cần ảnh mẫu.
 import ClipperLib from 'clipper-lib';
@@ -122,8 +122,8 @@ export function deriveLetters(glyphs) {
     c: [opened('o', -36, 36, false)],
     e: [opened('o', -48, -6, true)],
     C: [opened('O', -34, 34, false)],
-    l: [copy('I')],
-    I: [copy('l')],
+    // Không chép l ↔ I: chỉ giống nhau ở chữ không chân, đứng (Arial); chữ có chân/nghiêng l thường khác hẳn I hoa
+    // (lỗi 23/11: ô I của font nghiêng nhận nét l thường). Cần ảnh mẫu.
     i: [{ needs: ['l'], build: () => {
       const st = cut(get('l'), box(-1e4, -1e4, 1e4, xTop)), [x0, x1] = leftStem('l', xTop * .5);
       let dot = ok('.') ? get('.') : box(0, 0, stem * 1.05, stem * 1.1);

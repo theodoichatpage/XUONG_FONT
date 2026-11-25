@@ -71,6 +71,40 @@ export function edgeCoverage(pixels, ink, threshold, light) {
   });
 }
 
+// Nét tóc (hairline) của chữ thanh-đậm/nghiêng chất lượng cao chỉ rộng 1–2 điểm ảnh và nhạt hơn ngưỡng tách, nên bị
+// rơi mất (nét tay của r, chân móc mảnh). Giữ lại: điểm nhạt hơn ngưỡng nhưng vẫn rõ là mực (đậm hơn giấy ít nhất 40%
+// khoảng mực–giấy), là đỉnh vân tối theo ít nhất một trục (tối hơn cả hai điểm kề hai bên) và nối liền với mực chắc
+// chắn. Mép nhòe của nét dày không phải đỉnh vân (một bên là nét, một bên là giấy) nên không làm nét dày thêm.
+function recoverHairlines(pixels, ink, coverage, w, h, threshold, light, histogram) {
+  let count = 0, total = 0; for (const n of histogram) total += n;
+  let paper = light ? 0 : 255;
+  if (!light) { for (let v = 255; v >= 0; v--) { count += histogram[v]; if (count >= total * .3) { paper = v; break; } } }
+  else { for (let v = 0; v < 256; v++) { count += histogram[v]; if (count >= total * .3) { paper = v; break; } } }
+  const weak = light ? threshold - .6 * (threshold - paper) : threshold + .6 * (paper - threshold);
+  const darker = (a, b) => light ? a > b : a < b;
+  const candidate = p => {
+    const v = pixels[p];
+    if (ink[p] || (light ? v < weak : v > weak)) return false;
+    const x = p % w, y = (p - x) / w;
+    const ridgeX = x > 0 && x < w - 1 && darker(v, pixels[p - 1]) && darker(v, pixels[p + 1]);
+    const ridgeY = y > 0 && y < h - 1 && darker(v, pixels[p - w]) && darker(v, pixels[p + w]);
+    const ridgeD = x > 0 && x < w - 1 && y > 0 && y < h - 1 && ((darker(v, pixels[p - w - 1]) && darker(v, pixels[p + w + 1])) || (darker(v, pixels[p - w + 1]) && darker(v, pixels[p + w - 1])));
+    return ridgeX || ridgeY || ridgeD;
+  };
+  const stack = []; for (let p = 0; p < ink.length; p++) if (ink[p]) stack.push(p);
+  let added = 0;
+  while (stack.length) {
+    const p = stack.pop(), x = p % w, y = (p - x) / w;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+      const q = yy * w + xx;
+      if (candidate(q)) { ink[q] = 1; coverage[q] = Math.max(coverage[q], 170); added++; stack.push(q); }
+    }
+  }
+  return added;
+}
+
 export function wordInk(canvas, box, settings) {
   const frame = region(canvas, box, 5);
   const { x, y, w, h } = frame;
@@ -96,7 +130,9 @@ export function wordInk(canvas, box, settings) {
   // no synthetic cleanup. Uncertain backgrounds remain visible for review.
   if (!settings?.legacyCleanup) {
     const smooth = settings?.smooth !== false;
-    return { frame, ink, coverage: smooth ? edgeCoverage(pixels, ink, threshold, light) : ink.map(value=>value*255), preserveOutline:true,
+    const coverage = smooth ? edgeCoverage(pixels, ink, threshold, light) : ink.map(value=>value*255);
+    const hairlines = recoverHairlines(pixels, ink, coverage, w, h, threshold, light, histogram);
+    return { frame, ink, coverage, preserveOutline:true, hairlines,
       processing:{threshold,light,method:smooth?'threshold-antialiased':'threshold-only',morphology:false,smooth} };
   }
   if (settings?.polarity === 'light' || settings?.polarity === 'dark') return { frame, ink, preserveOutline:true };

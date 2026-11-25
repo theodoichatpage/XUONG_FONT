@@ -12,7 +12,7 @@ function moduleFor(name, file) {
 }
 const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
 const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
-const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
 const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
@@ -81,5 +81,28 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     }
     done.push(font.name + ': đạt');
   }
+  // 5. Râu mẫu (tách từ ảnh, bảng dấu) ghép vào chữ có chân serif: chân râu mọc từ đầu chân serif của U / vai phải
+  // của O, liền thân, vươn và cao theo chuẩn đo (lỗi cũ: râu cao cố định 130, mọc từ giữa nét U rồi vắt ngang chân serif).
+  const { MARK_RANGES } = moduleFor('mark-ranges-rules', 'site/mark-ranges.js');
+  for (const [name, file] of [['Times New Roman', 'C:/Windows/Fonts/times.ttf'], ['Georgia', 'C:/Windows/Fonts/georgia.ttf'], ['Arial', 'C:/Windows/Fonts/arial.ttf']]) {
+    if (!fs.existsSync(file)) continue;
+    const source = parse(fs.readFileSync(file)), image = glyphMap(source);
+    for (const g of image.values()) g.origin = 'direct';
+    for (const c of [...'ơưƠƯờởữợ']) image.delete(c);
+    image.set('̛', { char: '̛', d: hornShape(260, 300, 30), advance: 0, source: 'Ảnh mẫu', origin: 'direct' });
+    const made = new Map(composeVietnamese(image, () => false).map(g => [g.char, g]));
+    const all = new Map([...image, ...made]), rows = checkRules(all);
+    assert.notEqual(status(rows, 'horn'), 'fail', name + ': râu mẫu ghép sai chỗ/rời thân ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
+    const xH = glyphBounds(image.get('x')).height;
+    for (const [char, root] of [['Ư', 'U'], ['ư', 'u'], ['Ơ', 'O'], ['ơ', 'o']]) {
+      const g = made.get(char), rb = glyphBounds(image.get(root)), gb = glyphBounds(g);
+      const reach = (gb.x + gb.width - rb.x - rb.width) / rb.width, tip = (gb.y + gb.height - rb.y - rb.height) / xH;
+      for (const [metric, value] of [['reach', reach], ['tip', tip]]) {
+        const [min, , max] = MARK_RANGES['rau_' + root + '.' + metric], pad = (max - min) * .1;
+        assert.ok(value >= min - pad && value <= max + pad, name + ' ' + char + ': ' + metric + ' ' + value.toFixed(2) + ' ngoài chuẩn ' + min + '–' + max);
+      }
+    }
+  }
+  done.push('râu mẫu ghép vào chữ có chân serif: đạt');
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });

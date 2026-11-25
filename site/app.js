@@ -746,7 +746,16 @@ function trimEdgeFragments(area) {
   // tới khi tách được phần nằm trọn trong vùng (dấu câu) khỏi phần chạm mép (mẩu chữ bên cạnh). Trả về vùng mới bao
   // phần bên trong và danh sách điểm ảnh của mẩu chạm mép để xóa trắng trước khi tách nét.
   try {
-    const { ink, width } = segmentation(), height = ink.length / width;
+    // Mực của vùng khoanh theo ngưỡng Otsu trên chính vùng (không dùng tách nền thích ứng: vùng nhỏ chỉ có một dấu câu
+    // thì nền ước lượng bị tối theo dấu và không còn mực nào — lỗi 25/11).
+    const { data, width, height } = selectedImage();
+    const gray = new Uint8Array(width * height), histogram = new Uint32Array(256);
+    for (let p = 0; p < gray.length; p++) { const v = Math.round(.299 * data[p * 4] + .587 * data[p * 4 + 1] + .114 * data[p * 4 + 2]); gray[p] = v; histogram[v]++; }
+    let total = 0, sumAll = 0; for (let v = 0; v < 256; v++) { total += histogram[v]; sumAll += v * histogram[v]; }
+    let left = 0, sum = 0, best = -1, cut = 127;
+    for (let v = 0; v < 255; v++) { left += histogram[v]; sum += v * histogram[v]; const right = total - left; if (!left || !right) continue; const d = sum / left - (sumAll - sum) / right, score = left * right * d * d; if (score > best) { best = score; cut = v; } }
+    const light = $('polarity').value === 'light';
+    const ink = Uint8Array.from(gray, v => light ? v > cut : v <= cut);
     const label = source => {
       const seen = new Int32Array(source.length).fill(-1), comps = [];
       for (let start = 0; start < source.length; start++) {
@@ -764,7 +773,9 @@ function trimEdgeFragments(area) {
       }
       return { comps, seen };
     };
-    for (const r of [0, 1, 2, 3]) {
+    let cutBottom = false;
+    // Không bào mòn: bào làm đứt nét tóc (tay chữ r mảnh) rồi bị xóa như mẩu chữ bên cạnh (lỗi 25/11).
+    for (const r of [0]) {
       let eroded = ink;
       if (r) {
         eroded = new Uint8Array(ink.length);
@@ -791,8 +802,8 @@ function trimEdgeFragments(area) {
         const best = outside.filter(solid).sort((a, b) => ratio(a) - ratio(b) || centre(a) - centre(b))[0];
         if (best) { inside = [best]; outside = outside.filter(c => c !== best); }
       }
-      if (!inside.length) continue;
-      if (!outside.length) return area;
+      if (!inside.length) { const main = comps.filter(solid).sort((a, b) => b.pixels.length - a.pixels.length)[0]; if (r === 0 && main && main.y1 >= height - 3) cutBottom = true; continue; }
+      if (!outside.length) return cutBottom ? { ...area, cutBottom } : area;
       // Điểm ảnh gốc thuộc mẩu chạm mép: điểm mực gần mẩu đó (≤ r+1) hơn là gần phần bên trong.
       const owner = new Int8Array(ink.length);   // 1 = bên trong, 2 = mẩu mép
       const grow = (list, tag) => { for (const c of list) for (const p of c.pixels) owner[p] = tag; };
@@ -812,9 +823,10 @@ function trimEdgeFragments(area) {
       const m = 2, x0 = Math.max(0, u.x0 - m), y0 = Math.max(0, u.y0 - m);
       const next = { x: area.x + x0, y: area.y + y0, w: Math.min(width, u.x1 + m + 1) - x0, h: Math.min(height, u.y1 + m + 1) - y0 };
       next.erase = erase.map(p => ({ x: area.x + p % width, y: area.y + Math.floor(p / width) }));
+      next.cutBottom = inside.some(c => c.y1 >= height - 3);
       return next;
     }
-    return area;
+    return cutBottom ? { ...area, cutBottom } : area;
   } catch (error) { console.warn('trimEdgeFragments', error); return area; }
 }
 // Dấu câu tách từ ảnh: CỠ theo tỉ lệ chữ của chính ảnh đó (đơn vị font/điểm ảnh đo từ các chữ đã tách cùng ảnh),
@@ -911,12 +923,18 @@ async function trace(single) {
     }
     // Dấu câu khoanh tay: cỡ và độ cao theo đúng tỉ lệ chữ của chính ảnh này (chữ đã tách từ cùng ảnh), không phóng
     // cho đầy khung như chữ cái (dấu phẩy thành to bằng nửa chữ).
-    for (const [char, glyph] of traced) if (punctuation.includes(char)) traced.set(char, fitToReferenceScale(glyph));
-    // Dấu phẩy phải có đuôi: khung khoanh cắt mất đuôi thì nét tách ra chỉ là một chấm (cao chưa tới 1,2 lần rộng).
-    for (const [char, glyph] of traced) if ((char === ',' || char === ';') && glyph.d) {
-      const low = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => glyphBounds({ d })).sort((a, b) => a.y - b.y)[0];
-      if (low && low.height < 1.2 * low.width) throw new Error('Chưa lưu ' + char + ': nét tách ra chỉ có phần đầu chấm, mất đuôi dấu phẩy, vì vùng khoanh cắt ngang đuôi. Hãy khoanh rộng hơn xuống phía dưới, bao trọn cả đuôi; lẹm sang chữ bên cạnh cũng được.');
+    // Bỏ hạt lẻ (contour ngoài nhỏ hơn 2% contour lớn nhất, đứng tách khỏi nét): nhiễu nén ảnh hoặc mẩu sót của chữ bên cạnh.
+    if (single) for (const [char, glyph] of traced) {
+      const parts = svgpath(glyph.d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(d => ({ d, b: glyphBounds({ d }) }));
+      const big = Math.max(...parts.map(p => p.b.width * p.b.height));
+      const kept = parts.filter(p => p.b.width * p.b.height >= .02 * big || parts.some(q => q !== p && q.b.width * q.b.height > p.b.width * p.b.height && p.b.x >= q.b.x && p.b.x + p.b.width <= q.b.x + q.b.width && p.b.y >= q.b.y && p.b.y + p.b.height <= q.b.y + q.b.height));
+      if (kept.length < parts.length) traced.set(char, { ...glyph, d: kept.map(p => p.d).join(' ') });
     }
+    for (const [char, glyph] of traced) if (punctuation.includes(char)) traced.set(char, fitToReferenceScale(glyph));
+    // Dấu phẩy phải có đuôi: phần mực chính chạm mép dưới vùng khoanh nghĩa là khung cắt ngang đuôi (không đoán theo
+    // tỉ lệ cao/rộng: dấu phẩy mỗi font một dáng).
+    for (const char of traced.keys()) if ((char === ',' || char === ';') && single && area.cutBottom)
+      throw new Error('Chưa lưu ' + char + ': mép dưới vùng khoanh cắt ngang đuôi dấu phẩy. Hãy kéo khung xuống thấp hơn để bao trọn cả đuôi; lẹm sang chữ bên cạnh cũng được.');
     const rejected = [...traced.values()].filter(glyph => glyph.punctuationRejected).map(glyph => glyph.char + ' (đầu chấm ' + glyph.punctuationRejected.head + ', chấm i ' + glyph.punctuationRejected.dot + ')');
     if (rejected.length) throw new Error('Chưa lưu ' + rejected.join(' ') + ': nét tách ra lệch quá 10 lần so với chấm chữ i của font, tức là vùng khoanh chưa lấy trọn dấu câu (có thể chỉ được một mẩu nhỏ hoặc nhầm sang chữ bên cạnh). Hãy khoanh rộng hơn một chút, bao trọn cả đầu và đuôi dấu câu; lẹm sang chữ bên cạnh cũng được, Xưởng sẽ tự bỏ phần đó.');
     for (const [char, glyph] of traced) if (!glyphs.get(char)?.locked) glyphs.set(char, glyph);
@@ -1798,8 +1816,15 @@ async function fixByRules() {
     }
     const letters = deriveLetters(next).filter(glyph => charset.includes(glyph.char) && !real(glyphs.get(glyph.char)));
     for (const glyph of letters) next.set(glyph.char, glyph);
+    // Chữ dựng từ bộ phận theo quy tắc cũ nay đã bỏ (ví dụ I chép từ l): gỡ khỏi bộ chữ để ô trống chờ ảnh mẫu.
+    for (const [char, glyph] of [...next]) if (glyph?.source === 'Dựng từ bộ phận' && !glyph.locked && !glyph.approved && !letters.some(l => l.char === char)) next.delete(char);
     await smooth([...next.values()].filter(smoothable));   // chữ gốc (cả chữ vừa dựng) trước khi ghép dấu
     const failing = new Set((before?.issues || []).map(issue => issue.char).filter(char => glyphs.get(char)?.d && !real(glyphs.get(char))));
+    // Bảng quy tắc skill: râu Xưởng ghép lệch chỗ nối (mọc giữa nét, vắt qua chân serif) hoặc rời thân thì ghép lại cả
+    // nhóm chữ có râu do Xưởng ghép, theo quy tắc nối râu hiện tại.
+    const hornRow = checkRules(glyphs).rows.find(row => row.id === 'horn');
+    if (hornRow?.issues.some(issue => glyphs.get(issue.char)?.source === 'Ghép dấu'))
+      for (const [char, glyph] of glyphs) if (glyph?.source === 'Ghép dấu' && char.normalize('NFD').includes('̛')) failing.add(char);
     const reshaped = new Set([...heights.changed.map(g => g.char), ...cleaned]);
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
       || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu')

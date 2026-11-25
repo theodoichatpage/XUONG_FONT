@@ -5,7 +5,7 @@
 import ClipperLib from 'clipper-lib';
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
-import { measureStem, charset } from './vietnamese.js';
+import { measureStem, charset, rightEdgeAt } from './vietnamese.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import { placePunctuation } from './punctuation-rules.js';
 import { outlineDefects } from './outline-quality.js';
@@ -23,6 +23,23 @@ export function iDotWidth(map) {
   return list.length >= 2 && list[0].b.height < full.height * .35 ? list[0].b.width : 0;
 }
 const near = (value, target, tolerance) => target > 0 && Math.abs(value / target - 1) <= tolerance;
+
+// Râu do Xưởng ghép (ơ ư Ơ Ư): phần râu là các contour không có trong chữ gốc. Chân râu phải nằm ở mép phải xa nhất của
+// vùng trên chữ gốc (một phần năm trên, như chỗ Xưởng nối râu), cắm vào nét không quá 0.6 nét thân. Trả về độ lùi vào trong nếu vượt, 0 nếu đạt.
+export function hornFootOffset(glyph, map, stem) {
+  if (glyph?.source !== 'Ghép dấu' || !stem) return 0;
+  const [root] = glyph.char.normalize('NFD'), base = map.get(root);
+  if (!base?.d || !'oOuU'.includes(root)) return 0;
+  const key = b => [b.x, b.y, b.width, b.height].map(v => Math.round(v)).join(',');
+  const own = new Set(parts(base.d).map(p => key(p.b))), box = glyphBounds(base), top = box.y + box.height;
+  const extra = parts(glyph.d).filter(p => !own.has(key(p.b)) && p.b.y + p.b.height > top && p.b.x > box.x + box.width / 2);
+  if (!extra.length) return 0;
+  const hornLeft = Math.min(...extra.map(p => p.b.x));
+  let edge = -Infinity;
+  for (let n = 0; n <= 12; n++) { const x = rightEdgeAt(base.d, top - 2 - box.height * .2 * n / 12); if (x !== null) edge = Math.max(edge, x); }
+  const offset = edge - hornLeft;
+  return Number.isFinite(offset) && offset > .6 * stem ? offset : 0;
+}
 
 // Mỗi quy tắc: id, mô tả ngắn, mục skill, hàm đo trả về danh sách chữ lệch kèm số đo.
 export const RULES = [
@@ -77,8 +94,8 @@ export const RULES = [
       const { changed } = normalizeHeights(map, ctx.editable);
       return changed.map(g => ({ char: g.char, measure: g.heightFix?.baseline ? 'chân ' + Math.round(-g.heightFix.baseline) : 'đỉnh ×' + (g.heightFix?.scale || 1).toFixed(2), target: 'nhóm' }));
     } },
-  { id: 'horn', text: 'Râu ơ ư nối liền thân, không rời', skill: 'references/design-rules.md (Phân loại dấu: râu là phần nối vào thân)',
-    check(map) {
+  { id: 'horn', text: 'Râu ơ ư nối liền thân ở vùng trên bên phải, không rời', skill: 'references/design-rules.md (Phân loại dấu: râu là phần nối vào thân; Râu: nối ở vùng trên bên phải o/u)',
+    check(map, ctx) {
       const out = [];
       for (const [char, g] of map) {
         if (!g?.d || !char.normalize('NFD').includes('̛')) continue;
@@ -86,8 +103,12 @@ export const RULES = [
         try {
           const solids = ClipperLib.Clipper.SimplifyPolygons(toPolygons(g.d), ClipperLib.PolyFillType.pftNonZero)
             .filter(p => ClipperLib.Clipper.Orientation(p) && Math.abs(ClipperLib.Clipper.Area(p)) > 36 * 256);
-          if (solids.length > 1 + Math.max(0, marks)) out.push({ char, measure: solids.length + ' mảng', target: (1 + Math.max(0, marks)) + ' mảng' });
+          if (solids.length > 1 + Math.max(0, marks)) { out.push({ char, measure: solids.length + ' mảng', target: (1 + Math.max(0, marks)) + ' mảng' }); continue; }
         } catch { /* không đo được: bỏ qua */ }
+        // Râu Xưởng ghép: chân râu mọc từ mép phải xa nhất ở vùng trên của o/u (đầu chân serif của U, vai phải của o),
+        // không mọc từ giữa nét rồi vắt ngang qua chân serif (lỗi cũ ở Ư của font có chân).
+        const misplaced = hornFootOffset(g, map, ctx.stem);
+        if (misplaced) out.push({ char, measure: 'chân râu lùi ' + Math.round(misplaced) + ' vào trong', target: '≤ ' + Math.round(.6 * ctx.stem) });
       }
       return out;
     } },

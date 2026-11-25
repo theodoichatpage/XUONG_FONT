@@ -216,42 +216,49 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
       if (sample) {
         const source = glyphBounds(sample);
         if (source.width > 0 && source.height > 0) {
-          if (mark === '\u031b' && sample.nativeSize) {
-            // Skill: r\u00e2u n\u1ed1i v\u00e0o th\u00e2n \u1edf v\u00f9ng tr\u00ean b\u00ean ph\u1ea3i o/u. T\u00ecm m\u00e9p ph\u1ea3i th\u1eadt c\u1ee7a n\u00e9t t\u1ea1i \u0111\u1ed9 cao n\u1ed1i
-            // (o cong v\u00e0o trong n\u00ean kh\u00f4ng d\u00f9ng khung ch\u1eef nh\u1eadt), c\u1eafm g\u1ed1c r\u00e2u v\u00e0o trong n\u00e9t \u0111\u1ec3 li\u1ec1n kh\u1ed1i.
-            // Chân râu nằm gọn trong thân: mép trên của chân không cao hơn đỉnh thân (chữ đậm nét dày dễ tạo bậc khấc).
-            // Bề dày chân râu .9 nét thân, nên tâm chân phải thấp hơn đỉnh thân ít nhất nửa bề dày (.45 nét) cộng chút dư.
-            const stem = sample.stem || bounds.width * .2, inset = .45 * stem;
-            const attachY = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .5 * stem);
-            const edge = rightEdgeAt(original.d, attachY) ?? bounds.x + bounds.width;
-            // Chuẩn đo: độ vươn phải theo độ rộng chữ gốc, đầu râu cao hơn đỉnh thân theo x-height.
+          if (mark === '\u031b') {
+            // Skill (design-rules.md, mark-standards.md "Râu ơ ư"): râu nối vào thân ở vùng trên bên phải o/u. Tìm mép phải
+            // thật của nét tại độ cao nối (o cong vào trong, U có chân serif nên không dùng khung chữ nhật), cắm gốc râu vào
+            // trong nét để liền khối; chân râu nằm gọn trong thân (mép trên chân không cao hơn đỉnh thân); độ vươn phải và
+            // độ cao đầu râu theo chuẩn đo. Áp cho mọi râu: râu Xưởng dựng từ nét và râu mẫu lấy từ ảnh/bảng dấu/font gốc
+            // (râu mẫu giữ hình người vẽ, chỉ co giãn đều cho khớp chuẩn). Không dùng cỡ cố định (lỗi cũ: râu ảnh cao 130,
+            // lùi 12% vào giữa thân U nên mọc từ giữa nét, đè ngang chân serif).
+            const stem = sample.stem || bodyStem || bounds.width * .2, inset = .45 * stem;
+            // Mép phải lấy lớn nhất trong dải từ độ cao nối tới đỉnh thân: U có chân serif thì râu mọc từ đầu chân serif
+            // (như Times), không mọc từ giữa nét dưới chân serif rồi vắt ngang qua nó. o cong vào trong nên mép lớn nhất
+            // nằm ở đáy dải, giữ như cũ.
+            const low = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .5 * stem);
+            let edge = null, edgeY = low;
+            for (let n = 0; n <= 12; n++) {
+              const y = low + (bodyTop - 2 - low) * n / 12, x = rightEdgeAt(original.d, y);
+              if (x !== null && (edge === null || x > edge + 1)) { edge = x; edgeY = y; }
+            }
+            edge ??= bounds.x + bounds.width;
+            const attachY = Math.min(edgeY, bodyTop - .5 * stem);
             const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
-            const shape = hornShape(bounds.x + bounds.width + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem, body.roundEnds);
-            const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
-            const placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
+            const right = bounds.x + bounds.width, rsb = original.advance - right;
+            let placedHorn;
+            if (sample.nativeSize) {
+              const shape = hornShape(right + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem, body.roundEnds);
+              const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
+              placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
+            } else {
+              // Râu mẫu (nét người vẽ, bề dày tùy hình): đáy chân râu ngay dưới chỗ có mép phải xa nhất (đầu chân serif của U,
+              // vai phải của o) để chân chồng lên nét; mép trái cắm vào nét một đoạn inset. Co giãn cho đầu râu đúng độ cao chuẩn
+              // và mép phải đúng độ vươn chuẩn (lỗi cũ: râu mảnh treo dưới chân serif, rời thân).
+              const foot = edgeY - .15 * stem, left = edge - inset;
+              // Co theo chiều cao và độ vươn chuẩn; tỉ lệ ngang/dọc lệch nhau không quá 1.6 lần để giữ hình người vẽ.
+              const ky = (bodyTop + tip - foot) / source.height, kx = Math.min(1.6 * ky, Math.max(ky / 1.6, (right + reach - left) / source.width));
+              placedHorn = svgpath(sample.d).translate(-source.x, -source.y).scale(kx, ky).translate(left, foot).round(1).toString();
+            }
             paths.push(placedHorn);
             // Râu lấn sang lề phải như font chuyên nghiệp; chỉ cộng một phần nhỏ của đoạn chìa ra (đo cả độ nghiêng).
-            const hornRight = glyphBounds({ d: placedHorn }).x + glyphBounds({ d: placedHorn }).width;
-            const right = bounds.x + bounds.width, rsb = original.advance - right;
+            const hornBox = glyphBounds({ d: placedHorn }), hornRight = hornBox.x + hornBox.width;
             // Giới hạn phần lấn: lề phải mới không âm quá 0.15 độ rộng chữ so với lề gốc (tránh râu đâm vào N, n kế bên);
             // chữ nghiêng cho lấn thêm theo độ nghiêng vì chữ kế bên cũng nghiêng tránh ra (Italic: ~0.25).
             const limit = hornRight + Math.min(rsb, 0) - (.15 + .5 * Math.abs(body.slant)) * bounds.width;
             advance = Math.max(advance, Math.round(original.advance + STD.horn.advance[key] * Math.max(0, hornRight - right)), Math.ceil(limit));
-            continue;
-          }
-          if (mark === '\u031b') {
-            const scale = sample.nativeSize ? Math.min(1, bounds.width * .60 / source.width)
-              : Math.min(130 / source.height, bounds.width * .60 / source.width);
-            const width = source.width * scale, height = source.height * scale;
-            const overlap = Math.min(width * .32, bounds.width * .12);
-            const right = bounds.x + bounds.width;
-            // The left base of the horn seats inside the upper-right stem.
-            paths.push(svgpath(sample.d).translate(-source.x, -source.y).scale(scale)
-              .translate(right - overlap, bodyTop - height * .62).round(1).toString());
-            // Râu lấy từ ảnh/font: cùng quy tắc độ rộng với râu dựng (lấn sang lề phải, chỉ cộng một phần).
-            const hornKey = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
-            advance += Math.max(0, Math.round(STD.horn.advance[hornKey] * (width - overlap)));
             continue;
           }
           if (sample.nativeSize && mark !== '\u0323') { stack.push({ mark, sample, source }); continue; }
@@ -726,7 +733,7 @@ export function deriveBarredD(glyphs, stem = measureStem(glyphs)) {
 }
 
 // Mép phải thật của các contour tại độ cao y (đơn vị font, trục y hướng lên).
-function rightEdgeAt(d, y) {
+export function rightEdgeAt(d, y) {
   let best = null, x0 = 0, y0 = 0, sx = 0, sy = 0;
   const cross = (ax, ay, bx, by) => {
     if ((ay - y) * (by - y) > 0 || ay === by) return;

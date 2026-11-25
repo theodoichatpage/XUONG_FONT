@@ -97,7 +97,7 @@ Dùng phép đo để báo thiếu mã, metadata, khoảng gần nhất và giao
 
 ## Chữ cái gốc còn thiếu
 
-Dựng từ bộ phận của chữ đã có như nhà thiết kế (n → h m u r, o + thân → b d p q, o → c e, E → F L, P → R, O → Q C, V → W, 6 ↔ 9, l ↔ I, l → i), chỉ điền ô trống, ghi là suy luận để duyệt. Không tự vẽ chữ không có bộ phận để mượn. Bảng cách dựng và bộ chữ mẫu tối thiểu: `references/xuong-font-workflow.md`.
+Dựng từ bộ phận của chữ đã có như nhà thiết kế (n → h m u r, o + thân → b d p q, o → c e, E → F L, P → R, O → Q C, V → W, 6 ↔ 9, l → i; không chép l ↔ I vì I hoa và l thường khác nhau ở font có chân, font nghiêng), chỉ điền ô trống, ghi là suy luận để duyệt. Không tự vẽ chữ không có bộ phận để mượn. Bảng cách dựng và bộ chữ mẫu tối thiểu: `references/xuong-font-workflow.md`.
 
 ## Hoàn thiện font theo quy tắc
 
