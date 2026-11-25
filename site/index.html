@@ -68,15 +68,16 @@
         </div>
         <div class="inline"><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
         <section class="layout-text" aria-labelledby="layout-text-title">
-          <label id="layout-text-title" for="layout-text">Nội dung chữ trong ảnh <small>(dựng không cần Gemini)</small></label>
+          <label id="layout-text-title" for="layout-text">Nội dung chữ trong ảnh <small>(đúng thứ tự từng dòng)</small></label>
           <textarea id="layout-text" rows="4" spellcheck="false" placeholder="Gõ đúng chữ có trong ảnh, mỗi dòng ảnh một dòng, đủ dấu"></textarea>
           <label for="layout-style">Kiểu chữ trong ảnh</label>
           <select id="layout-style"></select>
+          <p class="help">Nhập đúng nội dung để dựng trực tiếp từ ảnh, không cần Gemini. Mỗi ảnh một kiểu chữ.</p>
         </section>
       </div>
       <section id="image-style-confirmation" class="image-style-confirmation" hidden aria-label="Xác nhận kiểu chữ trong ảnh"><h3>Xác nhận kiểu chữ trong ảnh</h3><p class="help">Tên bộ font và AI đang nhận khác kiểu chữ. Chọn kiểu đúng dưới ảnh rồi bấm lại <strong>Tạo bộ font</strong> ở trên. Không cần nhập tên hoặc tải ảnh lại.</p><div id="image-style-cards" class="fp-images"></div></section>
-      <section class="manual-trace" aria-labelledby="manual-trace-title">
-        <h3 id="manual-trace-title">Tách chữ thủ công</h3>
+      <details class="manual-trace workspace-tools">
+        <summary id="manual-trace-title">Tách chữ thủ công</summary>
         <div class="field-row">
           <label>Kiểu chữ trong ảnh<select id="polarity"><option value="adaptive">Chữ tối · nền không đều</option><option value="dark">Chữ tối · nền sáng</option><option value="light">Chữ sáng · nền tối</option></select></label>
           <label id="threshold-field">Ngưỡng tách <output id="threshold-value">40</output><input id="threshold" type="range" min="5" max="120" value="40"></label>
@@ -87,7 +88,7 @@
           <input id="chars" placeholder="Ví dụ HÀO KHÍ" maxlength="160" autocomplete="off" spellcheck="false">
           <div class="buttons"><button id="trace" class="primary" type="submit">Tách và thêm thủ công</button><button id="single" type="button" title="Gộp toàn bộ nét trong vùng chọn thành một ký tự">Thêm một chữ</button></div>
         </form>
-      </section>
+      </details>
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
