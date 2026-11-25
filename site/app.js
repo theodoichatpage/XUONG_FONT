@@ -959,6 +959,136 @@ async function trace(single) {
 }
 
 const tiles = new Map();
+let recentGlyphs = new Set();
+let glyphReview;
+let glyphReviewPending;
+let glyphReviewError = false;
+
+function setProofMode(inspecting) {
+  $('title-proof').hidden = inspecting;
+  $('glyph-proof').hidden = !inspecting;
+  $('show-title-proof').setAttribute('aria-pressed', String(!inspecting));
+  $('show-glyph-proof').setAttribute('aria-pressed', String(inspecting));
+  if (inspecting) {
+    renderGlyphInspection();
+    requestGlyphReview();
+  }
+}
+
+function requestGlyphReview() {
+  const record = currentFontExport;
+  if (!record || glyphReviewPending === record) return;
+  glyphReviewPending = record;
+  assessFont(record).then(result => {
+    if (record !== currentFontExport) return;
+    const warnings = new Map();
+    for (const finding of result.findings) {
+      if (!['fail', 'warning'].includes(finding.status) || finding.rule === 'coverage') continue;
+      const pair = ['pair-collision', 'horn-pair'].includes(finding.rule);
+      const chars = pair ? [...finding.chars] : finding.chars.split(/\s+/u);
+      for (const char of chars) {
+        if ([...char].length !== 1 || !usableGlyph(char)) continue;
+        if (!warnings.has(char)) warnings.set(char, []);
+        warnings.get(char).push(pair ? finding.chars + ' · ' + finding.message : finding.message);
+      }
+    }
+    glyphReview = { ...result, warnings };
+    renderGlyphs();
+  }).catch(() => {
+    if (record !== currentFontExport) return;
+    glyphReviewError = true;
+    renderGlyphs();
+  });
+}
+
+function renderGlyphInspection() {
+  if ($('glyph-proof').hidden) return;
+  const vector = $('glyph-proof-vector'), context = $('glyph-proof-context');
+  const metrics = $('glyph-proof-metrics'), results = $('glyph-proof-results');
+  vector.replaceChildren();
+  context.replaceChildren();
+  metrics.textContent = '';
+  results.replaceChildren();
+  const selectedTitle = selected ? (toneSamples.get(selected) ?? selected) + ' · U+' + selected.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') : 'Chọn ký tự trong bảng giữa';
+  $('glyph-proof-title').textContent = selectedTitle;
+  const glyph = selected && usableGlyph(selected);
+  const marks = [...(selected || '').normalize('NFD')].slice(1);
+  $('glyph-proof-adjust').disabled = !glyph || !marks.some(mark => mark !== '\u031b');
+  $('glyph-proof-next').disabled = !glyphReview?.warnings.size;
+  const note = message => {
+    const row = document.createElement('li');
+    row.textContent = message;
+    results.append(row);
+  };
+  if (!selected) return;
+  if (!glyph) { note('Còn thiếu ký tự trong bộ chữ.'); return; }
+  if (toneSamples.has(selected)) { note('Đây là dấu mẫu dùng để ghép chữ.'); return; }
+  if (!glyphReview) {
+    note(glyphReviewError ? 'Chưa đọc được TTF để soát.' : 'Đang chuẩn bị TTF để soát…');
+    return;
+  }
+  const { font, warnings, measured } = glyphReview;
+  if (!font.charToGlyphIndex(selected)) { note('Còn thiếu ký tự trong TTF.'); return; }
+  if (!font.charToGlyph(selected).path.commands.length) { note('Ký tự có mã nhưng thiếu nét trong TTF.'); return; }
+  const guides = $('glyph-proof-guides').checked;
+  const drawing = makeQualitySVG(font, selected, { guides, detailed: true }).svg;
+  vector.append(drawing);
+  if (guides) {
+    const legend = document.createElement('p');
+    legend.className = 'help';
+    legend.textContent = [...drawing.querySelectorAll('line')].map(line =>
+      line.getAttribute('aria-label') + ' ' + Math.round(-Number(line.getAttribute('y1')))).join(' · ');
+    vector.append(legend);
+  }
+  const exported = font.charToGlyph(selected), box = exported.getBoundingBox();
+  metrics.textContent = [font.getEnglishName('fontSubfamily'), glyph.source,
+    'Lề trái ' + Math.round(box.x1), 'Lề phải ' + Math.round(exported.advanceWidth - box.x2),
+    'Bước chữ ' + exported.advanceWidth, 'UPM ' + font.unitsPerEm].filter(Boolean).join(' · ');
+  const root = selected.normalize('NFD')[0];
+  const structural = marks.find(mark => ['\u0302', '\u0306', '\u031b'].includes(mark));
+  const compare = [...new Set([root, structural && (root + structural).normalize('NFC'), selected])]
+    .filter(char => char && font.charToGlyphIndex(char));
+  if (compare.length > 1) {
+    const caption = document.createElement('strong');
+    caption.textContent = compare.join(' – ');
+    context.append(caption, makeQualitySVG(font, compare.join('  '), { guides }).svg);
+  }
+  const words = $('sample').value.normalize('NFC').match(/[\p{L}\p{N}]+/gu) || [];
+  const proofWords = [...new Set(words.filter(word => word.includes(selected) &&
+    [...word].every(char => font.charToGlyphIndex(char))))].slice(0, 2);
+  if (proofWords.length) context.append(makeQualitySVG(font, proofWords.join('  '), { guides: false }).svg);
+  const findings = warnings.get(selected) || [];
+  for (const finding of findings) note('Cần xem · ' + finding);
+  const gap = measured.find(item => item.char === selected)?.gap;
+  if (gap !== undefined && gap >= glyphReview.threshold.minGap) note('Đạt ngưỡng khoảng hở dấu–thân · ' + gap + ' / 1000 em.');
+  else if (gap === undefined && marks.length) note('Chưa đo được khoảng hở dấu–thân cho chữ này.');
+  if (!findings.length && gap === undefined && !marks.length) note('Cần duyệt hình chữ và khoảng cách bằng mắt.');
+}
+
+$('show-title-proof').onclick = () => setProofMode(false);
+$('show-glyph-proof').onclick = () => setProofMode(true);
+$('glyph-proof-guides').onchange = renderGlyphInspection;
+$('glyph-filter').onchange = () => {
+  renderGlyphs();
+  if ($('glyph-filter').value === 'review') requestGlyphReview();
+};
+$('glyph-proof-next').onclick = () => {
+  const chars = charset.filter(char => glyphReview?.warnings.has(char));
+  const next = chars[(chars.indexOf(selected) + 1) % chars.length];
+  if (!next) return;
+  $('glyph-filter').value = 'review';
+  tiles.get(next).click();
+  renderGlyphs();
+  tiles.get(next).scrollIntoView({ block: 'nearest' });
+};
+$('glyph-proof-adjust').onclick = () => {
+  auditRepairPending = false;
+  completionPending = false;
+  $('mark-spacing-tools').hidden = false;
+  $('mark-spacing-scope').value = 'selected';
+  previewMarkSpacing();
+  $('mark-spacing-tools').scrollIntoView({ block: 'nearest' });
+};
 for (const char of [...toneSamples.keys(), ...charset]) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -985,8 +1115,13 @@ for (const char of [...toneSamples.keys(), ...charset]) {
 }
 
 function renderGlyphs() {
+  const filter = $('glyph-filter').value;
+  let visible = 0;
   for (const [char, tile] of tiles) {
     const glyph = usableGlyph(char);
+    tile.hidden = filter === 'recent' ? !glyph || !recentGlyphs.has(char)
+      : filter === 'missing' ? !!glyph : filter === 'review' ? !glyphReview?.warnings.has(char) : false;
+    if (!tile.hidden && !toneSamples.has(char)) visible++;
     tile.className = 'glyph' + (glyph ? (['Ảnh mẫu', 'Ảnh làm sạch'].includes(glyph.source)) ? ' ready' : ' generated' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
     const name = toneSamples.get(char) ?? char;
@@ -1015,6 +1150,15 @@ function renderGlyphs() {
   $('selected').textContent = selected ? `${toneSamples.get(selected) ?? selected} · ${usableGlyph(selected)?.source ?? 'Còn thiếu'}` : 'Chọn một ô để nhập ký tự đó.';
   $('remove').disabled = !glyphs.has(selected);
   $('reset').disabled = !glyphs.size;
+  for (const id of ['glyphs', 'lower-glyphs', 'more-glyphs']) {
+    const group = $(id);
+    group.hidden = filter !== 'all' && ![...group.children].some(tile => !tile.hidden);
+    group.previousElementSibling.hidden = group.hidden;
+  }
+  $('tone-samples').closest('details').hidden = filter !== 'all';
+  $('glyph-filter-status').textContent = filter === 'all' ? ''
+    : filter === 'review' && !glyphReview && glyphs.size ? (glyphReviewError ? 'Chưa đọc được TTF' : 'Đang soát TTF…') : visible + ' ký tự';
+  renderGlyphInspection();
 }
 
 function renderPreview() {
@@ -1044,6 +1188,9 @@ function scheduleFont() {
   if (downloadURL) URL.revokeObjectURL(downloadURL);
   downloadURL = undefined;
   currentFontExport = undefined;
+  glyphReview = undefined;
+  glyphReviewError = false;
+  if (!$('glyph-proof').hidden || $('glyph-filter').value === 'review') renderGlyphs();
   download.removeAttribute('href');
   download.setAttribute('aria-disabled', 'true');
   debounce = setTimeout(async () => {
@@ -1087,9 +1234,14 @@ function scheduleFont() {
       download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
       currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
       download.setAttribute('aria-disabled', 'false');
+      if (!$('glyph-proof').hidden || $('glyph-filter').value === 'review') requestGlyphReview();
       if (repairRecheckPending) { const options = repairRecheckPending === true ? { propose: false } : repairRecheckPending; repairRecheckPending = false; await editorFontCheck.run([currentFontExport], options); }
     } catch (error) {
-      if (turn === revision) $('missing').textContent = 'Không xuất được font · ' + error.message;
+      if (turn === revision) {
+        $('missing').textContent = 'Không xuất được font · ' + error.message;
+        glyphReviewError = true;
+        renderGlyphs();
+      }
     }
   }, 120);
 }
@@ -1139,10 +1291,19 @@ $('ai-scan').addEventListener('click', async()=>{
   if(!localLayoutReady()&&!geminiKey.value.trim()){status('Gõ nội dung chữ dưới mỗi ảnh, hoặc nhập khóa Gemini ở thanh trên để tạo bộ font.');return;}
   const controller=new AbortController();designRun=controller;busy=true;$('name').disabled=true;renderReferences();
   $('stop-design').hidden=false;$('stop-design').disabled=false;
+  const before = new Map(glyphs);
   let result;
   try{result=await familyWorkspace.createFromCurrent({...currentFamilyInput(),signal:controller.signal});}
   finally{busy=false;$('name').disabled=false;designRun=undefined;$('stop-design').hidden=true;renderReferences();}
-  if(!result?.ok&&!controller.signal.aborted)markMissingLayoutText();
+  if (result?.ok) {
+    recentGlyphs = new Set([...glyphs].filter(([char, glyph]) => {
+      const previous = before.get(char);
+      return previous?.d !== glyph.d || previous?.advance !== glyph.advance || previous?.source !== glyph.source;
+    }).map(([char]) => char));
+    $('glyph-filter').value = 'all';
+    setProofMode(false);
+    renderGlyphs();
+  } else if (!controller.signal.aborted) markMissingLayoutText();
 });
 $('stop-design').addEventListener('click', () => {
   if (!designRun) return;
@@ -1375,6 +1536,7 @@ $('remove').addEventListener('click', () => {
 $('reset').addEventListener('click', async () => {
   if (busy || !(await ask('Xóa tất cả ký tự trong bộ đang làm?', { ok: 'Xóa bộ chữ' }))) return;
   glyphs.clear();
+  recentGlyphs.clear();
   importedMetrics = undefined;
   loadedSourceBlob = undefined;
   selected = undefined;
@@ -1513,6 +1675,7 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
     }
   }
   auditRepairPending=false; markCandidates=[];
+  recentGlyphs.clear();
   glyphs = new ProtectedGlyphMap(drafts);
   // Font do chính người dùng dựng từ ảnh trong Xưởng rồi lưu lại (không phải file font của nhà thiết kế khác):
   // fromImages đã từng đúng, hoặc bản lưu từ trình sửa mang tên riêng (không phải bản Việt hóa XFVN của font khác).

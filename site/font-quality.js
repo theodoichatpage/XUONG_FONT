@@ -109,7 +109,7 @@ export async function assessFont(record,{minGap=16,hornTolerance=20}={}){
   add('manual','optical','','Cần duyệt bằng mắt: hòa hợp nét, hình râu, hỏi/ngã, chấm i, độ rõ ở cỡ nhỏ, thiết kế Italic và hai dòng.');
   return {record,font,coverage,findings,measured,tested,checkedPairs,threshold:{minGap,hornTolerance},time:new Date().toISOString(),counts:{fail:findings.filter(f=>f.status==='fail').length,warning:findings.filter(f=>f.status==='warning').length,manual:findings.filter(f=>f.status==='manual').length}};
 }
-export function makeQualitySVG(font,text){
+export function makeQualitySVG(font,text,{guides=true,detailed=false}={}){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg'),group=document.createElementNS(ns,'g');
   const paths=[],missing=[];let x=0,previous;
   let top=font.ascender,bottom=font.descender;
@@ -120,7 +120,27 @@ export function makeQualitySVG(font,text){
   }
   const pad=font.unitsPerEm*.08;svg.setAttribute('viewBox',`${-pad} ${-top-pad} ${x+2*pad} ${top-bottom+2*pad}`);svg.setAttribute('role','img');svg.setAttribute('aria-label','Outline vector của font đang kiểm: '+text);
   group.setAttribute('transform','scale(1,-1)');group.append(...paths);svg.append(group);
-  const cap=font.charToGlyphIndex('H') ? font.charToGlyph('H').getBoundingBox().y2 : font.ascender*.8;
-  for(const [value,label]of [[0,'baseline'],[cap,'cap-height']]){const line=document.createElementNS(ns,'line');line.setAttribute('x1',0);line.setAttribute('x2',x);line.setAttribute('y1',-value);line.setAttribute('y2',-value);line.setAttribute('vector-effect','non-scaling-stroke');line.setAttribute('class','quality-guide');line.setAttribute('aria-label',label);svg.append(line);}
+  const cap = font.tables.os2?.sCapHeight || (font.charToGlyphIndex('H') ? font.charToGlyph('H').getBoundingBox().y2 : undefined);
+  const xHeight = font.tables.os2?.sxHeight || (font.charToGlyphIndex('x') ? font.charToGlyph('x').getBoundingBox().y2 : undefined);
+  const levels = detailed ? [[font.ascender, 'Nét vươn trên'], [cap, 'Chữ hoa'], [xHeight, 'x-height'],
+    [0, 'Đường chân chữ'], [font.descender, 'Nét xuống']] : [[0, 'baseline'], [cap ?? font.ascender * .8, 'cap-height']];
+  if (detailed) {
+    const bounds = font.charToGlyph(text).getBoundingBox();
+    const left = Math.min(0, bounds.x1) - pad;
+    const right = Math.max(x, bounds.x2) + pad;
+    svg.setAttribute('viewBox', `${left} ${-top-pad} ${right-left} ${top-bottom+2*pad}`);
+  }
+  if (guides) for (const [value, label] of levels) {
+    if (!Number.isFinite(value)) continue;
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', detailed ? '-100%' : 0);
+    line.setAttribute('x2', detailed ? '100%' : x);
+    line.setAttribute('y1', -value);
+    line.setAttribute('y2', -value);
+    line.setAttribute('vector-effect', 'non-scaling-stroke');
+    line.setAttribute('class', 'quality-guide');
+    line.setAttribute('aria-label', label);
+    svg.append(line);
+  }
   return {svg,missing:[...new Set(missing)]};
 }
