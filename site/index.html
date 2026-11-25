@@ -168,7 +168,12 @@
             <strong id="glyph-proof-title"></strong>
             <label><input id="glyph-proof-guides" type="checkbox" checked> Đường chuẩn</label>
           </div>
-          <div id="glyph-proof-vector" class="glyph-proof-vector"></div>
+          <div class="glyph-view-head"><span>Xem ký tự</span><span id="glyph-proof-unicode" class="glyph-view-unicode"></span></div>
+          <figure id="glyph-proof-figure" class="glyph-view-figure">
+            <canvas id="glyph-proof-bg" aria-hidden="true"></canvas>
+            <canvas id="glyph-proof-glyph" role="img"></canvas>
+          </figure>
+          <div id="glyph-proof-vector" class="glyph-proof-vector" hidden></div>
           <p id="glyph-proof-metrics" class="help"></p>
           <div id="glyph-proof-context" class="glyph-proof-context"></div>
           <ul id="glyph-proof-results" aria-live="polite"></ul>

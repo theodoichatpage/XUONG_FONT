@@ -963,17 +963,108 @@ let recentGlyphs = new Set();
 let glyphReview;
 let glyphReviewPending;
 let glyphReviewError = false;
+// Ký tự đang xem ở Soát ký tự. Theo Glyphs Set Overview của trang Migra: rê chuột lên ô là xem ngay ô đó và giữ nguyên
+// khi rời chuột (không quay lại). Ở Xưởng, ô đang chọn để chỉnh (selected) chỉ đổi khi bấm.
+let inspected;
 
 function setProofMode(inspecting) {
   $('title-proof').hidden = inspecting;
   $('glyph-proof').hidden = !inspecting;
   $('show-title-proof').setAttribute('aria-pressed', String(!inspecting));
   $('show-glyph-proof').setAttribute('aria-pressed', String(inspecting));
+  inspected = inspecting ? selected : undefined;
+  markInspected();
   if (inspecting) {
     renderGlyphInspection();
     requestGlyphReview();
   }
 }
+
+function markInspected() {
+  for (const [char, tile] of tiles) tile.classList.toggle('inspecting', !$('glyph-proof').hidden && char === inspected);
+}
+
+function inspectGlyph(char) {
+  if ($('glyph-proof').hidden || inspected === char) return;
+  inspected = char;
+  markInspected();
+  renderGlyphInspection();
+}
+
+// Khung xem ký tự. Cách vẽ theo đúng component Glyphs View của trang Migra (index-D6-4TZZw.js, đối tượng Alpine
+// fontGlyphs: setupCanvas, drawBg, drawGlyph, drawHLine): hai lớp canvas (đường chuẩn, chữ) theo devicePixelRatio;
+// lề 80 px; tỉ lệ = min(rộng/(rộng + 1000), cao/(sTypoAscender − sTypoDescender)); đường chân cách mép trên
+// lề + cao × sTypoAscender/(sTypoAscender − sTypoDescender); đường chuẩn lấy từ bảng OS/2 của file TTF; nét đứt [2,2],
+// dày 1, chữ 12 px; tên đường bên trái, giá trị bên phải; Baseline/Ascender/Descender ghi phía trên đường, Cap Height và
+// x-height ghi phía dưới; chữ đặt giữa theo bước chữ (advanceWidth). Màu theo Xưởng.
+// Lề 80 px là của khung Migra rộng ~616 px; cột phải của Xưởng hẹp hơn nên lề co theo cùng tỉ lệ (0.13 bề rộng, tối đa 80).
+const glyphViewMargin = width => Math.min(80, width * .13);
+function setupGlyphCanvas(canvas) {
+  const { width, height } = $('glyph-proof-figure').getBoundingClientRect(), ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  const context = canvas.getContext('2d');
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+  return { context, width, height };
+}
+
+function drawGlyphView(char) {
+  const back = setupGlyphCanvas($('glyph-proof-bg')), front = setupGlyphCanvas($('glyph-proof-glyph'));
+  const font = glyphReview?.font, unicode = char ? 'U+' + char.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') : '';
+  const index = font && char ? font.charToGlyphIndex(char) : 0;
+  $('glyph-proof-unicode').textContent = unicode && (unicode + ' (' + (index || 'chưa có trong TTF') + ')');
+  $('glyph-proof-glyph').setAttribute('aria-label', char ? (toneSamples.get(char) ?? char) + ' phóng lớn' : 'Chưa chọn ký tự');
+  if (!font || !back.width) return;
+  const os2 = font.tables.os2 || {}, ascender = os2.sTypoAscender ?? font.ascender, descender = os2.sTypoDescender ?? font.descender;
+  const margin = glyphViewMargin(back.width);
+  const width = back.width - margin * 2, height = back.height - margin * 2, span = ascender - descender;
+  const scale = Math.min(width / (width + 1000), height / span);
+  const baseline = margin + height * ascender / span;
+  if ($('glyph-proof-guides').checked) {
+    const { context } = back, color = '#a89a8b';
+    context.font = '12px ' + getComputedStyle(document.body).fontFamily;
+    context.fillStyle = context.strokeStyle = color;
+    context.lineWidth = 1;
+    context.lineCap = 'round';
+    context.setLineDash([2, 2]);
+    const line = (label, value, above = false) => {
+      if (!Number.isFinite(value)) return;
+      const y = baseline - value * scale, textY = above ? y - 10 : y + 20;
+      context.textAlign = 'left';
+      context.fillText(label, 10, textY);
+      context.textAlign = 'right';
+      context.fillText(String(value), back.width - 10, textY);
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(back.width, y);
+      context.stroke();
+    };
+    line('Đường chân chữ', 0, true);
+    line('Nét vươn trên', ascender, true);
+    line('Nét xuống', descender, true);
+    line('Chữ hoa', os2.sCapHeight);
+    line('x-height', os2.sxHeight);
+  }
+  const { context } = front;
+  if (!index || !font.glyphs.get(index).path.commands.length) {
+    context.fillStyle = '#fffcf5';
+    context.textAlign = 'center';
+    context.font = '600 15px ' + getComputedStyle(document.body).fontFamily;
+    context.fillText(char ? 'Còn thiếu ' + (toneSamples.get(char) ?? char) + ' trong TTF' : '', front.width / 2, front.height / 2);
+    return;
+  }
+  const glyph = font.glyphs.get(index), x = (front.width - glyph.advanceWidth * scale) / 2;
+  const path = glyph.getPath(x, baseline, scale * font.unitsPerEm, {}, font);
+  path.fill = '#fffcf5';
+  path.draw(context);
+}
+
+let glyphViewResize;
+new ResizeObserver(() => {
+  clearTimeout(glyphViewResize);
+  glyphViewResize = setTimeout(() => { if (!$('glyph-proof').hidden) drawGlyphView(inspected ?? selected); }, 200);
+}).observe($('glyph-proof-figure'));
 
 function requestGlyphReview() {
   const record = currentFontExport;
@@ -1009,10 +1100,13 @@ function renderGlyphInspection() {
   context.replaceChildren();
   metrics.textContent = '';
   results.replaceChildren();
-  const selectedTitle = selected ? (toneSamples.get(selected) ?? selected) + ' · U+' + selected.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') : 'Chọn ký tự trong bảng giữa';
+  // Ký tự đang xem: ô vừa rê chuột (như trang Migra), không có thì ô đang chọn.
+  const viewed = inspected ?? selected;
+  const selectedTitle = viewed ? (toneSamples.get(viewed) ?? viewed) + ' · ' + (usableGlyph(viewed)?.source ?? 'Còn thiếu') : 'Rê chuột hoặc chọn ký tự trong bảng giữa';
   $('glyph-proof-title').textContent = selectedTitle;
-  const glyph = selected && usableGlyph(selected);
-  const marks = [...(selected || '').normalize('NFD')].slice(1);
+  drawGlyphView(viewed);
+  const glyph = viewed && usableGlyph(viewed);
+  const marks = [...(viewed || '').normalize('NFD')].slice(1);
   $('glyph-proof-adjust').disabled = !glyph || !marks.some(mark => mark !== '\u031b');
   $('glyph-proof-next').disabled = !glyphReview?.warnings.size;
   const note = message => {
@@ -1020,33 +1114,24 @@ function renderGlyphInspection() {
     row.textContent = message;
     results.append(row);
   };
-  if (!selected) return;
+  if (!viewed) return;
   if (!glyph) { note('Còn thiếu ký tự trong bộ chữ.'); return; }
-  if (toneSamples.has(selected)) { note('Đây là dấu mẫu dùng để ghép chữ.'); return; }
+  if (toneSamples.has(viewed)) { note('Đây là dấu mẫu dùng để ghép chữ.'); return; }
   if (!glyphReview) {
     note(glyphReviewError ? 'Chưa đọc được TTF để soát.' : 'Đang chuẩn bị TTF để soát…');
     return;
   }
   const { font, warnings, measured } = glyphReview;
-  if (!font.charToGlyphIndex(selected)) { note('Còn thiếu ký tự trong TTF.'); return; }
-  if (!font.charToGlyph(selected).path.commands.length) { note('Ký tự có mã nhưng thiếu nét trong TTF.'); return; }
+  if (!font.charToGlyphIndex(viewed)) { note('Còn thiếu ký tự trong TTF.'); return; }
+  if (!font.charToGlyph(viewed).path.commands.length) { note('Ký tự có mã nhưng thiếu nét trong TTF.'); return; }
   const guides = $('glyph-proof-guides').checked;
-  const drawing = makeQualitySVG(font, selected, { guides, detailed: true }).svg;
-  vector.append(drawing);
-  if (guides) {
-    const legend = document.createElement('p');
-    legend.className = 'help';
-    legend.textContent = [...drawing.querySelectorAll('line')].map(line =>
-      line.getAttribute('aria-label') + ' ' + Math.round(-Number(line.getAttribute('y1')))).join(' · ');
-    vector.append(legend);
-  }
-  const exported = font.charToGlyph(selected), box = exported.getBoundingBox();
+  const exported = font.charToGlyph(viewed), box = exported.getBoundingBox();
   metrics.textContent = [font.getEnglishName('fontSubfamily'), glyph.source,
     'Lề trái ' + Math.round(box.x1), 'Lề phải ' + Math.round(exported.advanceWidth - box.x2),
     'Bước chữ ' + exported.advanceWidth, 'UPM ' + font.unitsPerEm].filter(Boolean).join(' · ');
-  const root = selected.normalize('NFD')[0];
+  const root = viewed.normalize('NFD')[0];
   const structural = marks.find(mark => ['\u0302', '\u0306', '\u031b'].includes(mark));
-  const compare = [...new Set([root, structural && (root + structural).normalize('NFC'), selected])]
+  const compare = [...new Set([root, structural && (root + structural).normalize('NFC'), viewed])]
     .filter(char => char && font.charToGlyphIndex(char));
   if (compare.length > 1) {
     const caption = document.createElement('strong');
@@ -1054,12 +1139,12 @@ function renderGlyphInspection() {
     context.append(caption, makeQualitySVG(font, compare.join('  '), { guides }).svg);
   }
   const words = $('sample').value.normalize('NFC').match(/[\p{L}\p{N}]+/gu) || [];
-  const proofWords = [...new Set(words.filter(word => word.includes(selected) &&
+  const proofWords = [...new Set(words.filter(word => word.includes(viewed) &&
     [...word].every(char => font.charToGlyphIndex(char))))].slice(0, 2);
   if (proofWords.length) context.append(makeQualitySVG(font, proofWords.join('  '), { guides: false }).svg);
-  const findings = warnings.get(selected) || [];
+  const findings = warnings.get(viewed) || [];
   for (const finding of findings) note('Cần xem · ' + finding);
-  const gap = measured.find(item => item.char === selected)?.gap;
+  const gap = measured.find(item => item.char === viewed)?.gap;
   if (gap !== undefined && gap >= glyphReview.threshold.minGap) note('Đạt ngưỡng khoảng hở dấu–thân · ' + gap + ' / 1000 em.');
   else if (gap === undefined && marks.length) note('Chưa đo được khoảng hở dấu–thân cho chữ này.');
   if (!findings.length && gap === undefined && !marks.length) note('Cần duyệt hình chữ và khoảng cách bằng mắt.');
@@ -1082,6 +1167,7 @@ $('glyph-proof-next').onclick = () => {
   tiles.get(next).scrollIntoView({ block: 'nearest' });
 };
 $('glyph-proof-adjust').onclick = () => {
+  if (inspected && inspected !== selected) tiles.get(inspected)?.click();
   auditRepairPending = false;
   completionPending = false;
   $('mark-spacing-tools').hidden = false;
@@ -1095,13 +1181,16 @@ for (const char of [...toneSamples.keys(), ...charset]) {
   button.className = 'glyph';
   // Bấm một lần: chọn ký tự. Nháy đúp (hoặc Enter khi đang chọn bằng bàn phím): mở xem chi tiết phóng to.
   const choose = () => {
-    if (selected === char) return;
+    inspected = $('glyph-proof').hidden ? inspected : char;
+    if (selected === char) { markInspected(); renderGlyphInspection(); return; }
     selected = char;
     $('chars').value = char;
     persistReferences();
     renderGlyphs();
   };
   button.addEventListener('click', choose);
+  // Soát ký tự: rê chuột lên ô là xem ngay (Migra: @mouseover="activeGlyphIndex = glyph.index").
+  button.addEventListener('mouseover', () => inspectGlyph(char));
   button.addEventListener('dblclick', () => { choose(); zoomGlyph(char); });
   button.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
@@ -1122,7 +1211,8 @@ function renderGlyphs() {
     tile.hidden = filter === 'recent' ? !glyph || !recentGlyphs.has(char)
       : filter === 'missing' ? !!glyph : filter === 'review' ? !glyphReview?.warnings.has(char) : false;
     if (!tile.hidden && !toneSamples.has(char)) visible++;
-    tile.className = 'glyph' + (glyph ? (['Ảnh mẫu', 'Ảnh làm sạch'].includes(glyph.source)) ? ' ready' : ' generated' : '');
+    tile.className = 'glyph' + (glyph ? (['Ảnh mẫu', 'Ảnh làm sạch'].includes(glyph.source)) ? ' ready' : ' generated' : '')
+      + (!$('glyph-proof').hidden && char === inspected ? ' inspecting' : '');
     tile.setAttribute('aria-pressed', String(char === selected));
     const name = toneSamples.get(char) ?? char;
     tile.setAttribute('aria-label', name + ' · ' + (glyph?.source ?? 'Còn thiếu'));
