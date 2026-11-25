@@ -26,19 +26,25 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     root.hidden = false;
     root.open = true;
   };
-  root.innerHTML=`<summary>Đóng công cụ Family</summary><p class="help">Dùng ô tên và vùng ảnh ở màn hình chính rồi bấm Tạo bộ font. Phần này dành cho xem lại kết quả và sửa khi cần.</p><div class="family-project-body">
+  root.innerHTML=`<summary>Quay lại Tạo font mới</summary><div data-fp="project-intro"><p class="help">Dùng ô tên và vùng ảnh ở màn hình chính rồi bấm Tạo bộ font. Phần này dành cho xem lại kết quả và sửa khi cần.</p><div class="family-project-body">
     <div class="tool-row"><label>Bản font đã lưu<select data-fp="projects"><option value="">Chọn dự án đã lưu</option></select></label><button type="button" data-fp="new">Tạo dự án Family</button><label>Tên Family<input data-fp="name" maxlength="100" placeholder="Ví dụ: Sử Việt Kiêu Hùng"></label><button type="button" data-fp="save">Lưu bản nháp</button><button type="button" data-fp="backup">Backup dự án</button><label class="check-file-button">Khôi phục backup<input data-fp="restore" type="file" accept=".json" class="visually-hidden"></label></div>
     <p data-fp="status" class="help" role="status" aria-live="polite">Family và ảnh được lưu riêng trên trình duyệt. Backup gồm ảnh, outline và lịch sử; giữ file backup trước khi xóa dữ liệu trang.</p>
-    <div data-fp="content" hidden><p data-fp="quick-status" class="help"></p><button type="button" data-fp="continue" class="primary" hidden>Tiếp tục tạo bộ font</button><section hidden class="fp-upload" data-fp="drop" tabindex="0"><label>Chọn nhiều ảnh PNG/JPG/WEBP<input data-fp="files" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><p>Kéo thả hoặc Ctrl+V tại khu vực Family. Tối đa 15 MB/ảnh, 40 triệu pixel/ảnh và 100 ảnh/dự án.</p><button type="button" data-fp="analyze">AI phân tích và phân loại ảnh mới</button><button type="button" data-fp="trace">Phục dựng Style đang chọn từ ảnh gốc</button></section>
-    <button type="button" data-fp="show-images">Xem / đổi phân loại ảnh</button><div data-fp="images" class="fp-images"></div><details data-fp="advanced"><summary>Chi tiết từng chữ, kiểu chữ và xuất nâng cao</summary><div data-fp="matrix" class="family-matrix"></div>
+    </div><div data-fp="content" hidden><div data-fp="project-images"><p data-fp="quick-status" class="help"></p><button type="button" data-fp="continue" class="primary" hidden>Tiếp tục tạo bộ font</button><section hidden class="fp-upload" data-fp="drop" tabindex="0"><label>Chọn nhiều ảnh PNG/JPG/WEBP<input data-fp="files" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><p>Kéo thả hoặc Ctrl+V tại khu vực Family. Tối đa 15 MB/ảnh, 40 triệu pixel/ảnh và 100 ảnh/dự án.</p><button type="button" data-fp="analyze">AI phân tích và phân loại ảnh mới</button><button type="button" data-fp="trace">Phục dựng Style đang chọn từ ảnh gốc</button></section>
+    <button type="button" data-fp="show-images">Xem / đổi phân loại ảnh</button><div data-fp="images" class="fp-images"></div></div><details data-fp="advanced"><summary>Chi tiết từng chữ, kiểu chữ và xuất nâng cao</summary><div data-fp="style-controls"><div data-fp="matrix" class="family-matrix"></div>
     <div class="tool-row"><label>Tên Style<input data-fp="style-name" maxlength="80"></label><button type="button" data-fp="rename-style">Lưu tên Style</button><button type="button" data-fp="open">Mở Style trong trình sửa</button><button type="button" data-fp="capture">Lưu phần sửa từ trình sửa về Style</button><button type="button" data-fp="compose">Ghép glyph thiếu từ thành phần có mẫu</button><button type="button" data-fp="export">Xuất TTF bản nháp Style</button><button type="button" data-fp="collection">Lưu TTF vào Bộ sưu tập</button><button type="button" data-fp="export-family">Xuất các Style đã hoàn thiện</button></div>
-    <details><summary>Vùng ảnh chưa tách được</summary><p data-fp="trace-diagnostics" class="help"></p></details><p data-fp="style-state" class="help"></p><details><summary>Hồ sơ thiết kế theo bằng chứng ảnh</summary><div data-fp="profile"></div></details>
-    <div class="tool-row"><label>Lọc glyph<select data-fp="filter"><option value="all">Tất cả</option><option value="missing">Chưa có dữ liệu</option><option value="direct">Tham chiếu trực tiếp</option><option value="inferred">Suy luận</option><option value="error">Cần xem lại / bị từ chối</option><option value="approved">Đã duyệt và khóa</option></select></label><button type="button" data-fp="proof-all">Đối chiếu toàn Style từ ảnh gốc</button><button type="button" data-fp="approve-batch">Duyệt và khóa các glyph đã vượt đối chiếu</button></div><div data-fp="glyphs" class="fp-glyphs"></div>
-    <section data-fp="proof-section"><h3>Đối chiếu glyph gốc</h3><label>Chữ đã tách<select data-fp="review-char"></select></label><p class="help">Trước hết kiểm tra ảnh gốc có đúng ký tự đang chọn không. Điểm trùng nét chỉ đo vector so với vùng ảnh, không xác nhận AI đã đọc đúng chữ.</p><p data-fp="glyph-name"></p><label class="check"><input type="checkbox" data-fp="identity"> Tôi đã xem ảnh gốc: đúng ký tự đang chọn, không cắt nhầm chữ hoặc dấu</label><div class="tool-row"><label>Ngưỡng ảnh<input type="number" min="0" max="254" value="128" data-fp="threshold"></label><label>IoU tối thiểu<input type="number" min="0" max="1" step=".01" value=".96" data-fp="iou"></label><label>Sai lệch contour trung bình tối đa (pixel hiển thị)<input type="number" min="0" max="10" step=".1" value="1" data-fp="contour"></label><label>Lệch chi tiết tối đa (pixel soát)<input type="number" min="0" max="20" step=".1" value="4" data-fp="edge"></label><label class="check"><input type="checkbox" data-fp="overlay">Overlay</label><button type="button" data-fp="retrace">Vector hóa lại glyph này</button><button type="button" data-fp="approve">Duyệt và khóa</button><button type="button" data-fp="reject">Từ chối</button><button type="button" data-fp="unlock">Mở khóa để sửa</button><button type="button" data-fp="previous">Khôi phục phiên bản trước</button></div><div data-fp="proof" class="fp-proof"></div><div data-fp="metrics" class="fp-metrics"></div><p class="help">Đen: phần trùng. Đỏ: nét nguồn bị thiếu. Xanh: nét xuất thừa. Chỉ một phép scale chung, không kéo giãn riêng để che sai lệch. Không tự loại watermark nằm trên nét chữ.</p></section>
+    </div><details><summary>Vùng ảnh chưa tách được</summary><p data-fp="trace-diagnostics" class="help"></p></details><p data-fp="style-state" class="help"></p><details><summary>Hồ sơ thiết kế theo bằng chứng ảnh</summary><div data-fp="profile"></div></details>
+    <div class="tool-row"><button type="button" data-fp="proof-all">Đối chiếu toàn Style từ ảnh gốc</button><button type="button" data-fp="approve-batch">Duyệt và khóa các glyph đã vượt đối chiếu</button></div><p data-fp="proof-all-status" class="help" role="status" aria-atomic="true"></p>
+    <section data-fp="proof-section"><h3>Đối chiếu glyph gốc</h3><label>Ký tự cần đối chiếu<select data-fp="review-char"></select></label><p class="help">Trước hết kiểm tra ảnh gốc có đúng ký tự đang chọn không. Điểm trùng nét chỉ đo vector so với vùng ảnh, không xác nhận AI đã đọc đúng chữ.</p><p data-fp="glyph-name"></p><label class="check"><input type="checkbox" data-fp="identity"> Tôi đã xem ảnh gốc: đúng ký tự đang chọn, không cắt nhầm chữ hoặc dấu</label><div class="tool-row"><label>Ngưỡng ảnh<input type="number" min="0" max="254" value="128" data-fp="threshold"></label><label>IoU tối thiểu<input type="number" min="0" max="1" step=".01" value=".96" data-fp="iou"></label><label>Sai lệch contour trung bình tối đa (pixel hiển thị)<input type="number" min="0" max="10" step=".1" value="1" data-fp="contour"></label><label>Lệch chi tiết tối đa (pixel soát)<input type="number" min="0" max="20" step=".1" value="4" data-fp="edge"></label><label class="check"><input type="checkbox" data-fp="overlay">Overlay</label><button type="button" data-fp="retrace">Vector hóa lại glyph này</button><button type="button" data-fp="approve">Duyệt và khóa</button><button type="button" data-fp="reject">Từ chối</button><button type="button" data-fp="unlock">Mở khóa để sửa</button><button type="button" data-fp="previous">Khôi phục phiên bản trước</button></div><div data-fp="proof" class="fp-proof"></div><div data-fp="metrics" class="fp-metrics"></div><p class="help">Đen: phần trùng. Đỏ: nét nguồn bị thiếu. Xanh: nét xuất thừa. Chỉ một phép scale chung, không kéo giãn riêng để che sai lệch. Không tự loại watermark nằm trên nét chữ.</p></section>
     <label class="check"><input type="checkbox" data-fp="rendering">Tôi đã kiểm Style này trong ứng dụng sử dụng font, ở nhiều cỡ và hai dòng</label><button type="button" data-fp="verify">Kiểm điều kiện hoàn thiện Style</button></details>
     </div></div>`;
   const confirmation=document.getElementById('image-style-confirmation'),confirmationCards=document.getElementById('image-style-cards');
   const $=name=>root.querySelector('[data-fp="'+name+'"]');
+  function showFamilyView(reviewOnly) {
+    for (const name of ['project-intro', 'project-images', 'style-controls']) $(name).hidden = reviewOnly;
+    $('advanced').querySelector('summary').hidden = reviewOnly;
+    openWorkspace();
+    root.scrollTop = 0;
+  }
   let project,styleId='Regular',selectedChar='i',busy=false,urls=[],proofRevision=0,lastProof,editorBinding;
   let queue=Promise.resolve(),flowSignal,flowTarget,flowRunning=false,flowImages;
   // Khi bấm Tạo bộ font chỉ xử lý ảnh đang có trong danh sách (và ảnh nền trắng dựng từ chúng),
@@ -54,7 +60,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     try{await queue;localStorage.setItem('xuong-font-active-family',project.id);say(message+' · Đã lưu bản '+snapshot.version+'.');await renderProjects();}
     catch(error){say('CHƯA LƯU ĐƯỢC: '+error.message+'. Giữ tab mở và thử Backup dự án.');throw error;}
   }
-  async function run(task){if(busy)return false;busy=true;root.setAttribute('aria-busy','true');try{await task();return true;}catch(error){say(error.message);return false;}finally{busy=false;root.removeAttribute('aria-busy');}}
+  async function run(task, report = say){if(busy)return false;busy=true;root.setAttribute('aria-busy','true');try{await task();return true;}catch(error){report(error.message);return false;}finally{busy=false;root.removeAttribute('aria-busy');}}
   async function renderProjects(){const rows=await listFamilyProjects();$('projects').replaceChildren(new Option('Chọn dự án đã lưu',''));for(const p of rows.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)))$('projects').append(new Option(p.name+' · '+p.styles.filter(s=>s.glyphs.length).length+' Style có glyph',p.id));$('projects').value=project?.id||'';}
   function touchStyle(style){style.status=styleStatus(style);style.verification=undefined;}
   async function makeFont(style){
@@ -94,14 +100,6 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       await persist('Đã lưu kết quả đối chiếu '+glyph.char);
     }catch(error){if(turn===proofRevision)$('metrics').textContent='Chưa đối chiếu được: '+error.message;}
   }
-  function renderGlyphs(){
-    const style=activeStyle();$('glyphs').replaceChildren();if(!style)return;
-    const filter=$('filter').value;
-    const chars=[...new Set([...charset,...style.glyphs.map(g=>g.char)])];
-    for(const char of chars){const glyph=style.glyphs.find(g=>g.char===char);if(filter==='missing'&&glyph||filter==='direct'&&glyph?.origin!=='direct'||filter==='inferred'&&glyph?.origin!=='inferred'||filter==='approved'&&!glyph?.approved||filter==='error'&&(!glyph||glyph.approved))continue;
-      const button=document.createElement('button');button.type='button';button.textContent=char+' '+(!glyph?'○':glyph.locked?'🔒':glyph.origin==='inferred'?'△':'●');button.title=char+' · '+(!glyph?'Chưa có dữ liệu':glyph.origin||'Chưa rõ nguồn');button.setAttribute('aria-pressed',String(char===selectedChar));button.addEventListener('click',()=>{if(busy)return;selectedChar=char;const chosen=activeGlyph();$('threshold').value=String(chosen?.processing?.threshold??128);renderGlyphs();void showProof();});$('glyphs').append(button);
-    }
-  }
   function render(){
     release();confirmationCards?.replaceChildren();if(confirmation)confirmation.hidden=true;$('content').hidden=!project;if(!project)return;
     if(root.classList.contains('fp-guided')){const count=project.images.filter(i=>!i.confirmed&&!i.excluded).length;$('quick-status').textContent=count?'Còn '+count+' ảnh cần chọn kiểu chữ hoặc Bỏ qua ảnh này.':'Đã xác nhận ảnh. Bấm Tạo bộ font ở vùng ảnh mẫu để tiếp tục.';}
@@ -121,8 +119,8 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     }
     $('profile').replaceChildren();for(const evidence of project.images.filter(i=>i.styleId===styleId&&i.confirmed&&i.analysis)){const paragraph=document.createElement('p');paragraph.textContent=evidence.name+' · AI mô tả, chưa phải phép đo đã xác minh: '+Object.entries(evidence.analysis.profile).filter(([,v])=>v).map(([k,v])=>labelNames[k]+': '+v).join(' · ');$('profile').append(paragraph);}
     $('trace-diagnostics').textContent=project.images.filter(i=>i.styleId===styleId).flatMap(i=>(i.traceDiagnostics||[]).filter(d=>d.status!=='segmented').map(d=>i.name+' — '+d.text+': '+({'unsupported-character':'có ký tự chưa hỗ trợ','ink-crosses-box':'vùng AI khoanh cắt ngang nét chữ','no-safe-separation':'chưa tìm được ranh giới an toàn giữa các chữ'}[d.status]||d.status))).join('\n')||'Chưa có báo cáo vùng bị bỏ qua. Vẫn cần kiểm đúng ký tự bằng ảnh gốc.';
-    $('review-char').replaceChildren(...style.glyphs.map(g=>new Option(g.char+' · '+(g.locked?'Đã khóa':'Chưa duyệt'),g.char)));$('review-char').value=selectedChar;
-    renderGlyphs();
+    $('review-char').replaceChildren(...style.glyphs.map(g=>new Option(g.char+' · '+(g.locked?'Đã khóa':g.origin==='inferred'?'Suy luận':'Từ ảnh'),g.char)));$('review-char').value=selectedChar;
+
   }
   async function addImages(files){
     if(!project)throw Error('Tạo hoặc mở Family trước khi nhập ảnh.');
@@ -172,17 +170,21 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   });
   $('rename-style').onclick=()=>run(async()=>{activeStyle().name=$('style-name').value.trim()||activeStyle().id;await persist('Đã đổi tên Style');render();});
   $('identity').onchange=()=>run(async()=>{const g=activeGlyph();if(!g)return;if(g.locked)throw Error('Chữ đã khóa; mở khóa trước khi đổi xác nhận.');g.identityVersion=$('identity').checked?g.version:undefined;await persist('Đã cập nhật xác nhận đúng ký tự '+g.char);});
-  $('review-char').onchange=()=>{selectedChar=$('review-char').value;renderGlyphs();void showProof();};
-  $('filter').onchange=renderGlyphs;
+  $('review-char').onchange=()=>{selectedChar=$('review-char').value;$('threshold').value=String(activeGlyph()?.processing?.threshold??128);void showProof();};
   for(const field of ['overlay','threshold','iou','contour','edge'])$(field).onchange=()=>{void showProof();};
   $('approve').onclick=()=>run(async()=>{const g=activeGlyph();if(!glyphPass(g))throw Error('Cần xác nhận ảnh gốc đúng ký tự và đối chiếu đạt ngưỡng đã dùng khi phục dựng. Nếu đổi ngưỡng ảnh, hãy vector hóa lại trước khi duyệt.');g.approved=true;g.locked=true;g.reconstructionStatus='approved';await persist('Đã duyệt và khóa '+g.char);render();});
+  const reportBatchProof = message => {
+    $('proof-all-status').textContent = message;
+    say(message);
+  };
   $('proof-all').onclick=()=>run(async()=>{
+    reportBatchProof('Đang chuẩn bị TTF để đối chiếu ảnh gốc…');
     const options=proofOptions(),style=activeStyle(),{blob}=await makeFont(style),bytes=new Uint8Array(await blob.arrayBuffer());
     const candidates=style.glyphs.filter(g=>!g.locked).sort((a,b)=>String(a.sourceImageId).localeCompare(String(b.sourceImageId)));
     let cachedId,canvas,passed=0;const skipped=[];
     for(const [index,glyph]of candidates.entries()){
       flowSignal?.throwIfAborted();
-      say('Đối chiếu '+(index+1)+' / '+candidates.length+': '+glyph.char+'…');
+      reportBatchProof('Đối chiếu '+(index+1)+' / '+candidates.length+': '+glyph.char+'…');
       const image=project.images.find(i=>i.id===glyph.sourceImageId);
       if(!image||!glyph.placement){skipped.push(glyph.char+' (thiếu ảnh hoặc phép đặt)');continue;}
       try{
@@ -192,9 +194,15 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       }catch(error){glyph.proof=undefined;skipped.push(glyph.char+' ('+error.message+')');}
       await new Promise(resolve=>setTimeout(resolve,0));
     }
-    await persist('Đã đối chiếu toàn Style: '+passed+' / '+candidates.length+' glyph chưa khóa qua ngưỡng. Bỏ qua: '+(skipped.join(', ')||'không'));
-    renderGlyphs();
-  });
+    const checked = candidates.length - skipped.length;
+    const summary = checked
+      ? `Đã đối chiếu ${checked} chữ. ${passed} qua ngưỡng, ${checked - passed} cần xem lại.`
+      : 'Chưa có chữ nào đủ dữ liệu ảnh gốc để đối chiếu trong kiểu đang chọn.';
+    const message = summary + (skipped.length ? ` Bỏ qua ${skipped.length} chữ: ${skipped.join(', ')}.` : '');
+    await persist(message);
+    $('proof-all-status').textContent = message;
+
+  }, reportBatchProof);
   $('approve-batch').onclick=()=>run(async()=>{let count=0;for(const g of activeStyle().glyphs)if(glyphPass(g)){g.approved=true;g.locked=true;g.reconstructionStatus='approved';count++;}await persist('Đã duyệt và khóa '+count+' glyph có kết quả đối chiếu');render();});
   $('reject').onclick=()=>run(async()=>{const g=activeGlyph();if(!g)return;if(g.locked)throw Error('Mở khóa trước khi từ chối glyph đã duyệt.');g.approved=false;g.reconstructionStatus='rejected';await persist('Đã từ chối '+g.char);render();});
   $('unlock').onclick=()=>run(async()=>{const g=activeGlyph();if(!g)return;g.locked=false;g.approved=false;g.reconstructionStatus='needs-review';g.proof=undefined;await persist('Đã mở khóa '+g.char);render();});
@@ -301,5 +309,5 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     replaceProjectGlyph(style,next);
     try{await persist('Đã lưu chỉnh outline '+next.char);render();}catch(error){Object.assign(style,snapshot);throw error;}
   },async projectStyles(context){await restoration;if(context?.sourceProjectId&&context.sourceProjectId!==project?.id)return [];if(context?.familyName&&context.familyName!==project?.name)return [];if(context?.requireMatch&&!context.sourceProjectId&&!context.familyName)return [];return project?.styles||[];},
-    async storedLayout(file){await restoration;if(!project)return;const digest=await digestReference(file),image=project.images.find(i=>i.digest===digest&&i.layoutText);return image?{text:image.layoutText,style:image.layoutStyle}:undefined;},async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;openWorkspace();$('advanced').open=true;render();await showProof();$('proof-section').scrollIntoView({block:'start'});},open:()=>{openWorkspace();root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
+    async storedLayout(file){await restoration;if(!project)return;const digest=await digestReference(file),image=project.images.find(i=>i.digest===digest&&i.layoutText);return image?{text:image.layoutText,style:image.layoutStyle}:undefined;},async reviewGlyph(char,metrics){await restoration;const matching=project?.styles.find(s=>s.glyphs.length&&s.weight===metrics?.weight&&s.italic===!!metrics?.italic)||project?.styles.find(s=>s.glyphs.length);if(matching)styleId=matching.id;if(!project||!activeStyle()?.glyphs.length){say('Chưa có chữ phục dựng trong bản font đang mở để đối chiếu.');return;}selectedChar=activeStyle().glyphs.some(g=>g.char===char)?char:activeStyle().glyphs[0].char;showFamilyView(true);$('advanced').open=true;render();await showProof();},open:()=>{showFamilyView(false);root.scrollIntoView({block:'start'});},async refresh(){await renderProjects();}};
 }
