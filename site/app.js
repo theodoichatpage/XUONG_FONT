@@ -1147,7 +1147,6 @@ function renderGlyphInspection() {
   const gap = measured.find(item => item.char === viewed)?.gap;
   if (gap !== undefined && gap >= glyphReview.threshold.minGap) note('Đạt ngưỡng khoảng hở dấu–thân · ' + gap + ' / 1000 em.');
   else if (gap === undefined && marks.length) note('Chưa đo được khoảng hở dấu–thân cho chữ này.');
-  if (!findings.length && gap === undefined && !marks.length) note('Cần duyệt hình chữ và khoảng cách bằng mắt.');
 }
 
 $('show-title-proof').onclick = () => setProofMode(false);
@@ -1191,13 +1190,6 @@ for (const char of [...toneSamples.keys(), ...charset]) {
   button.addEventListener('click', choose);
   // Soát ký tự: rê chuột lên ô là xem ngay (Migra: @mouseover="activeGlyphIndex = glyph.index").
   button.addEventListener('mouseover', () => inspectGlyph(char));
-  button.addEventListener('dblclick', () => { choose(); zoomGlyph(char); });
-  button.addEventListener('keydown', event => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    choose();
-    zoomGlyph(char);
-  });
   const grid = toneSamples.has(char) ? 'tone-samples' : lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
   $(grid).append(button);
   tiles.set(char, button);
@@ -1216,7 +1208,7 @@ function renderGlyphs() {
     tile.setAttribute('aria-pressed', String(char === selected));
     const name = toneSamples.get(char) ?? char;
     tile.setAttribute('aria-label', name + ' · ' + (glyph?.source ?? 'Còn thiếu'));
-    tile.title = tile.getAttribute('aria-label') + ' · nháy đúp để xem chi tiết';
+    tile.title = tile.getAttribute('aria-label');
     tile.replaceChildren();
     if (!glyph) { tile.textContent = name; continue; }
     const ns = 'http://www.w3.org/2000/svg';
@@ -1433,7 +1425,7 @@ $('reference').addEventListener('change', event => showReference(Number(event.ta
 $('previous-reference').addEventListener('click', () => showReference(activeReference - 1));
 $('next-reference').addEventListener('click', () => showReference(activeReference + 1));
 
-$('demo').addEventListener('click', () => {
+$('demo')?.addEventListener('click', () => {
   if (busy || loading || restoring) return;
   rememberReference();
   activeReference = -1;
@@ -1702,6 +1694,7 @@ if (!glyphs.size) {
   note.textContent='Trong Bộ sưu tập, chọn font đã lưu để mở lại; hoặc Nhập TTF / OTF đã xuất. Dữ liệu dự án được lưu riêng trong từng trình duyệt.';
   recovery.append(heading,explanation,open,note);
   $('editor-font-check').replaceChildren(recovery);
+  $('editor-font-check').hidden = false;
 }
 
 async function restoreReferenceProject() {
@@ -1779,11 +1772,11 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   const added = missingBefore.filter(char => glyphs.has(char));
   const missing = charset.filter(char => !glyphs.has(char));
   const audit = editOnly ? '' : auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) }));
-  status((editOnly ? 'Đang chỉnh sửa ' + record.name + '. '
-    + (regenerable ? regenerable + ' chữ có dấu do Xưởng ghép (so với ' + original.name + '); bấm Tạo dấu tiếng Việt để ghép lại theo chuẩn mới. '
-      : record.name.startsWith('XFVN - ') && !original ? 'Không thấy font gốc trong Bộ sưu tập nên mọi chữ được giữ như nét gốc; thêm font gốc vào Bộ sưu tập để ghép lại dấu. ' : '')
-    + 'Chỉnh xong mở Bộ sưu tập Font và bấm Lưu font đang làm để cập nhật. ' : 'Đã thêm ' + added.length + ' ký tự. ') + (missing.length ? 'Còn thiếu: ' + missing.join(' ') : 'Đã đủ bộ ký tự tiếng Việt.') + audit
-    + '\nDấu mẫu có thể thay trong Bộ ký tự. Xuất mới dựng lại đường nét, các bảng OpenType nâng cao cần kiểm tra sau xuất.');
+  // Chữ còn thiếu xem bằng bộ lọc Còn thiếu ở Bộ ký tự; ở đây chỉ báo việc cần làm.
+  status(editOnly
+    ? (regenerable ? regenerable + ' chữ có dấu do Xưởng ghép (so với ' + original.name + '); bấm Tạo dấu tiếng Việt để ghép lại theo chuẩn mới.'
+      : record.name.startsWith('XFVN - ') && !original ? 'Không thấy font gốc trong Bộ sưu tập nên mọi chữ được giữ như nét gốc; thêm font gốc vào Bộ sưu tập để ghép lại dấu.' : '')
+    : 'Đã thêm ' + added.length + ' ký tự.' + (missing.length ? '' : ' Đã đủ bộ ký tự tiếng Việt.') + audit);
   return true;
 }, runFontQuality);
 
@@ -2157,6 +2150,9 @@ async function fixByRules() {
     return true;
   } finally { busy = false; }
 }
+// Bảng "Tự động sửa font" đã ẩn; nút Hoàn thiện font chữ nằm ở Bộ ký tự và chạy đúng nút của bảng đó.
+// Thông báo của bảng chuyển ra dòng trạng thái chung.
+$('finish-font').addEventListener('click', () => $('editor-font-check').querySelector('[data-action=current]')?.click());
 const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   getCurrent: () => currentFontExport, beforeCheck: fixByRules, onSelect: renderRuleQuality, onOpen: openQualityFont, onInspect: inspectQualityText,
   onMarks: result => {
@@ -2166,6 +2162,11 @@ const editorFontCheck = createFontCheckPanel($('editor-font-check'), {
   onAIRepair: (result,candidates) => proposeQualityRepairs(result,candidates,{ai:true}),
   onRepair: proposeQualityRepairs
 });
+{
+  const panelStatus = $('editor-font-check').querySelector('[data-role=status]');
+  if (panelStatus) new MutationObserver(() => { if (panelStatus.textContent.trim()) status(panelStatus.textContent.trim()); })
+    .observe(panelStatus, { childList: true, characterData: true, subtree: true });
+}
 async function verifyMarkRepairDraft(snapshot, proposals, threshold) {
   const makeRecord = entries => {
     const active=[...entries.values()].filter(g=>!toneSamples.has(g.char));
