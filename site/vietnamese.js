@@ -2,11 +2,11 @@ import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
 import { MARK_STANDARDS as STD, STROKE_PER_MEASURED } from './mark-standards.js';
 import { sampleOutline } from './outline-cleanup.js';
-import { hornFromLetter, seatHorn } from './horn-from-letters.js';
+import { hornFromLetter, seatHorn, strokeTerminal } from './horn-from-letters.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
-export const punctuation = [...'.,:;!?-–—()“”‘’/+<>', ...`"'@#$%^&*[]{}_=~\\|`];
+export const punctuation = [...'.,:;!?-–—()“”‘’/+<>', ...`"'@#$%^&*[]{}_=~\\|`, '₫'];
 export const toneSamples = new Map([
   ['\u0301', 'Sắc'], ['\u0300', 'Huyền'], ['\u0323', 'Nặng'],
   ['\u0303', 'Ngã'], ['\u0309', 'Hỏi'], ['\u0306', 'Trăng'], ['\u0302', 'Mũ'], ['\u031b', 'Râu']
@@ -242,8 +242,22 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
               const hb = glyphBounds({ d: own.d });
               placedHorn = seatHorn(original.d, svgpath(own.d).translate(edge + own.anchor.dx - hb.x, bodyTop + own.anchor.dy - hb.y).round(1).toString(), stem);
             } else if (sample.nativeSize) {
-              const shape = hornShape(right + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem, body.roundEnds);
-              const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
+              // Đầu râu theo nét của chính font (hornEnds); dấu mẫu cũ chưa có thông tin thì đo lại.
+              const ends = sample.hornEnd || hornEnds(glyphs, stem, Math.max(.2, Math.min(1, 1.1 * body.contrast - .1)));
+              const ballUp = ends.ball ? .7 * ends.ball.height : 0;
+              // Độ vươn tính từ mép phải thân; chữ viết có nét nối chìa sang phải (u, o của Segoe Script) thì khung chữ rộng
+              // hơn thân nhiều: râu không vươn quá 0.45 độ rộng chữ tính từ chỗ nối.
+              const hw = Math.min(right + reach - (edge - inset), .45 * bounds.width + inset), hh = Math.max(.6 * stem, bodyTop + tip - attachY - ballUp);
+              const lean = d => body.slant ? svgpath(d).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : d;
+              const shape = hornShape(hw, hh, .9 * stem, ends.round, ends.endRatio);
+              let horn = sameDirection(lean(shape), original.d);
+              if (ends.ball) {
+                // Giọt nước lấy nguyên từ đầu tay r. Ở r giọt nước rủ xuống cuối tay ngang; râu vươn lên nên lật dọc cho
+                // bầu giọt ở trên: cổ giọt chồng lên đầu râu, đỉnh giọt chạm độ cao đầu râu chuẩn.
+                const [tx, ty] = hornTip(hw, hh, .9 * stem, ends.round, ends.endRatio);
+                const drop = svgpath(ends.ball.d).scale(1, -1).translate(tx, ty + .2 * ends.ball.height).toString();
+                horn += ' ' + sameDirection(lean(drop), original.d);
+              }
               placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
             } else {
               // Râu mẫu (nét người vẽ, bề dày tùy hình): đáy chân râu ngay dưới chỗ có mép phải xa nhất (đầu chân serif của U,
@@ -543,8 +557,12 @@ export function roundTerminals(glyphs) {
     };
     const mid = widthAt((top + bottom) / 2);
     if (!(mid > 0)) continue;
+    // Chỉ đo được khi l là một nét đơn: cách đầu một bề dày, mặt cắt vẫn gần bằng giữa thân. Chữ viết có l là vòng nét,
+    // nét vuốt nhọn dần thì mặt cắt lệch xa: không coi là đầu tròn (lỗi cũ: font viết tay đầu nhọn bị râu bo tròn).
+    const simple = [top - mid, bottom + mid].every(y => { const w = widthAt(y) / mid; return w > .8 && w < 1.25; });
     // Cả đầu trên và chân thân đều tròn mới coi là font đầu tròn (đầu xiên của serif chỉ nhỏ ở đầu trên, chân có serif rộng).
-    return widthAt(top - .15 * mid) / mid < .85 && widthAt(bottom + .15 * mid) / mid < .85;
+    return simple && widthAt(top - .15 * mid) / mid < .85 && widthAt(bottom + .15 * mid) / mid < .85
+      && widthAt(top - .5 * mid) / mid > .85 && widthAt(bottom + .5 * mid) / mid > .85;
   }
   return false;
 }
@@ -661,23 +679,43 @@ export function deriveMarkSamples(glyphs) {
   // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ,
   // thon nhẹ về đầu và cắt bằng theo kiểu đầu nét của bộ chữ.
   // Khi ghép, râu được vẽ lại theo độ vươn và độ cao đầu râu chuẩn của từng chữ (o, u, O, U).
-  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem, roundTerminals(glyphs)));
+  // Đầu râu và độ thon theo nét của chính font (mark-standards.md, Kiểu đầu nét): đầu tay chữ r là giọt nước thì gắn
+  // đúng giọt nước đó vào đầu râu; vuốt nhọn thì râu thon nhọn; đầu tròn (đo ở l, nét đơn) thì bo tròn; còn lại cắt bằng.
+  // Độ thon theo độ tương phản như sắc/huyền: font thanh-đậm có râu thon dần, font nét đều có râu gần đều.
+  const ends = hornEnds(glyphs, stem, taper);
+  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem, ends.round, ends.endRatio));
+  marks.get('̛').hornEnd = ends;
   return { marks, stem, thickness: t };
 }
 
 // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ, thon nhẹ về đầu.
-export function hornShape(width, height, thickness, round = false) {
+// Kiểu đầu râu theo nét của chính font. Thứ tự: đầu tay r (giọt nước / vuốt nhọn / thường) → đầu tròn đo ở l (nét đơn).
+export function hornEnds(glyphs, stem, taper) {
+  const term = strokeTerminal(glyphs, stem, topRightEdge);
+  const round = !term?.ball && term?.terminal !== 'taper' && roundTerminals(glyphs);
+  // Đầu râu / chân râu: vuốt nhọn 0.3; thanh-đậm theo độ thon sắc/huyền (≥ 0.35); nét thường 0.82 như râu font chuẩn.
+  const endRatio = term?.terminal === 'taper' ? .3 : taper < .6 ? Math.max(.35, taper) : .82;
+  return { terminal: term?.terminal || (round ? 'round' : 'plain'), round, endRatio, ball: term?.ball || null };
+}
+
+// Tâm đầu râu (điểm cuối đường tâm) của hornShape cùng tham số: chỗ gắn giọt nước.
+export function hornTip(width, height, thickness, round = false, endRatio = .82) {
+  const end = thickness * endRatio;
+  return [Math.max(.6 * thickness, width - .45 * thickness), Math.max(.3 * height, height - (round ? end / 2 : 0))];
+}
+
+export function hornShape(width, height, thickness, round = false, endRatio = .82) {
   // Đường tâm râu: đi ngang ra rồi cong lên, tới đầu thì dựng đứng. Đầu râu theo kiểu đầu nét của bộ chữ:
   // font đầu vuông (Poppins, Arial, Segoe...) cắt phẳng ngang như râu font chuyên nghiệp; font đầu tròn thì bo tròn.
   // Đỉnh ngoài của đầu râu chạm đúng chiều cao yêu cầu, nên chữ đậm (nét dày) có đường tâm thấp hơn tương ứng.
-  const end = thickness * .82, w = Math.max(.6 * thickness, width - .45 * thickness);
+  const end = thickness * endRatio, w = Math.max(.6 * thickness, width - .45 * thickness);
   const h = Math.max(.3 * height, height - (round ? end / 2 : 0));
   const sweep = Math.PI / 2;
   const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [w * Math.sin(s * sweep) / Math.sin(sweep), h * Math.pow(s, 1.8)]; });
   const left = [], right = [];
   points.forEach((point, i) => {
     const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (1 - .18 * i / 24) / 2;
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (1 - (1 - endRatio) * i / 24) / 2;
     left.push([point[0] - dy / length * half, point[1] + dx / length * half]);
     right.push([point[0] + dy / length * half, point[1] - dx / length * half]);
   });
@@ -744,6 +782,14 @@ export function topRightEdge(d, bounds, root, stem) {
   for (let n = 0; n <= 12; n++) {
     const y = low + (bodyTop - 2 - low) * n / 12, x = rightEdgeAt(d, y);
     if (x !== null && (edge === null || x > edge + 1)) { edge = x; edgeY = y; }
+  }
+  // Chữ viết tay: nét trái của u cao hơn nét phải, dải trên chỉ có nét trái nên mép tìm được nằm ở nửa trái. Dò thấp
+  // xuống (tới nửa chiều cao) để nối râu vào nét phải, không kéo râu ngang qua cả chữ.
+  if (edge !== null && edge < bounds.x + .55 * bounds.width) {
+    for (let n = 0; n <= 16; n++) {
+      const y = bodyTop - 2 - (bodyTop - 2 - (bounds.y + bounds.height * .5)) * n / 16, x = rightEdgeAt(d, y);
+      if (x !== null && x > bounds.x + .55 * bounds.width) { edge = x; edgeY = Math.min(y, bodyTop - .5 * stem); break; }
+    }
   }
   return { edge: edge ?? bounds.x + bounds.width, edgeY };
 }

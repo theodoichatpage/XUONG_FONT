@@ -91,3 +91,43 @@ export function seatHorn(bodyD, hornD, stem) {
   } catch { /* không đo được: giữ nguyên */ }
   return hornD;
 }
+
+// Đầu râu dựng từ nét của chính font (mark-standards.md, Kiểu đầu nét): đo **đầu tay chữ r** — đoạn nét mọc từ thân rồi
+// kết thúc tự do, gần râu nhất. Tay r = chữ r trừ thân chữ i không chấm. Đầu phình to hơn nét tay (giọt nước của Times,
+// Palatino, Askino) → 'ball', kèm hình giọt nước lấy nguyên từ tay r (tâm ở gốc tọa độ) để gắn vào đầu râu; đầu vuốt
+// mảnh dần → 'taper'; còn lại 'plain' (đầu cắt như sans). Trả về null nếu không tách được tay r (chữ nghiêng dính nét).
+export function strokeTerminal(glyphs, stem, topRightEdge) {
+  const r = glyphs.get('r'), i = glyphs.get('i') || glyphs.get('ı');
+  if (!r?.d || !i?.d || !stem) return null;
+  try {
+    const parts = svgpath(i.d).abs().toString().split(/(?=M)/).filter(p => p.trim()).map(d => ({ d, b: glyphBounds({ d }) }));
+    const body = parts.sort((a, b) => b.b.height - a.b.height)[0];
+    if (!body) return null;
+    const arm = hornFromLetter(r, { char: 'ı', d: body.d }, stem, topRightEdge);
+    if (!arm) return null;
+    const polys = toPolygons(arm.d), b = glyphBounds({ d: arm.d });
+    if (b.width < .6 * stem) return null;
+    // Mặt cắt dọc theo chiều dài tay (tay r chạy ngang): bề dày ở giữa tay so với phần đầu tay.
+    const thick = x => {
+      let h = 0;
+      for (const p of polys) {
+        const ys = [];
+        for (let k = 0; k < p.length; k++) { const a = p[k], c = p[(k + 1) % p.length]; const ax = a.X / S, cx = c.X / S; if ((ax <= x) !== (cx <= x)) ys.push(a.Y / S + (x - ax) / (cx - ax) * (c.Y - a.Y) / S); }
+        ys.sort((m, n) => m - n);
+        for (let k = 0; k + 1 < ys.length; k += 2) h += ys[k + 1] - ys[k];
+      }
+      return h;
+    };
+    const at = f => thick(b.x + b.width * f);
+    const middle = Math.max(1, [.35, .45, .55].map(at).sort((m, n) => m - n)[1]);
+    const end = Math.max(at(.8), at(.86), at(.92)), tip = at(.95);
+    const terminal = end > 1.35 * middle ? 'ball' : tip < .45 * middle && end < .8 * middle ? 'taper' : 'plain';
+    if (terminal !== 'ball') return { terminal, middle };
+    // Giọt nước: phần tay r từ 70% chiều dài trở ra, đặt tâm khung về gốc tọa độ.
+    const cut = [[{ X: Math.round((b.x + .7 * b.width) * S), Y: -1e5 * S }, { X: 1e5 * S, Y: -1e5 * S }, { X: 1e5 * S, Y: 1e5 * S }, { X: Math.round((b.x + .7 * b.width) * S), Y: 1e5 * S }]];
+    const ball = run(ClipperLib.ClipType.ctIntersection, polys, cut);
+    if (!ball.length) return { terminal: 'plain', middle };
+    const d = toD(ball), bb = glyphBounds({ d });
+    return { terminal, middle, ball: { d: svgpath(d).translate(-(bb.x + bb.width / 2), -(bb.y + bb.height / 2)).round(1).toString(), width: bb.width, height: bb.height } };
+  } catch { return null; }
+}

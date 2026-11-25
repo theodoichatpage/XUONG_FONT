@@ -113,6 +113,16 @@ export const RULES = [
       }
       return out;
     } },
+  { id: 'horn-pair', text: 'Cặp râu ư ơ: đầu râu cao bằng nhau', skill: 'references/design-rules.md mục 5 (Cặp râu)',
+    // Font chuẩn: đầu râu ư và ơ cao bằng nhau ở 8/12 font đo (Segoe, Tahoma, Verdana, Calibri, Palatino, Consolas, Times),
+    // lệch ≤ 37 ở số còn lại. Chỉ chấm cặp Xưởng ghép, ngưỡng 20/1000 em như chỉ báo chênh đỉnh râu của Xưởng. Chữ hoa Ư Ơ
+    // mỗi nhà thiết kế một kiểu (lệch −13 tới 129) nên không chấm.
+    check(map) {
+      const u = map.get('ư'), o = map.get('ơ');
+      if (!u?.d || !o?.d || (u.source !== 'Ghép dấu' && o.source !== 'Ghép dấu')) return null;
+      const top = g => { const b = glyphBounds(g); return b.y + b.height; }, diff = top(u) - top(o);
+      return Math.abs(diff) <= 20 ? [] : [{ char: 'ư ơ', measure: 'lệch ' + Math.round(diff), target: '≤ 20' }];
+    } },
   { id: 'outline', text: 'Viền không xù, đường cong không gấp khúc', skill: 'references/xuong-font-workflow.md 2',
     check(map, ctx) {
       const out = [];
@@ -144,9 +154,11 @@ export function checkRules(map, { editable = glyph => glyph?.source !== 'Font g�
 
 export function ruleMessage(result, { only } = {}) {
   if (!result) return '';
-  const rows = result.rows.filter(r => r.status === 'fail' && (!only || only.includes(r.id)));
+  // Mọi quy tắc lệch đều được kể tên (lỗi cũ: báo "đạt 8/10" mà không nói hai quy tắc nào lệch). `only`: quy tắc kể kèm chữ lệch.
+  const failed = result.rows.filter(r => r.status === 'fail');
+  const list = r => !only || only.includes(r.id) ? r.text + ' (' + r.issues.slice(0, 8).map(i => i.char).join(' ') + (r.issues.length > 8 ? ' …' : '') + ')' : r.text + ' (' + r.issues.length + ' chữ)';
   return ' Đối chiếu quy tắc skill: đạt ' + result.passed + '/' + result.checked + ' quy tắc.'
-    + (rows.length ? ' LỆCH: ' + rows.map(r => r.text + ' (' + r.issues.slice(0, 8).map(i => i.char).join(' ') + (r.issues.length > 8 ? ' …' : '') + ')').join('; ') + '.' : '');
+    + (failed.length ? ' LỆCH: ' + failed.map(list).join('; ') + '.' : '');
 }
 
 // Sửa theo bảng quy tắc những gì sửa được an toàn (chỉ dời, co dọc ít, co/giãn dấu câu và chấm nặng; không vẽ lại hình):

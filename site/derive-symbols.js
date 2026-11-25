@@ -92,6 +92,16 @@ export function deriveSymbols(glyphs) {
       const b = glyphBounds(S), x = b.x + b.width / 2, t = bar * .8;
       return { d: S.d + ' ' + orient(rect(x - t / 2, b.y - .1 * capTop, x + t / 2, b.y + b.height + .1 * capTop)), keep: true };
     },
+    // ₫ (U+20AB, design-rules.md: hình đ và gạch dưới, so với số và đường chân): đ của chính font thu 0.7, đỉnh ngang
+    // chữ hoa như số; gạch dưới rộng bằng đ đã thu, dày 0.5 nét thân, nằm trên đường chân (cách Arial, Times, Palatino
+    // làm: cả ký hiệu cao bằng chữ hoa, đứng cùng hàng số trong "20₫").
+    '₫': () => {
+      const dd = glyphs.get('đ'); if (!dd?.d) throw Error('Cần chữ đ.');
+      const b = glyphBounds(dd), k = .7, top = Math.max(capTop, b.y + b.height * k);
+      const small = svgpath(dd.d).translate(-b.x, -(b.y + b.height)).scale(k).translate(0, top).toString();
+      const bottom = top - b.height * k, t = .5 * stem, gap = .1 * capTop;
+      return { d: small + ' ' + orient(rect(0, bottom - gap - t, b.width * k, bottom - gap)), keep: true };
+    },
     '%': () => {
       const r = .19 * capTop, w = stem * .78, ring = (cx, cy) => {
         const pts = k => Array.from({ length: 40 }, (_, i) => { const a = i * Math.PI / 20; return [cx + k * .82 * Math.cos(a), cy + k * Math.sin(a)]; });

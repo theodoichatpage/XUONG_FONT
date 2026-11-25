@@ -37,7 +37,8 @@ Huyền là ảnh gương của sắc: cùng cao, cùng rộng, đầu rộng �
 
 ## Dấu nặng
 
-- Cỡ (cạnh lớn nhất) bằng **0.88** [0.67–1.0] dấu chấm của chính font. Không font nào trong nhóm dùng dấu nặng to hơn dấu chấm.
+- Số đo: cỡ (cạnh lớn nhất) bằng **0.88** [0.67–1.0] dấu chấm của chính font. Không font nào trong nhóm dùng dấu nặng to hơn dấu chấm.
+- **Xưởng dùng: nặng bằng dấu chấm của chính font** (người dùng chốt 22/11/2026; bảng quy tắc `dot-below`, sai ≤ 10%). Tạo dấu tiếng Việt dựng nặng 0.88 dấu chấm rồi bước sửa theo bảng quy tắc đưa về bằng dấu chấm, như mọi thao tác dựng khác.
 - Theo nét thân: **1.21** [0.9–1.75]. Font mảnh có dấu chấm to 2–3,7 lần nét (Segoe Light 1,76; Courier 3,67), nên nặng phải nhỏ hơn dấu chấm nhiều hơn.
 - Hở thân–dấu: **0.093** [0.06–0.16] x-height, chặt hơn dấu trên.
 
@@ -56,8 +57,12 @@ Bề dày râu gần bằng nét thân (đo được ở Ư: 0.86–0.92 nét th
 
 **Hình râu dựng cho chữ đậm (Bold, Black):** nét râu dày gần bằng nét thân, nên:
 - Chân râu nằm gọn trong thân: tâm chân thấp hơn đỉnh u/o ít nhất 0.5 nét thân (chân dày 0.9 nét), để mép trên chân không cao hơn đỉnh thân; nếu không sẽ thành bậc khấc hoặc gờ mỏng ở chỗ nối.
-- Đầu râu theo kiểu đầu nét của chính font. Đo đầu trên và chân thân `l`: ở độ sâu 0.15 bề dày, mặt cắt còn dưới 0.85 bề dày ở cả hai đầu thì là font đầu tròn (Comic Sans, Segoe Print) và râu bo tròn. Còn lại (Poppins, Arial, Segoe, Times...) râu cắt phẳng ngang ở đỉnh như râu của Segoe UI Black, Arial Black. Không bo tròn râu khi các nét khác của chữ sắc vuông.
+- Đầu râu và độ thon theo nét của chính font: giọt nước, vuốt nhọn, đầu tròn hay cắt bằng, đo trên tay chữ r và thân l theo mục [Kiểu đầu nét](#kiểu-đầu-nét). Không bo tròn râu khi các nét khác của chữ sắc vuông hay vuốt nhọn.
 - Đỉnh ngoài của đầu râu chạm đúng độ cao đầu râu theo bảng trên (đầu bo tròn: đường tâm thấp xuống nửa bề dày).
+
+**Chỗ nối râu (mọi râu Xưởng ghép):** chân râu mọc từ mép phải xa nhất của phần trên chữ gốc: đầu chân serif của U (Times, Georgia), vai phải của o/O, mép thân u. Chân cắm vào nét không quá 0.6 nét thân (bảng quy tắc `horn`). Không mọc từ giữa nét dưới chân serif rồi vắt ngang qua nó (lỗi 25/11/2026: râu ảnh cao cố định 130, lùi 12% vào giữa thân). Râu mẫu từ bảng dấu giữ hình người vẽ, co giãn cho khớp độ vươn và độ cao đầu râu ở bảng trên (tỉ lệ ngang/dọc lệch nhau ≤ 1.6 lần).
+
+**Cặp râu ư ơ:** đầu râu cao bằng nhau (font chuẩn: bằng nhau ở 8/12 font đo, lệch ≤ 37 ở số còn lại); bảng quy tắc `horn-pair` chấm cặp Xưởng ghép, lệch ≤ 20/1000 em. Ư Ơ mỗi nhà thiết kế một kiểu (lệch −13 tới 129) nên không chấm.
 
 **Độ rộng (advance) của ơ ư:** râu được phép lấn sang lề phải, không cộng cả đoạn râu vào độ rộng. Font chuyên nghiệp có lề phải của ư thường âm (Segoe −9, Verdana −46, Arial Italic −87), nên khoảng hở "ươ", "ưn" gần bằng "uo", "un". Xưởng cộng thêm 0.2 × đoạn râu chìa ra cho ư Ư, 0 cho ơ Ơ. Lề phải mới không âm quá 0.15 × độ rộng chữ so với lề gốc (Italic: 0.15 + 0.5 × độ nghiêng), để râu không đâm vào chữ kế bên. Cộng đủ cả đoạn râu cộng thêm lề làm "hương", "ưng" thưa hẳn ra.
 
@@ -104,7 +109,7 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 **Nguyên tắc (người dùng 23/11/2026):** dấu luôn lấy từ chính font đang làm, không lấy dấu hay chữ của font khác đưa vào bộ font mới. Áp như nhau cho font dựng từ ảnh và font nước ngoài cần Việt hóa. Thứ tự:
 
-- **Font dựng từ ảnh:** dấu người dùng vẽ trong chữ có dấu đã tách từ ảnh (hỏi ở ỏ/ả, mũ ở ê, nặng ở ọ… — `marksFromImageLetters`, giữ cỡ người vẽ) → dấu từ ảnh bảng dấu → loại dấu ảnh chưa có thì **dựng từ nét của chính font** theo quy tắc trang này (độ dày theo nét thân, độ thon/đầu nét theo kiểu nét, cỡ/khoảng hở/hai tầng theo tỉ lệ chuẩn tính trên x-height và chữ o của chính font). Không dùng hình dấu mặc định. Dấu mẫu đổi thì các chữ Xưởng đã ghép bằng dấu đó được ghép lại.
+- **Font dựng từ ảnh:** dấu người dùng vẽ trong chữ có dấu đã tách từ ảnh (hỏi ở ỏ/ả, mũ ở ê, nặng ở ọ… — `marksFromImageLetters`, giữ cỡ người vẽ; **râu** liền thân nên tách bằng cách lấy ư/ơ/Ư/Ơ của ảnh trừ u/o/U/O cùng ảnh, giữ hình, cỡ và khoảng tới mép phải vùng trên như trong ảnh, chữ hoa dùng râu chữ hoa nếu ảnh có — `site/horn-from-letters.js`) → dấu từ ảnh bảng dấu → loại dấu ảnh chưa có thì **dựng từ nét của chính font** theo quy tắc trang này (độ dày theo nét thân, độ thon/đầu nét theo kiểu nét, cỡ/khoảng hở/hai tầng theo tỉ lệ chuẩn tính trên x-height và chữ o của chính font). Không dùng hình dấu mặc định. Dấu mẫu đổi thì các chữ Xưởng đã ghép bằng dấu đó được ghép lại.
 - **Font nước ngoài cần Việt hóa:** dấu của nhà thiết kế có trong chữ Latin của font (á à ã â ă…) dùng trước; dấu font chưa có (hỏi, nặng, râu, trăng…) dựng từ nét của chính font theo quy tắc trang này.
 
 - **Dấu font đã có:** dùng trước, lấy từ chữ Latin do nhà thiết kế vẽ theo thứ tự cố định (ã õ ñ ũ..., chữ hoa Ã Õ Ñ Ũ...). Không lấy mẫu từ khối chữ tiếng Việt U+1EA0–1EF9 hay ơ ư: trong font đã Việt hóa rồi mở lại, các chữ đó có thể do công cụ ghép, và lấy chúng làm mẫu làm dấu cùng loại khác nhau giữa các chữ (ễ khác Ữ). Chữ hoa dùng dấu hoa tách từ Á, À, Ã... của chính font, không đặt dấu chữ thường lên chữ hoa.
@@ -138,7 +143,23 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 ## Kiểu đầu nét
 
-Đo đầu trên và chân thân `l`: ở độ sâu 0.15 bề dày tính từ mép, mặt cắt dưới 0.85 bề dày ở **cả hai** đầu thì font có đầu tròn. Kết quả khi lập chuẩn: Comic Sans, Comic Sans Bold, Segoe Print là đầu tròn; Arial, Arial Black, Segoe UI (mọi độ đậm), Times, Calibri, Consolas, Verdana, Bahnschrift là đầu vuông/serif. Râu dựng theo đúng kiểu này (dấu hỏi dựng hiện chưa áp quy tắc đầu nét); không bo tròn khi nét chữ sắc vuông, không cắt vuông khi nét chữ tròn.
+Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của chính font** (quy tắc Hòa hợp, design-rules.md mục 7), không chọn giữa vài hình có sẵn. Đầu nét đo trên **nét kết thúc tự do của chính font**, không đoán theo loại font.
+
+1. **Đầu tay chữ r** (nét mọc từ thân rồi kết thúc tự do, gần râu nhất). Tay r = chữ r trừ thân chữ i không chấm. Đo bề dày dọc theo tay: phần đầu (70–92% chiều dài) dày hơn 1.35 lần giữa tay → **giọt nước**; đầu (95%) mảnh dưới 0.45 lần và phần đầu dưới 0.8 lần giữa tay → **vuốt nhọn**; còn lại → **thường**. Đo được: Times, Georgia, Palatino, Comic Sans, Monotype Corsiva, Askino là giọt nước; Arial, Arial Bold, Calibri, Segoe UI, Verdana, Tahoma, Courier, Segoe Print, Gabriola là thường. Chữ nghiêng có r dính nét với thân (Times Italic, Segoe Script) không tách được tay r: chuyển sang bước 2.
+2. **Đầu thân `l`, chỉ khi l là một nét đơn:** cách mỗi đầu một bề dày, mặt cắt còn 0.8–1.25 lần giữa thân (không vòng nét, không chân serif). Ở độ sâu 0.15 bề dày mặt cắt dưới 0.85 và ở 0.5 bề dày trên 0.85 ở **cả hai** đầu → **đầu tròn** (Comic Sans, Segoe Print, MV Boli). l của chữ viết là vòng nét hoặc vuốt nhọn dần: **không** được coi là đầu tròn (lỗi 25/11/2026: font chữ viết đầu nhọn bị râu bo tròn vì chỉ đo mặt cắt ngang của l và chỉ có hai kiểu tròn/vuông).
+3. Không đo được thì đầu **cắt bằng** như râu font chuẩn.
+
+**Râu dựng theo đầu nét:**
+- Giọt nước: thân râu dựng theo chuẩn đo (vươn, cao, nối như mục Râu ơ ư), đầu râu gắn **đúng giọt nước lấy từ đầu tay r** của font, lật dọc cho bầu giọt ở trên (ở r giọt nước rủ xuống cuối tay ngang, râu thì vươn lên). Đỉnh giọt chạm độ cao đầu râu chuẩn.
+- Vuốt nhọn: râu thon dần, đầu còn 0.3 bề dày chân.
+- Đầu tròn: bo tròn. Thường: cắt bằng.
+- **Độ thon theo độ tương phản** như sắc/huyền (mục Nét đều hay nét thanh-đậm): thon = 1.1 × tương phản − 0.1; font thanh-đậm (thon < 0.6) có đầu râu bằng max(0.35, thon) × bề dày chân; font nét đều và sans thường giữ 0.82 như râu font chuẩn.
+- Chữ nghiêng: râu và giọt nước nghiêng theo chữ (mục Chữ nghiêng).
+- Râu vươn không quá 0.45 độ rộng chữ tính từ chỗ nối. Chữ viết có nét trái của u cao hơn nét phải thì chỗ nối dò xuống nét phải (tới nửa chiều cao), không kéo râu ngang qua cả chữ.
+
+**Giới hạn còn lại:** chữ viết **nối nét** (u, o có nét nối chìa lên bên phải như Segoe Script) thì râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ. Dấu hỏi, ngã dựng chưa áp đầu nét giọt nước/vuốt nhọn (chỉ áp độ thon theo tương phản).
+
+Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
 
 ## Hai tầng: dấu thanh nằm trên mũ/trăng
 

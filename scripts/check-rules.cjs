@@ -12,7 +12,7 @@ function moduleFor(name, file) {
 }
 const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
 const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
-const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
 const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
@@ -124,5 +124,24 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     assert.ok(Math.abs(reachGot - reachWant) <= .3 * reachWant + 10, name + ': râu ơ vươn ' + Math.round(reachGot) + ', ơ thật ' + Math.round(reachWant));
   }
   done.push('râu tách từ chữ ư trong ảnh: đạt');
+  // 7. Đầu râu dựng từ nét của chính font (mark-standards.md, Kiểu đầu nét). Lỗi cũ: font chữ viết đầu vuốt nhọn bị râu
+  // bo tròn vì chỉ có hai kiểu tròn/vuông và l của chữ viết (vòng nét) bị đo nhầm là đầu tròn.
+  const endsCases = [['Times New Roman', 'C:/Windows/Fonts/times.ttf', e => e.terminal === 'ball' && e.ball && !e.round],
+    ['Arial', 'C:/Windows/Fonts/arial.ttf', e => e.terminal === 'plain' && !e.round && e.endRatio === .82],
+    ['Monotype Corsiva', 'C:/Windows/Fonts/MTCORSVA.TTF', e => !e.round], ['Segoe Script', 'C:/Windows/Fonts/segoesc.ttf', e => !e.round],
+    ['Comic Sans', 'C:/Windows/Fonts/comic.ttf', e => e.terminal !== 'taper']];
+  for (const [name, file, ok] of endsCases) {
+    if (!fs.existsSync(file)) continue;
+    const map = glyphMap(parse(fs.readFileSync(file)), 'Font gốc'), ends = hornEnds(map, measureStem(map), Math.max(.2, Math.min(1, 1.1 * measureBody(map).contrast - .1)));
+    assert.ok(ok(ends), name + ': đầu râu sai kiểu ' + JSON.stringify({ ...ends, ball: !!ends.ball }));
+    if (name === 'Times New Roman') {
+      for (const c of [...'ơưƠƯờởữợ']) map.delete(c);
+      const { marks } = deriveMarkSamples(map); for (const [m, g] of marks) if (!map.get(m)) map.set(m, g);
+      const made = new Map(composeVietnamese(map, () => false).map(g => [g.char, g]));
+      const rows = checkRules(new Map([...map, ...made]));
+      assert.notEqual(status(rows, 'horn'), 'fail', name + ': râu giọt nước rời thân ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
+    }
+  }
+  done.push('đầu râu theo nét của font (giọt nước, vuốt nhọn, cắt bằng): đạt');
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });

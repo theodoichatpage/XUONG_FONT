@@ -729,15 +729,18 @@ function inkBounds(ink, width) {
   return bounds.x1 >= 0 ? [bounds] : [];
 }
 
+// Ghép lại chữ có dấu theo chữ gốc/dấu mẫu vừa đổi. Trả về các chữ vừa ghép để bảng quy tắc sửa và đối chiếu cả chúng.
 function updateComposed() {
   const composed = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   for (const [char, glyph] of glyphs) {
     if (glyph.source === 'Ghép dấu' && !glyphs.has(glyph.base)) glyphs.delete(char);
   }
+  const changed = [];
   for (const glyph of composed) {
     const active = [...glyph.char.normalize('NFD')].slice(1).some(mark => toneSamples.has(mark) && glyphs.has(mark));
-    if (glyphs.get(glyph.char)?.origin !== 'direct' && !glyphs.get(glyph.char)?.locked && glyphs.get(glyph.char)?.source !== 'Font gốc' && (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active)) glyphs.set(glyph.char, glyph);
+    if (glyphs.get(glyph.char)?.origin !== 'direct' && !glyphs.get(glyph.char)?.locked && glyphs.get(glyph.char)?.source !== 'Font gốc' && (glyphs.get(glyph.char)?.source === 'Ghép dấu' || active)) { glyphs.set(glyph.char, glyph); changed.push(glyph.char); }
   }
+  return changed;
 }
 
 
@@ -941,9 +944,10 @@ async function trace(single) {
     rememberReference();
     if (references[activeReference]) references[activeReference].settings.used = true;
     persistReferences();
-    updateComposed();
+    // Chữ có dấu ghép lại theo nét vừa tách cũng là chữ vừa dựng: sửa và đối chiếu cả chúng.
+    const recomposed = updateComposed();
     refresh();
-    const ruleNote = enforceRules([...traced.keys()]);
+    const ruleNote = enforceRules([...traced.keys(), ...recomposed]);
     refresh();
     status(`Đã thêm ${traced.size} ký tự từ ảnh mẫu.` + ruleNote);
   } catch (error) { status(error.message); }
@@ -1269,13 +1273,14 @@ $('borrow-glyphs').addEventListener('click', async () => {
   const { added, rejected, donors } = borrowMissing({ styles, target: glyphs, weight, italic, chars: charset });
   if (!donors.length) return status('Bộ font chưa có kiểu nào khác có chữ để lấy. Hãy dựng kiểu kia từ ảnh trước, ví dụ ảnh số ở kiểu Medium.');
   for (const glyph of added) glyphs.set(glyph.char, glyph);
+  const ruleNote = enforceRules(added.map(glyph => glyph.char));
   refresh();
   const groups = new Map();
   for (const glyph of added) groups.set(glyph.borrowedFrom, [...(groups.get(glyph.borrowedFrom) || []), glyph]);
   const message = (added.length ? 'Đã lấy ' + added.length + ' chữ: ' + [...groups].map(([name, list]) =>
     list.map(g => g.char).join(' ') + ' từ ' + name + ' (' + (list[0].weightShift >= 0 ? 'làm dày ' : 'làm mỏng ') + Math.abs(list[0].weightShift) + ' đơn vị mỗi bên nét)').join('; ') + '. Đây là nét suy luận, hãy xem lại.'
     : 'Không có chữ còn thiếu nào có sẵn ở kiểu khác (' + donors.join(', ') + ').')
-    + (rejected.length ? ' Bỏ qua ' + rejected.join(' ') + ' vì làm dày sẽ bít lòng chữ hoặc làm đứt nét.' : '');
+    + (rejected.length ? ' Bỏ qua ' + rejected.join(' ') + ' vì làm dày sẽ bít lòng chữ hoặc làm đứt nét.' : '') + ruleNote;
   status(message);
   reportDesign(message);
 });
@@ -1318,7 +1323,10 @@ $('derive-marks').addEventListener('click', () => {
     + (symbols.length ? ` Dựng thêm ${symbols.length} dấu câu, ký hiệu còn thiếu: ${symbols.map(g => g.char).join(' ')}.` : '')
     + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) }))
     + ' Đây là nét suy luận: hãy xem lại trong Thử tiêu đề, chỉnh bằng Chỉnh dấu hoặc thay bằng ảnh bảng dấu nếu có.'
-    + ruleMessage(checkRules(glyphs), { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'horn', 'marks'] });
+    // SKILL.md (Bảng quy tắc): sau mọi thao tác dựng, sửa những gì sửa được an toàn trên chữ vừa dựng rồi đối chiếu cả bảng
+    // (lỗi cũ: bước này chỉ đối chiếu, không sửa).
+    + enforceRules([...madeMarks.map(([mark]) => mark), ...barred, ...letters, ...generated, ...symbols].map(item => item.char || item));
+  refresh();
   status(message);
   reportDesign(message);
 });
@@ -1328,8 +1336,8 @@ $('apply-lowercase-horns').addEventListener('click', () => {
   const generated = applyCompactLowercaseHorns(glyphs);
   if (!generated.length) return status('Cần có chữ o hoặc u thường trước khi ghép râu.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);
+  const message = `Đã ghép râu đầu tròn cho: ${generated.map(glyph => glyph.char).join(' ')}.` + enforceRules(generated.map(glyph => glyph.char));
   refresh();
-  const message = `Đã ghép râu đầu tròn cho: ${generated.map(glyph => glyph.char).join(' ')}.`;
   status(message);
   reportDesign(message);
 });
@@ -1339,7 +1347,7 @@ $('apply-tone-samples').addEventListener('click', () => {
   const generated = applyReferenceMarks(glyphs, selected);
   if (!generated.length) return status('Chọn một chữ gốc có biến thể, hoặc chọn một dấu mẫu đã thêm.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);
-  const message = `Đã áp dụng dấu mẫu cho: ${generated.map(glyph => glyph.char).join(' ')}.`;
+  const message = `Đã áp dụng dấu mẫu cho: ${generated.map(glyph => glyph.char).join(' ')}.` + enforceRules(generated.map(glyph => glyph.char));
   refresh();
   status(message);
   reportDesign(message);
@@ -1353,8 +1361,10 @@ $('accents').addEventListener('click', () => {
   const generated = composeVietnamese(glyphs,()=>false,{requireReferenceMarks:[...glyphs.values()].some(g=>g.origin==='direct')});
   if (!generated.length) return status('Hãy thêm chữ nguyên âm gốc trước, ví dụ A, E hoặc O.');
   for (const glyph of generated) glyphs.set(glyph.char, glyph);
+  // Bảng quy tắc skill chạy sau mọi thao tác dựng, cả nhánh ghép bằng dấu mẫu đã có (lỗi cũ: nhánh này chỉ đối chiếu số đo).
+  const ruleNote = enforceRules(generated.map(glyph => glyph.char));
   refresh();
-  status(`Đã ghép ${generated.length} ký tự có dấu từ nguyên âm hiện có. Bạn có thể thay bằng nét lấy từ ảnh.` + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) })));
+  status(`Đã ghép ${generated.length} ký tự có dấu từ nguyên âm hiện có. Bạn có thể thay bằng nét lấy từ ảnh.` + auditMessage(auditMarks(glyphs, { slant: measureSlant(glyphs) })) + ruleNote);
 });
 $('remove').addEventListener('click', () => {
   if (busy || !glyphs.has(selected)) return;
@@ -1730,7 +1740,7 @@ function enforceRules(chars) {
   const { map, changed } = fixRules(glyphs, { editable, chars: chars ? new Set(chars) : undefined });
   if (changed.length) glyphs = new ProtectedGlyphMap(map);
   const result = checkRules(glyphs, { editable });
-  return (changed.length ? ' Sửa theo quy tắc: ' + changed.join(' ') + '.' : '') + ruleMessage(result, { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'marks'] });
+  return (changed.length ? ' Sửa theo quy tắc: ' + changed.join(' ') + '.' : '') + ruleMessage(result, { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'horn-pair', 'marks'] });
 }
 // Font do chính người dùng dựng trong Xưởng (không phải nét của nhà thiết kế khác):
 // - file Xưởng xuất mang mô tả "Made with draw-your-font" (src/assemble.js), kể cả khi được Nhập TTF vào Bộ sưu tập;
@@ -1876,7 +1886,7 @@ async function fixByRules() {
       + (kerned ? ' Kerning ' + kerned + ' cặp tiếng Việt được tính khi xuất.' : importedMetrics ? ' Font mở từ Bộ sưu tập: giữ nguyên kerning đã lưu.' : '')
       + (importedMetrics && !own ? ' Font của nhà thiết kế khác: chỉ sửa chữ Xưởng ghép/dựng, giữ nguyên nét gốc.' : '')
       + (before?.checked ? ' Trước khi sửa: đạt ' + before.passed + '/' + before.checked + ' chỉ số.' : '')
-      + auditMessage(after) + ruleMessage(checkRules(draft, { editable: glyph => glyph && !glyph.locked && (importedMetrics?.ownFont || glyph.source !== 'Font gốc') }), { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'outline'] });
+      + auditMessage(after) + ruleMessage(checkRules(draft, { editable: glyph => glyph && !glyph.locked && (importedMetrics?.ownFont || glyph.source !== 'Font gốc') }), { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'horn-pair', 'outline'] });
     if (!changed.length) {
       status('Hoàn thiện font: không có gì cần sửa theo quy tắc.' + tail + ' Đang kiểm file font…');
       if (missing.length) setTimeout(() => drawMissingWithAI(missing), 0);
