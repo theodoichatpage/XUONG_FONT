@@ -1694,7 +1694,6 @@ if (!glyphs.size) {
   note.textContent='Trong Bộ sưu tập, chọn font đã lưu để mở lại; hoặc Nhập TTF / OTF đã xuất. Dữ liệu dự án được lưu riêng trong từng trình duyệt.';
   recovery.append(heading,explanation,open,note);
   $('editor-font-check').replaceChildren(recovery);
-  $('editor-font-check').hidden = false;
 }
 
 async function restoreReferenceProject() {
