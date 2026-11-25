@@ -3,6 +3,7 @@ import { xuongFontFile } from './font-rename.js';
 import { ask } from './ask.js';
 import { auditMarks, auditMessage } from './rule-audit.js';
 import {setupOutlineCleanup} from './outline-cleanup-ui.js';
+import { setupFontLab } from './font-lab.js';
 import {cleanOutline,fromImage,sampleOutline} from './outline-cleanup.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import { placePunctuation as placePunctuationIn } from './punctuation-rules.js';
@@ -355,6 +356,30 @@ const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,prepareGlyph:
   retraceCandidate=undefined;$('accept-retrace').hidden=$('cancel-retrace').hidden=true;
   reviewProof=undefined;$('ai-proof').hidden=true;$('ai-review-run').disabled=true;
 }});
+
+// Font Lab (nháy đúp ô chữ): chữ sửa tay được khóa để Tạo dấu, Hoàn thiện và các bước dựng tự động không ghi đè.
+// Bảng chữ chặn ghi đè chữ khóa, nên ở đây ghi thẳng vào Map (chỉ khi người dùng tự lưu hoặc mở khóa trong Font Lab).
+async function commitLabEdit(previous, next) {
+  if (glyphs.get(previous.char) !== previous) throw Error('Chữ đã đổi trong lúc chỉnh. Đóng Font Lab rồi mở lại.');
+  const state = { glyphs: [...glyphs.values()].map(g => g === previous ? next : g), name: $('name').value, sample: $('sample').value, spacing: $('spacing').value, importedMetrics };
+  localStorage.setItem(storageKey, JSON.stringify(state));
+  try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { /* giữ thay đổi trong bộ chữ đang mở */ }
+  Map.prototype.set.call(glyphs, next.char, next);
+  recentGlyphs.add(next.char);
+  refresh();
+}
+const fontLab = setupFontLab({
+  getGlyph: char => glyphs.get(char),
+  commit: commitLabEdit,
+  unlock: async glyph => { const next = { ...glyph, locked: false, approved: false, version: (glyph.version || 0) + 1 }; await commitLabEdit(glyph, next); return next; },
+  recompose: char => composeVietnamese(glyphs, c => c === char, { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).find(g => g.char === char)?.d,
+  metrics: () => {
+    const top = char => { const g = glyphs.get(char); if (!g?.d) return undefined; const b = glyphBounds(g); return Math.round(b.y + b.height); };
+    return { ascent: importedMetrics?.ascent ?? ASCENT, descent: importedMetrics?.descent ?? DESCENT, cap: top('H'), x: top('x') };
+  },
+  label: char => toneSamples.get(char) ?? char,
+  onStatus: status
+});
 
 
 function showGlyphProof(proof) {
@@ -1190,6 +1215,7 @@ for (const char of [...toneSamples.keys(), ...charset]) {
   button.addEventListener('click', choose);
   // Soát ký tự: rê chuột lên ô là xem ngay (Migra: @mouseover="activeGlyphIndex = glyph.index").
   button.addEventListener('mouseover', () => inspectGlyph(char));
+  button.addEventListener('dblclick', () => { choose(); fontLab.open(char); });
   const grid = toneSamples.has(char) ? 'tone-samples' : lowercase.includes(char) ? 'lower-glyphs' : core.includes(char) || char === 'Đ' ? 'glyphs' : 'more-glyphs';
   $(grid).append(button);
   tiles.set(char, button);

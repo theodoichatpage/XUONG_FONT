@@ -276,6 +276,40 @@
 </section>
 <section id="font-checker" class="font-checker-page" role="tabpanel" aria-labelledby="open-font-checker" hidden><div class="checker-heading"><h2>Kiểm tra font tiếng Việt</h2><p>Phân tích file mới hoặc font thành phẩm ngay trên trình duyệt, không cần cài vào máy. Kết quả ở tab này tách riêng với bộ chữ đang chỉnh sửa.</p></div><section id="standalone-font-check" class="panel font-check-panel" aria-label="Kiểm tra file font độc lập"></section></section>
 </main>
+<dialog id="font-lab" class="font-lab" aria-labelledby="fl-title">
+  <div class="fl-head"><h2 id="fl-title">Font Lab</h2><span id="fl-source" class="help"></span><button id="fl-close" type="button" class="quiet" aria-label="Đóng Font Lab">×</button></div>
+  <div class="fl-body">
+    <div class="fl-stage">
+      <div class="fl-toolbar">
+        <label class="check"><input id="fl-points" type="checkbox" checked> Điểm và tay nắm</label>
+        <button id="fl-undo" type="button" title="Ctrl+Z">Hoàn tác</button><button id="fl-redo" type="button" title="Ctrl+Y">Làm lại</button>
+        <button id="fl-fit" type="button">Vừa khung</button>
+        <span id="fl-stats" class="help"></span>
+      </div>
+      <canvas id="fl-canvas" tabindex="0" aria-label="Nét chữ phóng lớn. Kéo điểm hoặc tay nắm để sửa." title="Kéo điểm hoặc tay nắm · Shift: chọn thêm, giữ thẳng hướng · nháy đúp điểm: đổi góc/cong · Delete: xóa · phím mũi tên: dời 1 (Shift 10) · cuộn: phóng to · kéo nền: dời khung · Ctrl+A: chọn cả chữ · Space: ẩn/hiện điểm"></canvas>
+    </div>
+    <aside class="fl-side">
+      <section><h3>Điểm đang chọn</h3>
+        <div class="fl-xy"><label>X <input id="fl-x" type="number" step="1"></label><label>Y <input id="fl-y" type="number" step="1"></label></div>
+        <div class="tool-row"><button id="fl-toggle" type="button">Đổi thành điểm cong</button><button id="fl-delete" type="button">Xóa</button></div>
+      </section>
+      <section id="fl-contour" hidden><h3>Khối nét đang chọn</h3>
+        <label>Co giãn <output id="fl-scale-value">100</output>%<input id="fl-scale" type="range" min="50" max="150" value="100"></label>
+        <label>Xoay <output id="fl-rotate-value">0</output>°<input id="fl-rotate" type="range" min="-30" max="30" value="0"></label>
+      </section>
+      <section><h3>Làm sạch nét</h3>
+        <div class="tool-row"><select id="fl-cleanup-level" aria-label="Mức làm sạch"><option value=".75">Nhẹ</option><option value="1.5" selected>Vừa</option><option value="3">Mạnh</option></select><label class="check"><input id="fl-cleanup-preview" type="checkbox"> Xem trước</label><button id="fl-cleanup-apply" type="button">Áp dụng</button></div>
+        <p id="fl-cleanup-note" class="help" role="status"></p>
+      </section>
+      <section id="fl-recompose-box"><h3>Dấu</h3>
+        <button id="fl-recompose" type="button">Dựng lại dấu theo quy tắc</button>
+        <p id="fl-recompose-note" class="help" role="status"></p>
+      </section>
+      <p id="fl-message" class="help" role="status"></p>
+      <div class="tool-row fl-actions"><button id="fl-unlock" type="button" class="quiet" hidden>Mở khóa chữ</button><button id="fl-save" type="button" class="primary" disabled>Lưu chữ</button></div>
+    </aside>
+  </div>
+</dialog>
 <dialog id="full-preview" aria-labelledby="full-preview-title">
   <div class="viewer-toolbar">
     <h2 id="full-preview-title">Thử tiêu đề</h2>
