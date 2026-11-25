@@ -33,7 +33,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     <button type="button" data-fp="show-images">Xem / đổi phân loại ảnh</button><div data-fp="images" class="fp-images"></div><details data-fp="advanced"><summary>Chi tiết từng chữ, kiểu chữ và xuất nâng cao</summary><div data-fp="matrix" class="family-matrix"></div>
     <div class="tool-row"><label>Tên Style<input data-fp="style-name" maxlength="80"></label><button type="button" data-fp="rename-style">Lưu tên Style</button><button type="button" data-fp="open">Mở Style trong trình sửa</button><button type="button" data-fp="capture">Lưu phần sửa từ trình sửa về Style</button><button type="button" data-fp="compose">Ghép glyph thiếu từ thành phần có mẫu</button><button type="button" data-fp="export">Xuất TTF bản nháp Style</button><button type="button" data-fp="collection">Lưu TTF vào Bộ sưu tập</button><button type="button" data-fp="export-family">Xuất các Style đã hoàn thiện</button></div>
     <details><summary>Vùng ảnh chưa tách được</summary><p data-fp="trace-diagnostics" class="help"></p></details><p data-fp="style-state" class="help"></p><details><summary>Hồ sơ thiết kế theo bằng chứng ảnh</summary><div data-fp="profile"></div></details>
-    <div class="tool-row"><label>Lọc glyph<select data-fp="filter"><option value="all">Tất cả</option><option value="missing">Chưa có dữ liệu</option><option value="direct">Tham chiếu trực tiếp</option><option value="inferred">Suy luận</option><option value="error">Cần xem lại / bị từ chối</option><option value="approved">Đã duyệt và khóa</option></select></label><button type="button" data-fp="proof-all">Đối chiếu toàn Style từ ảnh gốc</button><button type="button" data-fp="approve-batch">Duyệt và khóa các glyph đã vượt đối chiếu</button></div><div data-fp="glyphs" class="fp-glyphs"></div>
+    <div class="tool-row"><label>Lọc glyph<select data-fp="filter"><option value="all">Tất cả</option><option value="missing">Chưa có dữ liệu</option><option value="direct">Tham chiếu trực tiếp</option><option value="inferred">Suy luận</option><option value="error">Cần xem lại / bị từ chối</option><option value="approved">Đã duyệt và khóa</option></select></label><button type="button" data-fp="proof-all">Đối chiếu toàn Style từ ảnh gốc</button><button type="button" data-fp="approve-batch">Duyệt và khóa các glyph đã vượt đối chiếu</button></div><p data-fp="proof-all-status" class="help" role="status" aria-atomic="true"></p><div data-fp="glyphs" class="fp-glyphs"></div>
     <section data-fp="proof-section"><h3>Đối chiếu glyph gốc</h3><label>Chữ đã tách<select data-fp="review-char"></select></label><p class="help">Trước hết kiểm tra ảnh gốc có đúng ký tự đang chọn không. Điểm trùng nét chỉ đo vector so với vùng ảnh, không xác nhận AI đã đọc đúng chữ.</p><p data-fp="glyph-name"></p><label class="check"><input type="checkbox" data-fp="identity"> Tôi đã xem ảnh gốc: đúng ký tự đang chọn, không cắt nhầm chữ hoặc dấu</label><div class="tool-row"><label>Ngưỡng ảnh<input type="number" min="0" max="254" value="128" data-fp="threshold"></label><label>IoU tối thiểu<input type="number" min="0" max="1" step=".01" value=".96" data-fp="iou"></label><label>Sai lệch contour trung bình tối đa (pixel hiển thị)<input type="number" min="0" max="10" step=".1" value="1" data-fp="contour"></label><label>Lệch chi tiết tối đa (pixel soát)<input type="number" min="0" max="20" step=".1" value="4" data-fp="edge"></label><label class="check"><input type="checkbox" data-fp="overlay">Overlay</label><button type="button" data-fp="retrace">Vector hóa lại glyph này</button><button type="button" data-fp="approve">Duyệt và khóa</button><button type="button" data-fp="reject">Từ chối</button><button type="button" data-fp="unlock">Mở khóa để sửa</button><button type="button" data-fp="previous">Khôi phục phiên bản trước</button></div><div data-fp="proof" class="fp-proof"></div><div data-fp="metrics" class="fp-metrics"></div><p class="help">Đen: phần trùng. Đỏ: nét nguồn bị thiếu. Xanh: nét xuất thừa. Chỉ một phép scale chung, không kéo giãn riêng để che sai lệch. Không tự loại watermark nằm trên nét chữ.</p></section>
     <label class="check"><input type="checkbox" data-fp="rendering">Tôi đã kiểm Style này trong ứng dụng sử dụng font, ở nhiều cỡ và hai dòng</label><button type="button" data-fp="verify">Kiểm điều kiện hoàn thiện Style</button></details>
     </div></div>`;
@@ -54,7 +54,7 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
     try{await queue;localStorage.setItem('xuong-font-active-family',project.id);say(message+' · Đã lưu bản '+snapshot.version+'.');await renderProjects();}
     catch(error){say('CHƯA LƯU ĐƯỢC: '+error.message+'. Giữ tab mở và thử Backup dự án.');throw error;}
   }
-  async function run(task){if(busy)return false;busy=true;root.setAttribute('aria-busy','true');try{await task();return true;}catch(error){say(error.message);return false;}finally{busy=false;root.removeAttribute('aria-busy');}}
+  async function run(task, report = say){if(busy)return false;busy=true;root.setAttribute('aria-busy','true');try{await task();return true;}catch(error){report(error.message);return false;}finally{busy=false;root.removeAttribute('aria-busy');}}
   async function renderProjects(){const rows=await listFamilyProjects();$('projects').replaceChildren(new Option('Chọn dự án đã lưu',''));for(const p of rows.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)))$('projects').append(new Option(p.name+' · '+p.styles.filter(s=>s.glyphs.length).length+' Style có glyph',p.id));$('projects').value=project?.id||'';}
   function touchStyle(style){style.status=styleStatus(style);style.verification=undefined;}
   async function makeFont(style){
@@ -176,13 +176,18 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
   $('filter').onchange=renderGlyphs;
   for(const field of ['overlay','threshold','iou','contour','edge'])$(field).onchange=()=>{void showProof();};
   $('approve').onclick=()=>run(async()=>{const g=activeGlyph();if(!glyphPass(g))throw Error('Cần xác nhận ảnh gốc đúng ký tự và đối chiếu đạt ngưỡng đã dùng khi phục dựng. Nếu đổi ngưỡng ảnh, hãy vector hóa lại trước khi duyệt.');g.approved=true;g.locked=true;g.reconstructionStatus='approved';await persist('Đã duyệt và khóa '+g.char);render();});
+  const reportBatchProof = message => {
+    $('proof-all-status').textContent = message;
+    say(message);
+  };
   $('proof-all').onclick=()=>run(async()=>{
+    reportBatchProof('Đang chuẩn bị TTF để đối chiếu ảnh gốc…');
     const options=proofOptions(),style=activeStyle(),{blob}=await makeFont(style),bytes=new Uint8Array(await blob.arrayBuffer());
     const candidates=style.glyphs.filter(g=>!g.locked).sort((a,b)=>String(a.sourceImageId).localeCompare(String(b.sourceImageId)));
     let cachedId,canvas,passed=0;const skipped=[];
     for(const [index,glyph]of candidates.entries()){
       flowSignal?.throwIfAborted();
-      say('Đối chiếu '+(index+1)+' / '+candidates.length+': '+glyph.char+'…');
+      reportBatchProof('Đối chiếu '+(index+1)+' / '+candidates.length+': '+glyph.char+'…');
       const image=project.images.find(i=>i.id===glyph.sourceImageId);
       if(!image||!glyph.placement){skipped.push(glyph.char+' (thiếu ảnh hoặc phép đặt)');continue;}
       try{
@@ -192,9 +197,15 @@ export function setupFamilyWorkspace(root,{traceWords,getKey,getModel,exportStyl
       }catch(error){glyph.proof=undefined;skipped.push(glyph.char+' ('+error.message+')');}
       await new Promise(resolve=>setTimeout(resolve,0));
     }
-    await persist('Đã đối chiếu toàn Style: '+passed+' / '+candidates.length+' glyph chưa khóa qua ngưỡng. Bỏ qua: '+(skipped.join(', ')||'không'));
+    const checked = candidates.length - skipped.length;
+    const summary = checked
+      ? `Đã đối chiếu ${checked} chữ. ${passed} qua ngưỡng, ${checked - passed} cần xem lại.`
+      : 'Chưa có chữ nào đủ dữ liệu ảnh gốc để đối chiếu trong kiểu đang chọn.';
+    const message = summary + (skipped.length ? ` Bỏ qua ${skipped.length} chữ: ${skipped.join(', ')}.` : '');
+    await persist(message);
+    $('proof-all-status').textContent = message;
     renderGlyphs();
-  });
+  }, reportBatchProof);
   $('approve-batch').onclick=()=>run(async()=>{let count=0;for(const g of activeStyle().glyphs)if(glyphPass(g)){g.approved=true;g.locked=true;g.reconstructionStatus='approved';count++;}await persist('Đã duyệt và khóa '+count+' glyph có kết quả đối chiếu');render();});
   $('reject').onclick=()=>run(async()=>{const g=activeGlyph();if(!g)return;if(g.locked)throw Error('Mở khóa trước khi từ chối glyph đã duyệt.');g.approved=false;g.reconstructionStatus='rejected';await persist('Đã từ chối '+g.char);render();});
   $('unlock').onclick=()=>run(async()=>{const g=activeGlyph();if(!g)return;g.locked=false;g.approved=false;g.reconstructionStatus='needs-review';g.proof=undefined;await persist('Đã mở khóa '+g.char);render();});
