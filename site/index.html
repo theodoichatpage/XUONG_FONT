@@ -100,6 +100,11 @@
         <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
         <div class="tool-row"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div>
         <div class="selection-row">
+          <label for="glyph-filter">Lọc ký tự</label>
+          <select id="glyph-filter"><option value="all">Tất cả</option><option value="recent">Vừa tạo</option><option value="missing">Còn thiếu</option><option value="review">Cần xem</option></select>
+          <span id="glyph-filter-status" class="help" role="status"></span>
+        </div>
+        <div class="selection-row">
           <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
           <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
         </div>
@@ -143,6 +148,11 @@
     <div class="workspace-side">
       <section class="panel proof" aria-labelledby="proof-title">
         <div class="panel-title"><h2 id="proof-title">Thử tiêu đề</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
+        <div class="tool-row" role="group" aria-label="Chế độ xem font">
+          <button id="show-title-proof" type="button" aria-pressed="true">Thử tiêu đề</button>
+          <button id="show-glyph-proof" type="button" aria-pressed="false">Soát ký tự</button>
+        </div>
+        <div id="title-proof">
         <label for="sample">Nội dung xem trước</label>
         <textarea id="sample" rows="2" maxlength="240">Sớm mai, khi dân làng trở về quê hương, gió thổi nhẹ qua hàng tre xanh, cảnh đẹp tựa bức tranh thủy mặc.</textarea>
         <div id="preview" role="region" aria-label="Tiêu đề mẫu">HÀO KHÍ LAM SƠN</div>
@@ -152,6 +162,21 @@
           <label>Khoảng cách chữ trong TTF <output id="spacing-value">10</output><input type="range" id="spacing" min="-30" max="140" value="10"></label>
         </div>
         <p id="missing" class="help" aria-live="polite"></p>
+        </div>
+        <div id="glyph-proof" hidden>
+          <div class="selection-row">
+            <strong id="glyph-proof-title"></strong>
+            <label><input id="glyph-proof-guides" type="checkbox" checked> Đường chuẩn</label>
+          </div>
+          <div id="glyph-proof-vector" class="glyph-proof-vector"></div>
+          <p id="glyph-proof-metrics" class="help"></p>
+          <div id="glyph-proof-context" class="glyph-proof-context"></div>
+          <ul id="glyph-proof-results" aria-live="polite"></ul>
+          <div class="tool-row">
+            <button id="glyph-proof-next" type="button">Chữ cần xem tiếp theo</button>
+            <button id="glyph-proof-adjust" type="button">Chỉnh dấu chữ này</button>
+          </div>
+        </div>
       </section>
       <section class="panel quality-workbench font-check-panel" id="editor-font-check" aria-label="Đánh giá và xử lý font đang làm"></section>
     </div>
