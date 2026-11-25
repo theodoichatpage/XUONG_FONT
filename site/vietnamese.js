@@ -2,6 +2,7 @@ import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
 import { MARK_STANDARDS as STD, STROKE_PER_MEASURED } from './mark-standards.js';
 import { sampleOutline } from './outline-cleanup.js';
+import { hornFromLetter, seatHorn } from './horn-from-letters.js';
 
 export const core = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'];
 export const lowercase = [...'abcdefghijklmnopqrstuvwxyzđ'];
@@ -227,19 +228,20 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             // Mép phải lấy lớn nhất trong dải từ độ cao nối tới đỉnh thân: U có chân serif thì râu mọc từ đầu chân serif
             // (như Times), không mọc từ giữa nét dưới chân serif rồi vắt ngang qua nó. o cong vào trong nên mép lớn nhất
             // nằm ở đáy dải, giữ như cũ.
-            const low = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .5 * stem);
-            let edge = null, edgeY = low;
-            for (let n = 0; n <= 12; n++) {
-              const y = low + (bodyTop - 2 - low) * n / 12, x = rightEdgeAt(original.d, y);
-              if (x !== null && (edge === null || x > edge + 1)) { edge = x; edgeY = y; }
-            }
-            edge ??= bounds.x + bounds.width;
+            const { edge, edgeY } = topRightEdge(original.d, bounds, root, stem);
             const attachY = Math.min(edgeY, bodyTop - .5 * stem);
             const key = 'oOuU'.includes(root) ? root : /[oO]/u.test(root) ? 'o' : 'u';
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
             const right = bounds.x + bounds.width, rsb = original.advance - right;
             let placedHorn;
-            if (sample.nativeSize) {
+            const own = sample.byRoot && (sample.byRoot[root] || [...(isCap ? 'UO' : 'uo')].map(r => sample.byRoot[r]).find(Boolean)
+              || Object.values(sample.byRoot)[0]);
+            if (own) {
+              // Râu người dùng vẽ trong chữ ư/ơ của ảnh: giữ nguyên hình và cỡ (cùng tỉ lệ ảnh với thân chữ), đặt cùng
+              // khoảng so với mép phải vùng trên và đỉnh thân như trong ảnh. Không co giãn theo chuẩn chung.
+              const hb = glyphBounds({ d: own.d });
+              placedHorn = seatHorn(original.d, svgpath(own.d).translate(edge + own.anchor.dx - hb.x, bodyTop + own.anchor.dy - hb.y).round(1).toString(), stem);
+            } else if (sample.nativeSize) {
               const shape = hornShape(right + reach - (edge - inset), Math.max(.6 * stem, bodyTop + tip - attachY), .9 * stem, body.roundEnds);
               const horn = sameDirection(body.slant ? svgpath(shape).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : shape, original.d);
               placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
@@ -733,6 +735,19 @@ export function deriveBarredD(glyphs, stem = measureStem(glyphs)) {
 }
 
 // Mép phải thật của các contour tại độ cao y (đơn vị font, trục y hướng lên).
+// Mép phải xa nhất của phần trên chữ gốc o/u (chỗ nối râu): từ độ cao nối (0.8 chiều cao với o, 0.9 với u, và thấp
+// hơn đỉnh ít nhất nửa nét) tới đỉnh thân. U có chân serif thì là đầu chân serif.
+export function topRightEdge(d, bounds, root, stem) {
+  const bodyTop = bounds.y + bounds.height;
+  const low = Math.min(bounds.y + bounds.height * (/[oO]/u.test(root) ? .8 : .9), bodyTop - .5 * stem);
+  let edge = null, edgeY = low;
+  for (let n = 0; n <= 12; n++) {
+    const y = low + (bodyTop - 2 - low) * n / 12, x = rightEdgeAt(d, y);
+    if (x !== null && (edge === null || x > edge + 1)) { edge = x; edgeY = y; }
+  }
+  return { edge: edge ?? bounds.x + bounds.width, edgeY };
+}
+
 export function rightEdgeAt(d, y) {
   let best = null, x0 = 0, y0 = 0, sx = 0, sy = 0;
   const cross = (ax, ay, bx, by) => {
@@ -773,7 +788,21 @@ export function marksFromImageLetters(glyphs) {
   const rank = char => { const i = 'aoeuiynAOEUIYN'.indexOf(char.normalize('NFD')[0]); return i < 0 ? 99 : i; };
   const out = new Map();
   for (const mark of toneSamples.keys()) {
-    if (mark === '\u031b') continue;   // râu liền thân, không tách
+    if (mark === '\u031b') {
+      // Râu liền thân: tách bằng cách trừ chữ gốc cùng ảnh (horn-from-letters.js). Mỗi chữ gốc giữ râu riêng (ư cho u,
+      // Ư cho U...), để ghép chữ còn thiếu bằng râu cùng kiểu chữ trước.
+      let stem = 0; try { stem = measureStem(glyphs) || 0; } catch { /* chưa đo được */ }
+      const byRoot = {};
+      for (const [root, horned] of [['u', 'ư'], ['o', 'ơ'], ['U', 'Ư'], ['O', 'Ơ']]) {
+        if (!fromImage(glyphs.get(horned)) || !glyphs.get(root)?.d) continue;
+        const horn = hornFromLetter(glyphs.get(horned), glyphs.get(root), stem, topRightEdge);
+        if (horn) byRoot[root] = horn;
+      }
+      const first = Object.entries(byRoot)[0];
+      if (first) out.set(mark, { char: mark, d: first[1].d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: { u: 'ư', o: 'ơ', U: 'Ư', O: 'Ơ' }[first[0]],
+        byRoot, approved: false, locked: false });
+      continue;
+    }
     const donors = [...glyphs.values()].filter(g => {
       if (!fromImage(g) || [...g.char].length !== 1) return false;
       const [root, ...marks] = g.char.normalize('NFD');

@@ -28,6 +28,7 @@ const near = (value, target, tolerance) => target > 0 && Math.abs(value / target
 // vùng trên chữ gốc (một phần năm trên, như chỗ Xưởng nối râu), cắm vào nét không quá 0.6 nét thân. Trả về độ lùi vào trong nếu vượt, 0 nếu đạt.
 export function hornFootOffset(glyph, map, stem) {
   if (glyph?.source !== 'Ghép dấu' || !stem) return 0;
+  if (map.get('̛')?.byRoot) return 0;   // râu lấy từ chữ ư/ơ trong ảnh: giữ chỗ nối như người vẽ
   const [root] = glyph.char.normalize('NFD'), base = map.get(root);
   if (!base?.d || !'oOuU'.includes(root)) return 0;
   const key = b => [b.x, b.y, b.width, b.height].map(v => Math.round(v)).join(',');

@@ -104,5 +104,25 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     }
   }
   done.push('râu mẫu ghép vào chữ có chân serif: đạt');
+  // 6. Râu vẽ trong chữ ư của ảnh: tách ra ghép ơ (và Ư, Ơ) giữ hình, cỡ của râu trong ảnh, liền thân (lỗi cũ: bỏ qua
+  // râu trong ảnh, dựng râu theo hình mẫu chung nên khác kiểu và cỡ font gốc). Đối chiếu với ơ thật của font.
+  for (const [name, file] of [['Times New Roman', 'C:/Windows/Fonts/times.ttf'], ['Arial Bold', 'C:/Windows/Fonts/arialbd.ttf'], ['Segoe UI', 'C:/Windows/Fonts/segoeui.ttf']]) {
+    if (!fs.existsSync(file)) continue;
+    const source = parse(fs.readFileSync(file)), image = glyphMap(source), real = glyphMap(source);
+    for (const g of image.values()) g.origin = 'direct';
+    for (const c of [...'ơƠƯờởữợ']) image.delete(c);
+    const horn = marksFromImageLetters(image).get('̛');
+    assert.ok(horn?.byRoot?.u, name + ': phải tách được râu từ chữ ư trong ảnh');
+    image.set('̛', horn);
+    const made = new Map(composeVietnamese(image, () => false, { requireReferenceMarks: true }).map(g => [g.char, g]));
+    const rows = checkRules(new Map([...image, ...made]));
+    assert.notEqual(status(rows, 'horn'), 'fail', name + ': râu lấy từ ảnh rời thân ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
+    const top = c => { const b = glyphBounds(c); return b.y + b.height; }, rightOf = c => { const b = glyphBounds(c); return b.x + b.width; };
+    const want = top(real.get('ơ')) - top(real.get('o')), got = top(made.get('ơ')) - top(image.get('o'));
+    assert.ok(Math.abs(got - want) <= Math.max(.25 * want, 20), name + ': râu ơ ghép từ râu ư cao ' + Math.round(got) + ' trên đỉnh, ơ thật ' + Math.round(want));
+    const reachWant = rightOf(real.get('ơ')) - rightOf(real.get('o')), reachGot = rightOf(made.get('ơ')) - rightOf(image.get('o'));
+    assert.ok(Math.abs(reachGot - reachWant) <= .3 * reachWant + 10, name + ': râu ơ vươn ' + Math.round(reachGot) + ', ơ thật ' + Math.round(reachWant));
+  }
+  done.push('râu tách từ chữ ư trong ảnh: đạt');
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });
