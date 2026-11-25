@@ -43,10 +43,10 @@
   <div id="font-workspace" class="workspace" role="tabpanel" aria-labelledby="open-font-workspace">
     <details id="family-image-workspace" class="panel family-image-workspace"></details>
     <section class="panel source" aria-labelledby="source-title">
-      <div class="panel-title"><h2 id="source-title">Ảnh mẫu</h2><button id="demo" type="button" class="quiet">Thử ảnh mẫu</button></div>
-      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Thêm ảnh mẫu · kéo thả hoặc Ctrl+V</strong><small id="filename">PNG, JPG, WebP</small></label>
+      <div class="panel-title"><h2 id="source-title">Ảnh mẫu và dựng chữ</h2></div>
+      <label id="drop" class="upload" for="file"><span class="upload-icon" aria-hidden="true">↑</span><strong>Chọn, kéo hoặc dán ảnh (Ctrl+V)</strong><small id="filename">PNG, JPG, WebP</small></label>
       <input id="file" type="file" multiple accept="image/png,image/jpeg,image/webp" class="visually-hidden">
-      <p id="reference-storage" class="help" role="status" aria-live="polite"></p>
+      <p id="reference-storage" class="help" role="status" aria-live="polite" hidden></p>
       <div id="references" class="reference-list" hidden>
         <label for="reference">Ảnh đang xử lý <span id="reference-count"></span></label>
         <div class="reference-controls">
@@ -54,12 +54,8 @@
           <select id="reference"></select>
           <button id="next-reference" type="button" aria-label="Ảnh tiếp theo">›</button>
         </div>
-        <div class="tool-row scan-actions">
-          <button id="ai-scan" class="primary" type="button" aria-describedby="ai-scan-help" disabled>Tạo bộ font</button>
-          <button id="stop-design" type="button" hidden>Dừng</button>
-        </div>
         <label class="check auto-draw"><input id="auto-draw" type="checkbox"> Bổ sung chữ thiếu từ thành phần có mẫu</label>
-        <p id="ai-scan-help" class="help">Nhập tên ở thanh trên, thêm ảnh rồi bấm Tạo bộ font. Xưởng tự dựng chữ, kiểm tra và lưu tiến độ. Chỉ cần xác nhận nếu có ảnh chưa rõ kiểu chữ.</p>
+        <p id="ai-scan-help" class="help" hidden>Nhập tên ở thanh trên, thêm ảnh rồi bấm Tạo bộ font. Xưởng tự dựng chữ, kiểm tra và lưu tiến độ. Chỉ cần xác nhận nếu có ảnh chưa rõ kiểu chữ.</p>
         <details id="ai-scan-report" class="scan-report" hidden>
           <summary id="ai-scan-summary" aria-live="polite">Kết quả dựng chữ</summary>
           <p id="ai-scan-result" class="tool-popover"></p>
@@ -70,7 +66,7 @@
           <canvas id="image" tabindex="0" role="button" aria-haspopup="dialog" aria-label="Ảnh mẫu. Bấm để xem lớn, kéo để khoanh vùng chữ."></canvas>
           <button id="remove-reference" class="remove-reference" type="button" aria-label="Bỏ ảnh đang mở khỏi danh sách" title="Bỏ ảnh này" hidden>×</button>
         </div>
-        <div class="inline"><small>Bấm để phóng to. Kéo để khoanh vùng chữ.</small><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
+        <div class="inline"><button id="clear-crop" class="quiet">Dùng cả ảnh</button></div>
         <section class="layout-text" aria-labelledby="layout-text-title">
           <label id="layout-text-title" for="layout-text">Nội dung chữ trong ảnh <small>(đúng thứ tự từng dòng)</small></label>
           <textarea id="layout-text" rows="4" spellcheck="false" placeholder="Gõ đúng chữ có trong ảnh, mỗi dòng ảnh một dòng, đủ dấu"></textarea>
@@ -97,17 +93,16 @@
     </section>
     <section class="panel glyph-panel" aria-labelledby="glyph-title">
       <div class="glyph-toolbar">
-        <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span></div>
-        <div class="tool-row glyph-main-actions"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button></div>
-        <details class="workspace-tools glyph-more-tools"><summary>Công cụ chỉnh sửa</summary><div class="tool-row"><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button></div></details>
+        <div class="panel-title"><h2 id="glyph-title">Bộ ký tự</h2><span id="count" class="count"></span><span class="glyph-actions"><button id="ai-scan" class="primary" type="button" disabled>Tạo bộ font</button><button id="stop-design" type="button" hidden>Dừng</button><button id="finish-font" class="primary" type="button">Hoàn thiện font chữ</button></span></div>
+        <div class="tool-row glyph-tools"><button id="review-source-glyph" type="button">Đối chiếu chữ đã tách</button><button id="accents">Tạo dấu tiếng Việt</button><button id="borrow-glyphs" type="button" title="Ô còn trống, ví dụ số 0–9, lấy từ kiểu gần nhất trong cùng bộ font rồi làm dày hoặc mỏng theo độ đậm">Lấy chữ thiếu từ kiểu khác</button><button id="open-mark-spacing" type="button">Chỉnh dấu</button><button id="straighten-all" type="button" title="Nắn thẳng cạnh gồ ghề, làm nhọn góc bị bo và làm mượt phần cong cho mọi chữ chưa khóa, chưa duyệt. Mỗi chữ vẫn Hoàn tác riêng được.">Nắn thẳng hàng loạt</button></div>
         <div class="selection-row">
           <label for="glyph-filter">Lọc ký tự</label>
           <select id="glyph-filter"><option value="all">Tất cả</option><option value="recent">Vừa tạo</option><option value="missing">Còn thiếu</option><option value="review">Cần xem</option></select>
           <span id="glyph-filter-status" class="help" role="status"></span>
         </div>
         <div class="selection-row">
-          <p id="selected" class="selection" aria-live="polite">Chọn một ô để nhập ký tự đó.</p>
-          <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button>
+          <p id="selected" class="selection" aria-live="polite" hidden>Chọn một ô để nhập ký tự đó.</p>
+          <button id="remove" class="quiet" disabled>Xóa ký tự đang chọn</button><button id="straighten-undo" type="button" class="quiet" hidden>Hoàn tác nắn hàng loạt</button><button id="reset" class="quiet">Xóa bộ chữ</button>
         </div>
       </div>
 
@@ -148,9 +143,9 @@
     </section>
     <div class="workspace-side">
       <section class="panel proof" aria-labelledby="proof-title">
-        <div class="panel-title"><h2 id="proof-title">Xem kết quả</h2><a id="download" class="primary download" aria-disabled="true">Tải font .TTF</a></div>
-        <div class="tool-row proof-tabs" role="group" aria-label="Chế độ xem font">
-          <button id="show-title-proof" type="button" aria-pressed="true">Xem câu chữ</button>
+        <div class="panel-title"><h2 id="proof-title">Thử tiêu đề</h2><a id="download" class="primary download" aria-disabled="true" hidden>Tải font .TTF</a></div>
+        <div class="tool-row" role="group" aria-label="Chế độ xem font">
+          <button id="show-title-proof" type="button" aria-pressed="true">Thử tiêu đề</button>
           <button id="show-glyph-proof" type="button" aria-pressed="false">Soát ký tự</button>
         </div>
         <div id="title-proof">
@@ -165,7 +160,7 @@
         <p id="missing" class="help" aria-live="polite"></p>
         </div>
         <div id="glyph-proof" hidden>
-          <div class="selection-row">
+          <div class="selection-row" hidden>
             <strong id="glyph-proof-title"></strong>
             <label><input id="glyph-proof-guides" type="checkbox" checked> Đường chuẩn</label>
           </div>
@@ -175,16 +170,16 @@
             <canvas id="glyph-proof-glyph" role="img"></canvas>
           </figure>
           <div id="glyph-proof-vector" class="glyph-proof-vector" hidden></div>
-          <p id="glyph-proof-metrics" class="help"></p>
+          <p id="glyph-proof-metrics" class="help" hidden></p>
           <div id="glyph-proof-context" class="glyph-proof-context"></div>
           <ul id="glyph-proof-results" aria-live="polite"></ul>
-          <div class="tool-row">
+          <div class="tool-row" hidden>
             <button id="glyph-proof-next" type="button">Chữ cần xem tiếp theo</button>
             <button id="glyph-proof-adjust" type="button">Chỉnh dấu chữ này</button>
           </div>
         </div>
       </section>
-      <section class="panel quality-workbench font-check-panel" id="editor-font-check" aria-label="Đánh giá và xử lý font đang làm"></section>
+      <section class="panel quality-workbench font-check-panel" id="editor-font-check" aria-label="Đánh giá và xử lý font đang làm" hidden></section>
     </div>
   </div>
 <section id="font-collection" role="tabpanel" aria-labelledby="open-font-collection" hidden>
