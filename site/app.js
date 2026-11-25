@@ -2062,10 +2062,15 @@ async function fixByRules() {
         if (current?.d && current.source !== 'Dựng từ nét chữ' && !current.fromLetter) continue;   // dấu mẫu từ bảng dấu, font gốc: giữ
         next.set(mark, sample); markChanged.add(mark);
       }
-      const missing = [...toneSamples.keys()].filter(mark => !next.get(mark)?.d);
+      // Dấu còn thiếu, và dấu Xưởng đã dựng từ nét (chưa khóa, chưa duyệt) nay dựng ra khác: dựng lại theo quy tắc hiện
+      // hành, để dấu theo đúng kiểu nét của font (nét đều / thanh-đậm, đầu nét). Lỗi 25/11/2026: dấu Migra dựng khi còn
+      // đo nhầm tương phản vẫn nét đều sau Hoàn thiện vì chỉ dấu thiếu mới được dựng.
+      const stale = mark => { const current = next.get(mark);
+        return current?.d && current.source === 'Dựng từ nét chữ' && !current.locked && !current.approved && !current.fromLetter; };
+      const missing = [...toneSamples.keys()].filter(mark => !next.get(mark)?.d || stale(mark));
       if (missing.length) {
         const { marks, stem } = deriveMarkSamples(next);
-        for (const mark of missing) if (marks.get(mark)) { next.set(mark, marks.get(mark)); markChanged.add(mark); }
+        for (const mark of missing) if (marks.get(mark) && marks.get(mark).d !== next.get(mark)?.d) { next.set(mark, marks.get(mark)); markChanged.add(mark); }
         for (const glyph of deriveBarredD(next, stem)) if (!glyphs.get(glyph.char)?.d) next.set(glyph.char, glyph);
       }
     }

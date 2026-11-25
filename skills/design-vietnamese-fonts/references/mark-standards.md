@@ -105,6 +105,10 @@ Dấu đi theo nét chữ:
 
 Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0.1 (giới hạn 0.2–1); tương phản dưới 0.5 thì chân trái mũ 0.78, hai đầu ngã 0.5 bề dày giữa, đầu móc hỏi thon. Nét đều thì dấu gần như không thon. Không áp một độ thon cố định cho mọi font: font nét đều sẽ có dấu nhọn lạc kiểu, font thanh-đậm có dấu cứng và nặng.
 
+**Ký tự đặc biệt Xưởng dựng** (`site/derive-symbols.js`) đi theo cùng kiểu nét (người dùng 25/11/2026): font thanh-đậm (tương phản < 0.5) thì nét ngang của - _ = + < > #, gạch dọc của $ và gạch dưới của ₫ bằng nét mảnh của font (tương phản × nét thân, ít nhất 0.3); ngoặc ( ) { } mảnh hai đầu, đậm giữa; vòng của % đậm hai bên, mảnh ở đỉnh và đáy. ~ và ^ lấy từ dấu ngã và dấu mũ nên đã theo kiểu nét. Font nét đều và sans giữ nét gần đều như cũ (gạch nối 0.82 nét thân).
+
+**Dấu mẫu cũ trong dự án:** dấu Xưởng dựng từ nét (chưa khóa, chưa duyệt) được dựng lại khi bấm Hoàn thiện nếu quy tắc nay cho hình khác; kết quả đo đầu râu lưu kèm dấu râu có số phiên bản, khác phiên bản thì đo lại khi ghép (lỗi 25/11/2026: dấu Migra dựng khi còn đo nhầm tương phản vẫn nét đều, râu vẫn dài sau Hoàn thiện).
+
 ## Nguồn hình cho dấu
 
 **Nguyên tắc (người dùng 23/11/2026):** dấu luôn lấy từ chính font đang làm, không lấy dấu hay chữ của font khác đưa vào bộ font mới. Áp như nhau cho font dựng từ ảnh và font nước ngoài cần Việt hóa. Thứ tự:
@@ -151,7 +155,12 @@ Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của
 
 **Râu dựng theo đầu nét:**
 - Giọt nước: thân râu dựng theo chuẩn đo (vươn, cao, nối như mục Râu ơ ư), đầu râu gắn **đúng giọt nước lấy từ đầu tay r** của font, lật dọc cho bầu giọt ở trên (ở r giọt nước rủ xuống cuối tay ngang, râu thì vươn lên). Đỉnh giọt chạm độ cao đầu râu chuẩn.
-- Mũi vát sắc: râu **lưỡi vát** — chân mảnh bằng nét mảnh của font (max(0.25, thon) × bề dày, thon theo độ tương phản), dày dần tới đầu bằng nét đậm (0.9 nét thân), đầu **cắt phẳng góc sắc**; không bo tròn, không thon thành sợi. Râu lưỡi vát ngắn và thấp hơn: 0.75 lần trung vị độ vươn và độ cao đầu râu (vẫn trong khoảng chuẩn), vì đầu dày đã đủ nặng; dài theo trung vị thì thành nét kéo dài (người dùng 25/11/2026, Migra Extralight: râu cũ là dải cong mảnh, dài, đều nét).
+- Mũi vát sắc: râu **đầu vát** — **đầu trên đậm, chân thanh**, như nét vát của chính font (người dùng 25/11/2026, đối chiếu font mẫu có ư ơ đạt chuẩn):
+  - Chân mảnh bằng nét mảnh của font (max(0.25, thon) × bề dày, thon theo độ tương phản), dày đều dần tới đầu trên bằng nét đậm (0.9 nét thân).
+  - Đầu trên **cắt vát chéo** theo hướng nét (mép trong dừng sớm hơn mép ngoài một chút). Không cắt ngang, không vuốt nhọn thành mũi kim ("nhọn hoắt là vector trẻ con vẽ"), không bo tròn.
+  - Râu xiên dốc lên phải, uốn chữ S rất nhẹ; chiều ngang = 0.6 × chiều cao. Không chạy ngang rồi mới cong lên, không kéo dài.
+  - **ư và ơ dùng cùng một nét râu** (Ư và Ơ cũng vậy), chỉ khác chỗ gắn. Đầu râu cao hơn đỉnh thân 0.24 x-height (hoa 0.17), cùng độ cao ở ư và ơ. Không đo độ vươn từ khung chữ: khung u gồm cả đuôi chân phải nên râu ư thành dài hơn râu ơ (lỗi 25/11/2026).
+  - Chân râu vẫn theo mục Chỗ nối râu: mép phải xa nhất của vùng trên (vai phải o, mép thân u).
 - Đầu tròn: bo tròn. Thường: cắt bằng.
 - **Độ thon theo độ tương phản** như sắc/huyền (mục Nét đều hay nét thanh-đậm): thon = 1.1 × tương phản − 0.1; font thanh-đậm (thon < 0.6) có đầu râu bằng max(0.35, thon) × bề dày chân; font nét đều và sans thường giữ 0.82 như râu font chuẩn.
 - Chữ nghiêng: râu và giọt nước nghiêng theo chữ (mục Chữ nghiêng).
@@ -159,7 +168,7 @@ Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của
 
 **Giới hạn còn lại:** chữ viết **nối nét** (u, o có nét nối chìa lên bên phải như Segoe Script) thì râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ. Dấu hỏi, ngã dựng chưa áp đầu nét giọt nước/vuốt nhọn (chỉ áp độ thon theo tương phản).
 
-Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn), mục 8 (Migra Extralight/Extrabold nếu có trong Downloads — bản dùng cá nhân, không đưa vào repo: tương phản < 0.5, râu lưỡi vát chân mảnh đầu dày, liền thân, vươn và cao không quá chuẩn) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
+Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn), mục 8 (Migra Extralight/Extrabold nếu có trong Downloads — bản dùng cá nhân, không đưa vào repo: tương phản < 0.5, râu đầu vát chân mảnh đầu trên đậm cắt chéo, liền thân, ư ơ và Ư Ơ cùng cỡ râu, dấu râu mẫu cũ được đo lại, gạch nối mảnh; Arial giữ gạch nối 0.82 nét thân) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
 
 ## Hai tầng: dấu thanh nằm trên mũ/trăng
 

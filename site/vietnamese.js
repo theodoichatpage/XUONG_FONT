@@ -243,17 +243,27 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
               placedHorn = seatHorn(original.d, svgpath(own.d).translate(edge + own.anchor.dx - hb.x, bodyTop + own.anchor.dy - hb.y).round(1).toString(), stem);
             } else if (sample.nativeSize) {
               // Đầu râu theo nét của chính font (hornEnds); dấu mẫu cũ chưa có thông tin thì đo lại.
-              const ends = sample.hornEnd || hornEnds(glyphs, stem, Math.max(.2, Math.min(1, 1.1 * body.contrast - .1)));
+              const ends = sample.hornEnd?.v === HORN_END_VERSION ? sample.hornEnd : hornEnds(glyphs, stem, Math.max(.2, Math.min(1, 1.1 * body.contrast - .1)));
               const ballUp = ends.ball ? .7 * ends.ball.height : 0;
               // Độ vươn tính từ mép phải thân; chữ viết có nét nối chìa sang phải (u, o của Segoe Script) thì khung chữ rộng
               // hơn thân nhiều: râu không vươn quá 0.45 độ rộng chữ tính từ chỗ nối.
-              // Râu lưỡi vát (font đầu nét vát sắc như Migra) ngắn và thấp hơn: 0.75 lần trung vị độ vươn và độ cao đầu râu
-              // (vẫn trong khoảng chuẩn), vì đầu dày cắt phẳng đã đủ nặng; dài theo trung vị thì thành nét kéo dài (người
-              // dùng 25/11/2026).
-              const short = ends.terminal === 'blade' ? .75 : 1;
-              const hw = Math.min(right + short * reach - (edge - inset), .45 * bounds.width + inset), hh = Math.max(.6 * stem, bodyTop + short * tip - attachY - ballUp);
+              let hw = Math.min(right + reach - (edge - inset), .45 * bounds.width + inset), hh = Math.max(.6 * stem, bodyTop + tip - attachY - ballUp);
+              let footX = edge - inset, footY = attachY;
+              if (ends.terminal === 'blade') {
+                // Râu đầu vát (font chân vát sắc như Migra; người dùng 25/11/2026 đối chiếu font mẫu): ư và ơ dùng CÙNG một
+                // nét râu (Ư Ơ cũng vậy), chỉ khác chỗ gắn — không đo độ vươn từ khung chữ (khung u gồm cả đuôi chân phải
+                // nên râu ư dài hơn râu ơ). Chân râu ở mép phải nét ngay dưới đỉnh thân; đầu râu cao hơn đỉnh thân
+                // 0.24 x-height (hoa 0.17, trong khoảng chuẩn cả ơ và ư); râu xiên dốc: ngang = 0.6 × cao.
+                // Chân râu ở mép phải xa nhất của vùng trên (quy tắc Chỗ nối râu: vai phải của o, mép thân u). o cong vào
+                // trong nên chân râu ơ thấp hơn một chút, nhưng đầu râu cùng độ cao và cùng chiều ngang với ư.
+                const rise = (isCap ? .17 : .24) * body.xHeight, bite = Math.min(inset, .25 * stem);
+                footY = Math.min(edgeY, bodyTop - .6 * stem);
+                footX = edge - bite;
+                hh = bodyTop + rise - footY;
+                hw = .6 * (rise + .6 * stem) + bite;
+              }
               const lean = d => body.slant ? svgpath(d).skewX(Math.atan(body.slant) * 180 / Math.PI).toString() : d;
-              const shape = hornShape(hw, hh, .9 * stem, ends.round, ends.endRatio, ends.footRatio ?? 1);
+              const shape = hornShape(hw, hh, .9 * stem, ends.round, ends.endRatio, ends.footRatio ?? 1, ends);
               let horn = sameDirection(lean(shape), original.d);
               if (ends.ball) {
                 // Giọt nước lấy nguyên từ đầu tay r. Ở r giọt nước rủ xuống cuối tay ngang; râu vươn lên nên lật dọc cho
@@ -262,7 +272,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
                 const drop = svgpath(ends.ball.d).scale(1, -1).translate(tx, ty + .2 * ends.ball.height).toString();
                 horn += ' ' + sameDirection(lean(drop), original.d);
               }
-              placedHorn = svgpath(horn).translate(edge - inset, attachY).round(1).toString();
+              placedHorn = svgpath(horn).translate(footX, footY).round(1).toString();
             } else {
               // Râu mẫu (nét người vẽ, bề dày tùy hình): đáy chân râu ngay dưới chỗ có mép phải xa nhất (đầu chân serif của U,
               // vai phải của o) để chân chồng lên nét; mép trái cắm vào nét một đoạn inset. Co giãn cho đầu râu đúng độ cao chuẩn
@@ -686,19 +696,28 @@ export function deriveMarkSamples(glyphs) {
   // đúng giọt nước đó vào đầu râu; vuốt nhọn thì râu thon nhọn; đầu tròn (đo ở l, nét đơn) thì bo tròn; còn lại cắt bằng.
   // Độ thon theo độ tương phản như sắc/huyền: font thanh-đậm có râu thon dần, font nét đều có râu gần đều.
   const ends = hornEnds(glyphs, stem, taper);
-  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem, ends.round, ends.endRatio));
+  add('̛', hornShape(.09 * oW + .45 * stem, .35 * xH, .9 * stem, ends.round, ends.endRatio, ends.footRatio ?? 1, ends));
   marks.get('̛').hornEnd = ends;
   return { marks, stem, thickness: t };
 }
 
+// Phiên bản cách đo đầu râu. Dấu mẫu lưu trong dự án mang kết quả đo cũ (khác phiên bản) thì đo lại khi ghép,
+// để Hoàn thiện cũng dựng râu theo quy tắc mới (lỗi 25/11/2026: râu Migra vẫn dài theo trung vị vì dấu mẫu cũ).
+export const HORN_END_VERSION = 2;
+
 // Râu: gốc nằm ngang cắm vào thân, vươn sang phải rồi cong lên; dày gần bằng nét chữ, thon nhẹ về đầu.
 // Kiểu đầu râu theo nét của chính font. Thứ tự: đầu tay r (giọt nước / vuốt nhọn / thường) → đầu tròn đo ở l (nét đơn).
 export function hornEnds(glyphs, stem, taper) {
+  return { ...measureHornEnds(glyphs, stem, taper), v: HORN_END_VERSION };
+}
+
+function measureHornEnds(glyphs, stem, taper) {
   const term = strokeTerminal(glyphs, stem, topRightEdge);
   const round = !term?.ball && term?.terminal !== 'taper' && roundTerminals(glyphs);
-  // Tay r kết thúc bằng mũi vát sắc (Migra): râu kiểu lưỡi vát — chân mảnh bằng nét mảnh của font (theo độ tương phản),
-  // dày dần tới đầu bằng nét đậm, đầu cắt phẳng góc sắc; không thon thành sợi, không bo tròn.
-  if (term?.terminal === 'taper') return { terminal: 'blade', round: false, footRatio: Math.max(.25, taper), endRatio: 1, ball: null };
+  // Tay r kết thúc bằng mũi vát sắc (Migra): râu đầu trên đậm, chân thanh — chân mảnh bằng nét mảnh của font (theo độ
+  // tương phản), dày dần tới đầu bằng nét đậm, đầu cắt vát chéo (cut: mép trong dừng sớm hơn mép ngoài) như đầu nét vát
+  // của chính font. Không vuốt nhọn đầu (người dùng 25/11/2026: "nhọn hoắt ... là vector trẻ con vẽ"), không bo tròn.
+  if (term?.terminal === 'taper') return { terminal: 'blade', round: false, footRatio: Math.max(.25, taper), endRatio: 1, cut: .08, ball: null };
   // Đầu râu / chân râu: thanh-đậm theo độ thon sắc/huyền (≥ 0.35); nét thường 0.82 như râu font chuẩn.
   const endRatio = taper < .6 ? Math.max(.35, taper) : .82;
   return { terminal: term?.terminal || (round ? 'round' : 'plain'), round, footRatio: 1, endRatio, ball: term?.ball || null };
@@ -710,18 +729,25 @@ export function hornTip(width, height, thickness, round = false, endRatio = .82)
   return [Math.max(.6 * thickness, width - .45 * thickness), Math.max(.3 * height, height - (round ? end / 2 : 0))];
 }
 
-export function hornShape(width, height, thickness, round = false, endRatio = .82, footRatio = 1) {
+export function hornShape(width, height, thickness, round = false, endRatio = .82, footRatio = 1, { peak = 0, cut = 0 } = {}) {
   // Đường tâm râu: đi ngang ra rồi cong lên, tới đầu thì dựng đứng. Đầu râu theo kiểu đầu nét của bộ chữ:
   // font đầu vuông (Poppins, Arial, Segoe...) cắt phẳng ngang như râu font chuyên nghiệp; font đầu tròn thì bo tròn.
   // Đỉnh ngoài của đầu râu chạm đúng chiều cao yêu cầu, nên chữ đậm (nét dày) có đường tâm thấp hơn tương ứng.
   const end = thickness * endRatio, w = Math.max(.6 * thickness, width - .45 * thickness);
   const h = Math.max(.3 * height, height - (round ? end / 2 : 0));
+  // Râu đầu vát (cut): nét xiên dốc lên phải, uốn chữ S nhẹ (ra – dựng – ra) như nét vuốt của font, không chạy ngang
+  // rồi mới cong lên. Còn lại: đi ngang ra rồi cong lên, tới đầu thì dựng đứng.
   const sweep = Math.PI / 2;
-  const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24; return [w * Math.sin(s * sweep) / Math.sin(sweep), h * Math.pow(s, 1.8)]; });
+  const points = Array.from({ length: 25 }, (_, i) => { const s = i / 24;
+    return cut ? [w * (s + .05 * Math.sin(2 * Math.PI * s)), h * s] : [w * Math.sin(s * sweep) / Math.sin(sweep), h * Math.pow(s, 1.8)]; });
   const left = [], right = [];
   points.forEach((point, i) => {
     const a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
-    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * (footRatio + (endRatio - footRatio) * Math.pow(i / 24, footRatio < 1 ? 1.4 : 1)) / 2;
+    // Nét móc (peak > 0): chân mảnh → dày nhất ở peak → thu về endRatio ở đầu. Còn lại: đổi đều từ chân tới đầu.
+    const s = i / 24, ratio = peak ? (s < peak ? footRatio + (1 - footRatio) * Math.sin(s / peak * Math.PI / 2)
+      : 1 + (endRatio - 1) * Math.pow((s - peak) / (1 - peak), 1.3))
+      : footRatio + (endRatio - footRatio) * Math.pow(s, footRatio < 1 && !cut ? 1.4 : 1);
+    const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy) || 1, half = thickness * ratio / 2;
     left.push([point[0] - dy / length * half, point[1] + dx / length * half]);
     right.push([point[0] + dy / length * half, point[1] - dx / length * half]);
   });
@@ -730,6 +756,8 @@ export function hornShape(width, height, thickness, round = false, endRatio = .8
     const [ex, ey] = points.at(-1), [px, py] = points.at(-2), angle = Math.atan2(ey - py, ex - px);
     for (let k = 1; k < 12; k++) { const t = angle + Math.PI / 2 - k * Math.PI / 12; cap.push([ex + Math.cos(t) * end / 2, ey + Math.sin(t) * end / 2]); }
   }
+  // Cạnh vát xiên: mép trong (phía thân chữ) dừng sớm hơn một đoạn cut, mép ngoài chạm đỉnh → mũi nhọn sắc.
+  if (cut) left.splice(left.length - Math.max(1, Math.round(cut * 24)));
   return polygon([...left, ...cap, ...right.reverse()]);
 }
 

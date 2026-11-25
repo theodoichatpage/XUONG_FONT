@@ -3,7 +3,7 @@
 // $ dựng từ S, % từ vòng tròn dày theo nét thân, { } từ ngoặc, * từ nét thon. Ký tự hình phức tạp (? @ &) không tự vẽ: cần ảnh mẫu.
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
-import { polygon, strokeAlong, outerDirection, measureStem, deriveMarkSamples } from './vietnamese.js';
+import { polygon, strokeAlong, outerDirection, measureStem, deriveMarkSamples, strokeContrast } from './vietnamese.js';
 
 const rect = (x0, y0, x1, y1) => polygon([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
 
@@ -40,12 +40,17 @@ function measure(glyphs) {
   // Không có chấm i hay dấu chấm: chấm vuông cạnh bằng nét thân của chính font (không lấy cỡ từ font khác).
   if (!dot) dot = polygon([[0, 0], [stem, 0], [stem, stem], [0, stem]]);
   const dotBox = glyphBounds({ d: dot });
-  return { stem, capTop, xTop, direction, dot, dotBox, bar: .82 * stem, sb: Math.max(40, Math.round(.45 * stem)) };
+  // Ký tự đặc biệt theo kiểu nét của font (mark-standards.md, Nét đều hay thanh-đậm): font thanh-đậm (tương phản < 0.5,
+  // đo theo pháp tuyến nét o) thì nét ngang dùng nét mảnh của chính font (tương phản × nét thân, ít nhất 0.3), ngoặc
+  // thon hai đầu, vòng % mảnh ở đỉnh và đáy. Font nét đều, sans giữ nét gần đều như cũ.
+  const contrast = reference?.d ? strokeContrast(glyphs) : 1, thickThin = contrast < .5;
+  const hair = thickThin ? Math.max(.3, contrast) * stem : null;
+  return { stem, capTop, xTop, direction, dot, dotBox, thickThin, hair, bar: hair ?? .82 * stem, sb: Math.max(40, Math.round(.45 * stem)) };
 }
 
 export function deriveSymbols(glyphs) {
   const m = measure(glyphs);
-  const { stem, capTop, xTop, bar, sb, dotBox } = m;
+  const { stem, capTop, xTop, bar, sb, dotBox, thickThin, hair } = m;
   const orient = d => contours(d).map(part => outerDirection(part) === m.direction ? part : reverse(part)).join(' ');
   const dotAt = (x, y) => svgpath(m.dot).translate(x - dotBox.x, y - dotBox.y).toString();
   const dw = dotBox.width, dh = dotBox.height, mid = xTop * .47;
@@ -89,7 +94,7 @@ export function deriveSymbols(glyphs) {
     '^': () => { const t = deriveMarkSamples(glyphs).marks.get('̂').d, b = glyphBounds({ d: t }); return svgpath(t).translate(-b.x, capTop - b.y - b.height).toString(); },
     '$': () => {
       const S = glyphs.get('S'); if (!S?.d) throw Error('Cần chữ S.');
-      const b = glyphBounds(S), x = b.x + b.width / 2, t = bar * .8;
+      const b = glyphBounds(S), x = b.x + b.width / 2, t = thickThin ? bar : bar * .8;
       return { d: S.d + ' ' + orient(rect(x - t / 2, b.y - .1 * capTop, x + t / 2, b.y + b.height + .1 * capTop)), keep: true };
     },
     // ₫ (U+20AB, design-rules.md: hình đ và gạch dưới, so với số và đường chân): đ của chính font thu 0.7, đỉnh ngang
@@ -99,14 +104,16 @@ export function deriveSymbols(glyphs) {
       const dd = glyphs.get('đ'); if (!dd?.d) throw Error('Cần chữ đ.');
       const b = glyphBounds(dd), k = .7, top = Math.max(capTop, b.y + b.height * k);
       const small = svgpath(dd.d).translate(-b.x, -(b.y + b.height)).scale(k).translate(0, top).toString();
-      const bottom = top - b.height * k, t = .5 * stem, gap = .1 * capTop;
+      const bottom = top - b.height * k, t = thickThin ? hair : .5 * stem, gap = .1 * capTop;
       return { d: small + ' ' + orient(rect(0, bottom - gap - t, b.width * k, bottom - gap)), keep: true };
     },
     '%': () => {
       const r = .19 * capTop, w = stem * .78, ring = (cx, cy) => {
         const pts = k => Array.from({ length: 40 }, (_, i) => { const a = i * Math.PI / 20; return [cx + k * .82 * Math.cos(a), cy + k * Math.sin(a)]; });
-        let outer = polygon(pts(r)), inner = polygon(pts(r - w).reverse());
-        if (outerDirection(outer) !== m.direction) { outer = polygon(pts(r).reverse()); inner = polygon(pts(r - w)); }
+        // Vòng trong: bề dày hai bên là nét đậm, đỉnh và đáy là nét mảnh khi font thanh-đậm.
+        const pin = () => Array.from({ length: 40 }, (_, i) => { const a = i * Math.PI / 20; return [cx + (r - w) * .82 * Math.cos(a), cy + (r - (hair ?? w)) * Math.sin(a)]; });
+        let outer = polygon(pts(r)), inner = polygon(pin().reverse());
+        if (outerDirection(outer) !== m.direction) { outer = polygon(pts(r).reverse()); inner = polygon(pin()); }
         return outer + ' ' + inner;
       };
       const slash = orient(strokeAlong([[.05 * capTop, -.02 * capTop], [.78 * capTop, capTop * 1.02]], stem * .85));
@@ -121,7 +128,8 @@ export function deriveSymbols(glyphs) {
     '#': () => {
       const h = .78 * capTop, w = .62 * capTop, lean = .12 * capTop, th = stem * .82;
       const v = x => strokeAlong([[x, 0], [x + lean, h]], th);
-      return v(w * .22) + ' ' + v(w * .62) + ' ' + rect(0, h * .3 - th / 2, w + lean * .4, h * .3 + th / 2) + ' ' + rect(lean * .4, h * .68 - th / 2, w + lean, h * .68 + th / 2);
+      const hz = thickThin ? bar : th;   // nét ngang của # theo nét mảnh khi font thanh-đậm
+      return v(w * .22) + ' ' + v(w * .62) + ' ' + rect(0, h * .3 - hz / 2, w + lean * .4, h * .3 + hz / 2) + ' ' + rect(lean * .4, h * .68 - hz / 2, w + lean, h * .68 + hz / 2);
     },
   };
   function paren(right) {
@@ -130,7 +138,8 @@ export function deriveSymbols(glyphs) {
       const a = (-.5 + k / 20) * Math.PI * .72, x = depth * (1 - Math.cos(a)) / (1 - Math.cos(Math.PI * .36));
       return [right ? x : depth - x, bottom + h / 2 + Math.sin(a) / Math.sin(Math.PI * .36) * h / 2];
     });
-    return strokeAlong(points, s => stem * (.78 + .22 * Math.sin(Math.PI * s)));
+    const end = thickThin ? hair / stem : .78;   // thanh-đậm: hai đầu ngoặc mảnh bằng nét mảnh, giữa đậm
+    return strokeAlong(points, s => stem * (end + (1 - end) * Math.sin(Math.PI * s)));
   }
   function brace(right) {
     // Ngoặc nhọn: hai đầu cong ra ngoài, thân dọc, mũi nhọn ở giữa hướng vào trong.
@@ -140,7 +149,8 @@ export function deriveSymbols(glyphs) {
       const x = u < .1 ? depth * .45 * u / .1 : depth * .45 + depth * .55 * Math.max(0, (u - .78) / .22) ** 2;
       return [right ? depth - x : x, top - s * h];
     });
-    return strokeAlong(points, s => stem * (.7 + .22 * Math.sin(Math.PI * s)));
+    const end = thickThin ? hair / stem : .7;
+    return strokeAlong(points, s => stem * (end + (.92 - end) * Math.sin(Math.PI * s)));
   }
   function bracket(right) {
     const bottom = -.22 * capTop, top = capTop * 1.04, arm = 1.6 * stem, th = stem * .9, hb = bar;

@@ -12,7 +12,8 @@ function moduleFor(name, file) {
 }
 const { checkRules, fixRules } = moduleFor('rule-check', 'site/rule-check.js');
 const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rules', 'site/font-family.js');
-const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody, strokeContrast } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody, strokeContrast, rightEdgeAt, HORN_END_VERSION } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+const { deriveSymbols } = moduleFor('derive-symbols-rules', 'site/derive-symbols.js');
 const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
@@ -153,10 +154,14 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     assert.ok(contrast < .5, name + ': tương phản đo ra ' + contrast.toFixed(2) + ', Migra là font thanh–đậm');
     const ends = hornEnds(map, stem, Math.max(.2, Math.min(1, 1.1 * contrast - .1)));
     assert.equal(ends.terminal, 'blade', name + ': đầu râu phải là lưỡi vát, đo được ' + ends.terminal);
-    assert.ok(!ends.round && ends.footRatio < .5 && ends.endRatio === 1, name + ': râu lưỡi vát phải chân mảnh, đầu dày, không bo tròn');
+    assert.ok(!ends.round && ends.footRatio < .5 && ends.endRatio === 1 && ends.cut > 0 && ends.v === HORN_END_VERSION,
+      name + ': râu đầu vát phải chân mảnh, đầu trên đậm, cắt vát chéo, không bo tròn ' + JSON.stringify(ends));
     for (const c of [...'ơưƠƯờởữợ']) map.delete(c);
     const { marks } = deriveMarkSamples(map); for (const [m, g] of marks) if (!map.get(m)) map.set(m, g);
     const made = new Map(composeVietnamese(map, () => false).map(g => [g.char, g]));
+    // Dấu râu mẫu lưu trong dự án từ trước (kết quả đo đầu nét cũ, không có phiên bản) phải được đo lại khi ghép.
+    const old = new Map(map); old.set('̛', { ...map.get('̛'), hornEnd: { terminal: 'plain', round: false, footRatio: 1, endRatio: .82, ball: null } });
+    assert.equal(composeVietnamese(old, () => false).find(g => g.char === 'ư').d, made.get('ư').d, name + ': dấu râu mẫu cũ không được đo lại');
     const rows = checkRules(new Map([...map, ...made]));
     assert.notEqual(status(rows, 'horn'), 'fail', name + ': râu rời thân ' + JSON.stringify(rows.rows.find(r => r.id === 'horn')?.issues));
     const xH = glyphBounds(map.get('x')).height;
@@ -165,7 +170,28 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
       const [rMin, , rMax] = MARK_RANGES['rau_' + root + '.reach'], [tMin, , tMax] = MARK_RANGES['rau_' + root + '.tip'];
       assert.ok(reach <= rMax && tip <= tMax, name + ' ' + char + ': râu dài/cao quá chuẩn (vươn ' + reach.toFixed(2) + ' ≤ ' + rMax + ', cao ' + tip.toFixed(2) + ' ≤ ' + tMax + ')');
     }
-    done.push(name + ': râu lưỡi vát đạt');
+    // ư và ơ (Ư và Ơ) cùng một nét râu: cùng độ cao đầu râu, cùng chiều ngang từ chỗ nối (người dùng 25/11/2026:
+    // râu ư dài hơn râu ơ vì độ vươn đo từ khung u gồm cả đuôi chân phải).
+    const hornSize = (char, root) => { const g = glyphBounds(made.get(char)), r = glyphBounds(map.get(root)), top = r.y + r.height;
+      let edge = -Infinity;   // mép phải xa nhất của một phần năm trên (như quy tắc Chỗ nối râu)
+      for (let n = 0; n <= 12; n++) { const x = rightEdgeAt(map.get(root).d, top - 2 - r.height * .2 * n / 12); if (x !== null) edge = Math.max(edge, x); }
+      let hornRight = -Infinity;   // mép phải của phần râu (trên đỉnh thân; khung chữ u còn gồm đuôi chân phải)
+      for (let n = 1; n <= 24; n++) { const x = rightEdgeAt(made.get(char).d, top + (g.y + g.height - top) * n / 25); if (x !== null) hornRight = Math.max(hornRight, x); }
+      return { w: hornRight - edge, h: g.y + g.height - top }; };
+    for (const [a, b] of [[['ư', 'u'], ['ơ', 'o']], [['Ư', 'U'], ['Ơ', 'O']]]) {
+      const p = hornSize(...a), q = hornSize(...b);
+      assert.ok(Math.abs(p.w - q.w) <= .15 * stem + 4 && Math.abs(p.h - q.h) <= .15 * stem + 6,
+        name + ': râu ' + a[0] + ' và ' + b[0] + ' phải cùng cỡ (' + JSON.stringify([p, q].map(x => [Math.round(x.w), Math.round(x.h)])) + ')');
+    }
+    // Ký tự đặc biệt theo kiểu nét: font thanh-đậm thì nét ngang (gạch nối) mảnh như nét mảnh của font.
+    const hyphen = glyphBounds(deriveSymbols(map).find(g => g.char === '-'));
+    assert.ok(hyphen.height < .5 * stem, name + ': gạch nối của font thanh-đậm phải mảnh, đo ' + Math.round(hyphen.height) + ' / nét thân ' + Math.round(stem));
+    done.push(name + ': râu đầu vát, ư ơ cùng cỡ, ký tự đặc biệt thanh-đậm đạt');
   }
+  // Font nét đều / sans (Arial) giữ ký tự đặc biệt gần đều nét: gạch nối dày 0.82 nét thân như cũ.
+  { const map = glyphMap(parse(fs.readFileSync('C:/Windows/Fonts/arial.ttf')), 'Font gốc'), stem = measureStem(map);
+    const h = glyphBounds(deriveSymbols(map).find(g => g.char === '-')).height;
+    assert.ok(Math.abs(h - .82 * stem) < 2, 'Arial: gạch nối phải giữ 0.82 nét thân, đo ' + h.toFixed(1));
+    done.push('Arial: ký tự đặc biệt nét đều đạt'); }
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });
