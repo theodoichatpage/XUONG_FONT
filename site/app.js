@@ -401,6 +401,20 @@ function spreadLabEdit(char, previous) {
     glyphs.set(HORN, { ...(sample || {}), char: HORN, d: horn.d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char, byRoot, caseStrict: true, approved: false, locked: false });
     for (const c of charset) { const nfd = c.normalize('NFD'); if (c !== char && nfd.includes(HORN) && byRoot[nfd[0]] === horn && free(c)) related.add(c); }
   }
+  // Sửa dấu thanh ngay trên một chữ (ỏ, ả, ở, Ấ...): tách dấu vừa vẽ (contour không chạm khung contour nào của chữ gốc)
+  // làm dấu mẫu, rồi ghép lại mọi chữ mang dấu đó. Dùng khi ô Dấu mẫu trống hoặc khó sửa.
+  const tone = marks.at(-1), toneBase = tone && tone !== HORN && toneSamples.has(tone) ? glyphs.get((root + marks.slice(0, -1).join('')).normalize('NFC')) : null;
+  if (toneBase?.d && !glyphs.get(tone)?.locked) {
+    const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim());
+    const box = d => glyphBounds({ d }), hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    const baseBoxes = parts(toneBase.d).map(box), drawn = parts(glyphs.get(char).d).filter(d => !baseBoxes.some(b => hit(box(d), b)));
+    if (drawn.length) {
+      const sample = glyphs.get(tone);
+      glyphs.set(tone, { ...(sample || {}), char: tone, d: drawn.join(' '), advance: sample?.advance || 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char,
+        nativeSize: undefined, approved: true, locked: true, manualEdit: { time: new Date().toISOString(), fromLetter: char } });
+      for (const c of charset) if (c !== char && c.normalize('NFD').includes(tone) && free(c)) related.add(c);
+    }
+  }
   if (!related.size) return [];
   const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
   for (const glyph of made) glyphs.set(glyph.char, glyph);
