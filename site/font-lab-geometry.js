@@ -226,9 +226,12 @@ export function makeSmooth(contour, i, even = true) {
 }
 
 // Góc nhọn: thu tay nắm về điểm (hợp cho chân chữ, mũi dấu).
+// Góc nhọn (như FontLab): giữ nguyên hai tay nắm, chỉ tách để kéo riêng từng bên. Điểm đã là góc mà bấm lần nữa
+// thì thu hẳn tay nắm (hai cạnh thẳng vào góc, hợp cho mũi dấu, chân chữ).
 export function makeCorner(contour, i) {
   const node = contour[i];
-  node.in = node.out = null; node.smooth = false;
+  if (node.smooth) { node.smooth = false; return; }
+  node.in = node.out = null;
 }
 
 // Đoạn giữa hai điểm liền nhau: thẳng hoặc cong (tay nắm ở 1/3 và 2/3).
@@ -238,8 +241,9 @@ export function makeLine(contour, i) {
 }
 export function makeCurve(contour, i) {
   const a = contour[i], b = contour[(i + 1) % contour.length];
-  if (a.out || b.in) return;
-  a.out = lerp(a, b, 1 / 3); b.in = lerp(a, b, 2 / 3);
+  if (a.out && b.in) return;
+  if (!a.out) a.out = lerp(a, b, 1 / 3);
+  if (!b.in) b.in = lerp(a, b, 2 / 3);
 }
 
 // Cân tay nắm (như "Balance" của FontLab): hai tay nắm của một đoạn cong có cùng độ căng, giữ nguyên hướng.
