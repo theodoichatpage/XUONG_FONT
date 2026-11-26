@@ -373,23 +373,25 @@ async function commitLabEdit(previous, next) {
   try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { /* giữ thay đổi trong bộ chữ đang mở */ }
   Map.prototype.set.call(glyphs, next.char, next);
   recentGlyphs.add(next.char);
-  const spread = next.locked ? spreadLabEdit(next.char) : [];
+  const spread = next.locked ? spreadLabEdit(next.char, previous) : [];
   refresh();
   return spread;
 }
 // Sửa tay một chữ gốc hay dấu mẫu (ơ, â, o, dấu sắc…) thì các chữ Xưởng ghép từ nó (ớ ờ ở ỡ ợ, ấ ầ…) ghép lại ngay theo
 // nét vừa lưu, rồi sửa theo bảng quy tắc như mọi bước dựng. Chữ của nhà thiết kế (Font gốc, ảnh) và chữ đã khóa giữ nguyên.
-function spreadLabEdit(char) {
+function spreadLabEdit(char, previous) {
   const key = char.normalize('NFD'), isMark = toneSamples.has(char), HORN = '̛';
   const free = c => (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked;
   const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key)) && free(c)));
   // Sửa râu ở ơ/ư (Ơ/Ư): tách râu vừa vẽ làm râu mẫu cho cả cặp cùng cỡ chữ (ơ ↔ ư, Ơ ↔ Ư; skill: ư ơ cùng một nét râu),
   // rồi ghép lại mọi chữ có râu của cặp đó. Chữ có râu đã sửa tay riêng thì giữ râu của nó.
   const [root, ...marks] = key;
+  const before = new Map([[char, previous]]);
   const horn = marks.length === 1 && marks[0] === HORN && 'oOuU'.includes(root) && !glyphs.get(HORN)?.locked
     ? hornFromLetter(glyphs.get(char), glyphs.get(root), measureStem(glyphs), topRightEdge) : null;
   if (horn) {
-    const pair = { o: 'u', u: 'o', O: 'U', U: 'O' }[root], sample = glyphs.get(HORN);
+    const pair = { o: 'u', u: 'o', O: 'U', U: 'O' }[root], sample = glyphs.get(HORN), pairHorned = (pair + HORN).normalize('NFC');
+    before.set(pairHorned, glyphs.get(pairHorned));
     const byRoot = { ...(sample?.byRoot || {}), [root]: horn };
     if (!glyphs.get((pair + HORN).normalize('NFC'))?.manualEdit) byRoot[pair] = horn;
     glyphs.set(HORN, { ...(sample || {}), char: HORN, d: horn.d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char, byRoot, caseStrict: true, approved: false, locked: false });
@@ -398,8 +400,25 @@ function spreadLabEdit(char) {
   if (!related.size) return [];
   const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
   for (const glyph of made) glyphs.set(glyph.char, glyph);
-  if (made.length) enforceRules(made.map(g => g.char));
-  return made.map(g => g.char);
+  // Chữ ghép không dựng lại được (dấu thanh mẫu không thuộc nguồn được dùng để ghép, ví dụ dấu hỏi của ở, ử): giữ nguyên
+  // dấu thanh đang có, chỉ thay phần thân và râu bằng chữ gốc mới (ơ, ư...). Dấu là những contour không chạm khung contour
+  // nào của chữ gốc cũ hay mới.
+  const done = new Set(made.map(g => g.char));
+  for (const c of related) {
+    if (done.has(c)) continue;
+    const baseChar = [...before.keys()].find(b => c.normalize('NFD').startsWith(b.normalize('NFD')));
+    const old = before.get(baseChar), fresh = glyphs.get(baseChar), current = glyphs.get(c);
+    if (!old?.d || !fresh?.d || !current?.d || current.d.startsWith(fresh.d)) continue;
+    const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim());
+    const box = d => glyphBounds({ d }), hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    const baseBoxes = [...parts(old.d), ...parts(fresh.d)].map(box);
+    const tone = parts(current.d).filter(d => !baseBoxes.some(b => hit(box(d), b)));
+    if (!tone.length) continue;
+    glyphs.set(c, { ...current, d: fresh.d + ' ' + tone.join(' '), advance: fresh.advance, version: (current.version || 0) + 1, proof: undefined });
+    done.add(c);
+  }
+  if (done.size) enforceRules([...done]);
+  return [...done];
 }
 const fontLab = setupFontLab({
   getGlyph: char => glyphs.get(char),

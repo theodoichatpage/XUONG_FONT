@@ -275,7 +275,8 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
     $('fl-undo').disabled = !undo.length; $('fl-redo').disabled = !redo.length;
     const shift = glyph ? baselineShift(glyph.char, contours, font) : 0;
     $('fl-baseline').textContent = shift ? 'Khi lưu, chữ sẽ được đặt lại lên đường chân (dời ' + (shift > 0 ? '+' : '') + shift + ').' : '';
-    $('fl-save').disabled = !dirty && !shift;
+    // Chữ đã sửa tay: vẫn cho bấm Lưu để áp lại nét này cho các chữ ghép từ nó (ờ ở ư...).
+    $('fl-save').disabled = !dirty && !shift && !glyph?.manualEdit;
     $('fl-unlock').hidden = !glyph?.locked;
     $('fl-scope').textContent = nodes.length ? 'Áp dụng cho ' + nodes.length + ' điểm đang chọn' : 'Chưa chọn điểm: áp dụng cho cả chữ';
   }
