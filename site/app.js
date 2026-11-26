@@ -44,6 +44,12 @@ class ProtectedGlyphMap extends Map {
   clear(){for(const [char,glyph]of this)if(!glyph.locked)super.delete(char);}
 }
 let glyphs = new ProtectedGlyphMap();
+// Dựng lại cả bộ chữ từ một bản nháp (Map thường): chữ đã khóa (sửa tay trong Font Lab, đã duyệt) giữ nguyên, không bị
+// bản nháp ghép đè. Chỉ dùng khi bản nháp dựng từ bộ chữ đang làm; mở font khác thì tạo ProtectedGlyphMap mới như cũ.
+function keepLocked(next) {
+  for (const [char, glyph] of glyphs) if (glyph.locked) Map.prototype.set.call(next, char, glyph);
+  return new ProtectedGlyphMap(next);
+}
 let markCandidates = [], lastMarkChange = [], auditRepairPending = false;
 let importedMetrics;
 let loadedSourceBlob;
@@ -367,7 +373,21 @@ async function commitLabEdit(previous, next) {
   try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { /* giữ thay đổi trong bộ chữ đang mở */ }
   Map.prototype.set.call(glyphs, next.char, next);
   recentGlyphs.add(next.char);
+  const spread = next.locked ? spreadLabEdit(next.char) : [];
   refresh();
+  return spread;
+}
+// Sửa tay một chữ gốc hay dấu mẫu (ơ, â, o, dấu sắc…) thì các chữ Xưởng ghép từ nó (ớ ờ ở ỡ ợ, ấ ầ…) ghép lại ngay theo
+// nét vừa lưu, rồi sửa theo bảng quy tắc như mọi bước dựng. Chữ của nhà thiết kế (Font gốc, ảnh) và chữ đã khóa giữ nguyên.
+function spreadLabEdit(char) {
+  const key = char.normalize('NFD'), isMark = toneSamples.has(char);
+  const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key))
+    && (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked));
+  if (!related.size) return [];
+  const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
+  for (const glyph of made) glyphs.set(glyph.char, glyph);
+  if (made.length) enforceRules(made.map(g => g.char));
+  return made.map(g => g.char);
 }
 const fontLab = setupFontLab({
   getGlyph: char => glyphs.get(char),
@@ -1348,7 +1368,7 @@ function scheduleFont() {
       downloadURL = URL.createObjectURL(blob);
       download.href = downloadURL;
       download.download = (branded.label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Xuong Font') + '.ttf';
-      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu') };
+      currentFontExport = { name: branded.label, filename: download.download, blob, sourceId: importedMetrics?.sourceRecordId, fromImages:[...glyphs.values()].some(g=>g.origin==='direct'||g.source==='Ảnh mẫu'), manualChars:[...glyphs.values()].filter(g=>g.manualEdit&&g.locked).map(g=>g.char) };
       download.setAttribute('aria-disabled', 'false');
       if (!$('glyph-proof').hidden || $('glyph-filter').value === 'review') requestGlyphReview();
       if (repairRecheckPending) { const options = repairRecheckPending === true ? { propose: false } : repairRecheckPending; repairRecheckPending = false; await editorFontCheck.run([currentFontExport], options); }
@@ -1526,7 +1546,7 @@ $('import-tone-sheet').addEventListener('click', async () => {
     const next = new Map([...glyphs, ...samples]);
     const generated = applyReferenceMarks(next, [...samples.keys()]);
     for (const glyph of generated) next.set(glyph.char, glyph);
-    glyphs = new ProtectedGlyphMap(next);
+    glyphs = keepLocked(next);
     refresh();
     const message = `Đã nhập ${samples.size} dấu mẫu và cập nhật ${generated.length} chữ có dấu.`;
     status(message);
@@ -1584,7 +1604,7 @@ $('derive-marks').addEventListener('click', () => {
   // Dấu câu, ký hiệu còn trống: dựng từ nét chữ (chỉ điền ô trống).
   const symbols = deriveSymbols(next);
   for (const glyph of symbols) next.set(glyph.char, glyph);
-  glyphs = new ProtectedGlyphMap(next);
+  glyphs = keepLocked(next);
   refresh();
   // Tự kiểm quy tắc dấu của skill ngay sau khi ghép.
   const fitted = generated.filter(glyph => glyph.markFit);
@@ -1782,14 +1802,18 @@ const fontCollection = setupFontCollection(() => currentFontExport, async (recor
   // Mở lại bản Việt hóa: chữ font gốc không có là do Xưởng ghép trước đây. Đánh dấu là chữ ghép (không phải nét nhà
   // thiết kế) và bỏ dấu mẫu Xưởng đã dựng, để Tạo dấu tiếng Việt dựng lại theo chuẩn mới nhất.
   let regenerable = 0;
+  const manual = new Set(editOnly ? record.manualChars || [] : []);
   if (editOnly && original) {
     const base = (await importFontFile(original)).glyphs;
     for (const [char, glyph] of [...drafts]) {
       if (base.has(char)) continue;
       if (toneSamples.has(char)) { drafts.delete(char); continue; }
+      if (manual.has(char)) continue;
       if ([...char.normalize('NFD')].length > 1 || char === 'Đ' || char === 'đ') { drafts.set(char, { ...glyph, source: 'Ghép dấu', origin: 'inferred' }); regenerable++; }
     }
   }
+  // Chữ đã sửa tay trong Font Lab trước khi lưu vào Bộ sưu tập: khóa lại để Tạo dấu tiếng Việt, Hoàn thiện font không ghép đè.
+  for (const char of manual) { const glyph = drafts.get(char); if (glyph?.d) drafts.set(char, { ...glyph, locked: true, approved: true, manualEdit: { restored: true } }); }
   auditRepairPending=false; markCandidates=[];
   recentGlyphs.clear();
   glyphs = new ProtectedGlyphMap(drafts);
@@ -2017,7 +2041,7 @@ async function drawMissingWithAI(missing) {
 function enforceRules(chars) {
   const editable = glyph => glyph && !glyph.locked && !glyph.approved && (importedMetrics?.ownFont || glyph.source !== 'Font gốc');
   const { map, changed } = fixRules(glyphs, { editable, chars: chars ? new Set(chars) : undefined });
-  if (changed.length) glyphs = new ProtectedGlyphMap(map);
+  if (changed.length) glyphs = keepLocked(map);
   const result = checkRules(glyphs, { editable });
   return (changed.length ? ' Sửa theo quy tắc: ' + changed.join(' ') + '.' : '') + ruleMessage(result, { only: ['dot-i', 'colon-dots', 'dot-below', 'punct-place', 'heights', 'horn', 'horn-pair', 'marks'] });
 }
@@ -2138,7 +2162,7 @@ async function fixByRules() {
     const dotBelow = normalizeDotBelow(next, measureStem(next), glyph => editable(glyph) && ours(glyph));
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
-    const draft = new ProtectedGlyphMap(next);
+    const draft = keepLocked(next);   // chữ đã khóa (sửa tay trong Font Lab) không bị ghép lại
     // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
     // trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning).
     const kerned = importedMetrics ? 0 : vietnameseKerning([...draft.values()].filter(g => g?.d)).length;
