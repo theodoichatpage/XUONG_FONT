@@ -234,8 +234,9 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
             const reach = STD.horn.reach[key] * bounds.width, tip = STD.horn.tip[key] * body.xHeight;
             const right = bounds.x + bounds.width, rsb = original.advance - right;
             let placedHorn;
+            // caseStrict: râu sửa tay trong Font Lab chỉ dùng cho cùng cỡ chữ (râu Ơ không gắn sang ư thường).
             const own = sample.byRoot && (sample.byRoot[root] || [...(isCap ? 'UO' : 'uo')].map(r => sample.byRoot[r]).find(Boolean)
-              || Object.values(sample.byRoot)[0]);
+              || (!sample.caseStrict && Object.values(sample.byRoot)[0]));
             if (own) {
               // Râu người dùng vẽ trong chữ ư/ơ của ảnh: giữ nguyên hình và cỡ (cùng tỉ lệ ảnh với thân chữ), đặt cùng
               // khoảng so với mép phải vùng trên và đỉnh thân như trong ảnh. Không co giãn theo chuẩn chung.
