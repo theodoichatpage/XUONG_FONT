@@ -160,6 +160,7 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
     const shown = preview?.contours ?? contours, showPoints = opt('fl-points') && !spaceDown; // giữ phím cách: xem trước nét, ẩn điểm neo
     ctx.fillStyle = showPoints ? 'rgba(255,252,245,.86)' : '#fffcf5';
     ctx.fill(pathOf(shown));
+    if (opt('fl-rules') && !preview) drawThicknessHints();
     if (preview) { ctx.strokeStyle = '#e0533d'; ctx.lineWidth = 1.2; ctx.stroke(pathOf(contours)); }
     if (!showPoints || preview) { drawMarquee(); return; }
     ctx.strokeStyle = '#b8a896'; ctx.lineWidth = 1; ctx.stroke(pathOf(contours));
@@ -182,6 +183,22 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
       ctx.fill(); ctx.stroke();
     }));
     drawMarquee();
+  }
+
+  // Dấu/râu dày hoặc mỏng quá so với nét thân của font: tô đỏ khối nét đó và ghi số cần đạt ngay trên hình.
+  function drawThicknessHints() {
+    for (const check of rules?.checks ?? []) {
+      if (check.ok || !check.shapes?.length) continue;
+      const thick = check.value > check.range[1];
+      ctx.fillStyle = 'rgba(224,60,45,.55)'; ctx.fill(pathOf(check.shapes));
+      ctx.strokeStyle = '#ff5a44'; ctx.lineWidth = 2; ctx.stroke(pathOf(check.shapes));
+      const box = G.outlineBox(check.shapes), at = toScreen({ x: box.x1, y: box.y1 });
+      const text = check.label + (thick ? ' dày quá: ' : ' mỏng quá: ') + Math.round(check.value) + ' → nên ' + Math.round(check.range[0]) + '–' + Math.round(check.range[1]);
+      ctx.font = 'bold 12px ' + getComputedStyle(document.body).fontFamily;
+      const w = ctx.measureText(text).width, x = Math.min(at.x + 8, canvas.clientWidth - w - 12), y = Math.max(18, at.y - 8);
+      ctx.fillStyle = 'rgba(41,34,29,.85)'; ctx.fillRect(x - 5, y - 13, w + 10, 19);
+      ctx.fillStyle = '#ff8a7a'; ctx.textAlign = 'left'; ctx.fillText(text, x, y);
+    }
   }
 
   function drawMarquee() {
@@ -333,7 +350,7 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
         node[other] = { x: node.x + v.x / n * keep, y: node.y + v.y / n * keep };
       }
     } else for (const node of selectedNodes()) eachPoint(node, p => { p.x += dx; p.y += dy; });
-    rough = G.roughNodes(contours); refreshPanel(); draw();
+    rough = G.roughNodes(contours); updateRules(); refreshPanel(); draw();
   });
 
   const endDrag = () => {

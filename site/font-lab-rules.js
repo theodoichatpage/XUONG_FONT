@@ -89,7 +89,7 @@ export function markRules(char, contours, font) {
         out.checks.push({ name: m.name + ': lệch tâm', value: dx, range: [-.06, .06], ok: Math.abs(dx) <= .06, unit: ' × rộng o', note: 'Vị trí dấu: mũ, trăng, ngã đặt giữa chữ' });
       }
       const target = STD.thickness(font.stem), t = thickness(above);
-      out.checks.push({ name: m.name + ': độ dày nét', value: t, range: [target * .8, target * 1.2], ok: t >= target * .8 && t <= target * 1.2, unit: ' đơn vị', note: 'Theo nét thân ' + Math.round(font.stem) + ': chuẩn ' + Math.round(target) });
+      out.checks.push({ name: m.name + ': độ dày nét', value: t, range: [target * .8, target * 1.2], ok: t >= target * .8 && t <= target * 1.2, unit: ' đơn vị', note: 'Theo nét thân ' + Math.round(font.stem) + ': chuẩn ' + Math.round(target), shapes: above, label: 'Dấu' });
       if (['acute', 'grave'].includes(m.key)) {
         const cls = contrastClass(font.contrast), want = STD.acuteTaper[cls], tp = taper(above);
         if (tp != null) out.checks.push({ name: m.name + ': độ thon', value: tp, range: want, ok: tp >= want[0] - .05 && tp <= want[1] + .05, unit: '', note: 'Sự hòa hợp: font ' + classLabel[cls] + ' (nét o ' + font.contrast.toFixed(2) + ')' });
@@ -128,7 +128,7 @@ export function markRules(char, contours, font) {
     const extra = parts.filter(p => p.b.x1 > base.x1 + 2 && p.b.y0 > base.y0 + .3 * (base.y1 - base.y0) && p.b.y1 - p.b.y0 < .6 * (base.y1 - base.y0)).map(p => p.c);
     if (extra.length) {
       const target = STD.thickness(font.stem), t = thickness(extra);
-      out.checks.push({ name: 'Râu: độ dày nét', value: t, range: [target * .8, target * 1.2], ok: t >= target * .8 && t <= target * 1.2, unit: ' đơn vị', note: 'Theo nét thân ' + Math.round(font.stem) + ': chuẩn ' + Math.round(target) });
+      out.checks.push({ name: 'Râu: độ dày nét', value: t, range: [target * .8, target * 1.2], ok: t >= target * .8 && t <= target * 1.2, unit: ' đơn vị', note: 'Theo nét thân ' + Math.round(font.stem) + ': chuẩn ' + Math.round(target), shapes: extra, label: 'Râu' });
     }
   }
 
