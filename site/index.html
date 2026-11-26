@@ -277,33 +277,45 @@
 <section id="font-checker" class="font-checker-page" role="tabpanel" aria-labelledby="open-font-checker" hidden><div class="checker-heading"><h2>Kiểm tra font tiếng Việt</h2><p>Phân tích file mới hoặc font thành phẩm ngay trên trình duyệt, không cần cài vào máy. Kết quả ở tab này tách riêng với bộ chữ đang chỉnh sửa.</p></div><section id="standalone-font-check" class="panel font-check-panel" aria-label="Kiểm tra file font độc lập"></section></section>
 </main>
 <dialog id="font-lab" class="font-lab" aria-labelledby="fl-title">
-  <div class="fl-head"><h2 id="fl-title">Font Lab</h2><span id="fl-source" class="help"></span><button id="fl-close" type="button" class="quiet" aria-label="Đóng Font Lab">×</button></div>
+  <div class="fl-head"><h2 id="fl-title">Font Lab</h2><span id="fl-source" class="help"></span><span id="fl-baseline" class="help fl-baseline"></span><button id="fl-close" type="button" class="quiet" aria-label="Đóng Font Lab">×</button></div>
   <div class="fl-body">
     <div class="fl-stage">
       <div class="fl-toolbar">
-        <label class="check"><input id="fl-points" type="checkbox" checked> Điểm và tay nắm</label>
-        <button id="fl-undo" type="button" title="Ctrl+Z">Hoàn tác</button><button id="fl-redo" type="button" title="Ctrl+Y">Làm lại</button>
-        <button id="fl-fit" type="button">Vừa khung</button>
+        <label class="check"><input id="fl-points" type="checkbox" checked> Điểm</label>
+        <label class="check"><input id="fl-grid" type="checkbox" checked> Lưới</label>
+        <label class="check"><input id="fl-snap" type="checkbox"> Bắt lưới</label>
+        <label class="check"><input id="fl-rules" type="checkbox" checked> Đường quy tắc</label>
+        <button id="fl-undo" type="button" title="Ctrl+Z">Hoàn tác</button><button id="fl-redo" type="button" title="Ctrl+Y">Làm lại</button><button id="fl-fit" type="button">Vừa khung</button>
         <span id="fl-stats" class="help"></span>
       </div>
-      <canvas id="fl-canvas" tabindex="0" aria-label="Nét chữ phóng lớn. Kéo điểm hoặc tay nắm để sửa." title="Kéo điểm hoặc tay nắm · Shift: chọn thêm, giữ thẳng hướng · nháy đúp điểm: đổi góc/cong · Delete: xóa · phím mũi tên: dời 1 (Shift 10) · cuộn: phóng to · kéo nền: dời khung · Ctrl+A: chọn cả chữ · Space: ẩn/hiện điểm"></canvas>
+      <canvas id="fl-canvas" tabindex="0" aria-label="Nét chữ phóng lớn. Kéo điểm hoặc tay nắm để sửa." title="Kéo điểm/tay nắm · kéo trên nền: khung chọn · Shift: chọn thêm, giữ thẳng hướng · nháy đúp điểm: góc ↔ cong · nháy đúp lên viền: thêm điểm · Delete: xóa · mũi tên: dời 1 (Shift 10) · Ctrl+A: chọn cả chữ · cuộn: phóng to · giữ Space hoặc chuột phải để kéo khung nhìn"></canvas>
     </div>
     <aside class="fl-side">
       <section><h3>Điểm đang chọn</h3>
         <div class="fl-xy"><label>X <input id="fl-x" type="number" step="1"></label><label>Y <input id="fl-y" type="number" step="1"></label></div>
-        <div class="tool-row"><button id="fl-toggle" type="button">Đổi thành điểm cong</button><button id="fl-delete" type="button">Xóa</button></div>
+        <p id="fl-scope" class="help"></p>
       </section>
-      <section id="fl-contour" hidden><h3>Khối nét đang chọn</h3>
+      <section><h3>Biến đổi</h3>
+        <div class="fl-grid2"><button id="fl-flip-x" type="button">⇋ Lật ngang</button><button id="fl-flip-y" type="button">⇵ Lật dọc</button><button id="fl-sym-left" type="button" title="Giữ nửa trái, lật sang phải quanh trục giữa của nét (U, O, A, V, H…)">◧ Đối xứng: giữ trái</button><button id="fl-sym-right" type="button" title="Giữ nửa phải, lật sang trái quanh trục giữa của nét">◨ Đối xứng: giữ phải</button></div>
         <label>Co giãn <output id="fl-scale-value">100</output>%<input id="fl-scale" type="range" min="50" max="150" value="100"></label>
         <label>Xoay <output id="fl-rotate-value">0</output>°<input id="fl-rotate" type="range" min="-30" max="30" value="0"></label>
+      </section>
+      <section><h3>Canh điểm</h3>
+        <div class="fl-grid3"><button id="fl-align-left" type="button">⇤ Trái</button><button id="fl-align-center" type="button">↔ Giữa</button><button id="fl-align-right" type="button">⇥ Phải</button><button id="fl-align-top" type="button">⤒ Trên</button><button id="fl-align-middle" type="button">↕ Giữa</button><button id="fl-align-bottom" type="button">⤓ Dưới</button></div>
+      </section>
+      <section><h3>Sửa điểm</h3>
+        <div class="fl-grid2"><button id="fl-smooth" type="button" title="Tay nắm thẳng hàng, độ dài cân theo hai điểm bên cạnh">◯ Cong đều</button><button id="fl-corner" type="button" title="Thu tay nắm: góc sắc cho chân chữ, mũi dấu">◇ Góc nhọn</button><button id="fl-line" type="button" title="Đoạn giữa hai điểm chọn liền nhau thành thẳng">╱ Nắn thẳng đoạn</button><button id="fl-curve" type="button" title="Đoạn thẳng giữa hai điểm chọn liền nhau thành cong">◠ Thành đường cong</button><button id="fl-balance" type="button" title="Hai tay nắm của mỗi đoạn cong cùng độ căng">⚖ Cân tay nắm</button><button id="fl-extremes" type="button" title="Thêm điểm ở chỗ nét nằm ngang hoặc đứng">✚ Thêm cực trị</button><button id="fl-delete" type="button" title="Delete">✕ Xóa điểm</button></div>
+        <div class="tool-row"><label>Lệch tối đa <select id="fl-simplify-level"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="8">8</option></select></label><button id="fl-simplify" type="button" title="Bỏ điểm không cần mà nét lệch không quá mức chọn; giữ góc thật và điểm cực trị">✂ Bớt điểm thừa</button></div>
       </section>
       <section><h3>Làm sạch nét</h3>
         <div class="tool-row"><select id="fl-cleanup-level" aria-label="Mức làm sạch"><option value=".75">Nhẹ</option><option value="1.5" selected>Vừa</option><option value="3">Mạnh</option></select><label class="check"><input id="fl-cleanup-preview" type="checkbox"> Xem trước</label><button id="fl-cleanup-apply" type="button">Áp dụng</button></div>
         <p id="fl-cleanup-note" class="help" role="status"></p>
       </section>
-      <section id="fl-recompose-box"><h3>Dấu</h3>
+      <section id="fl-rules-box"><h3>Quy tắc dấu</h3>
+        <ul id="fl-rule-list" class="fl-rule-list"></ul>
+        <h4>Hòa hợp với nét của font</h4>
+        <ul id="fl-harmony" class="fl-harmony"></ul>
         <button id="fl-recompose" type="button">Dựng lại dấu theo quy tắc</button>
-        <p id="fl-recompose-note" class="help" role="status"></p>
       </section>
       <p id="fl-message" class="help" role="status"></p>
       <div class="tool-row fl-actions"><button id="fl-unlock" type="button" class="quiet" hidden>Mở khóa chữ</button><button id="fl-save" type="button" class="primary" disabled>Lưu chữ</button></div>
