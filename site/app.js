@@ -26,7 +26,7 @@ import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
 import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
-import { strokeTerminal } from './horn-from-letters.js';
+import { strokeTerminal, hornFromLetter } from './horn-from-letters.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -380,9 +380,21 @@ async function commitLabEdit(previous, next) {
 // Sửa tay một chữ gốc hay dấu mẫu (ơ, â, o, dấu sắc…) thì các chữ Xưởng ghép từ nó (ớ ờ ở ỡ ợ, ấ ầ…) ghép lại ngay theo
 // nét vừa lưu, rồi sửa theo bảng quy tắc như mọi bước dựng. Chữ của nhà thiết kế (Font gốc, ảnh) và chữ đã khóa giữ nguyên.
 function spreadLabEdit(char) {
-  const key = char.normalize('NFD'), isMark = toneSamples.has(char);
-  const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key))
-    && (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked));
+  const key = char.normalize('NFD'), isMark = toneSamples.has(char), HORN = '̛';
+  const free = c => (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked;
+  const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key)) && free(c)));
+  // Sửa râu ở ơ/ư (Ơ/Ư): tách râu vừa vẽ làm râu mẫu cho cả cặp cùng cỡ chữ (ơ ↔ ư, Ơ ↔ Ư; skill: ư ơ cùng một nét râu),
+  // rồi ghép lại mọi chữ có râu của cặp đó. Chữ có râu đã sửa tay riêng thì giữ râu của nó.
+  const [root, ...marks] = key;
+  const horn = marks.length === 1 && marks[0] === HORN && 'oOuU'.includes(root) && !glyphs.get(HORN)?.locked
+    ? hornFromLetter(glyphs.get(char), glyphs.get(root), measureStem(glyphs), topRightEdge) : null;
+  if (horn) {
+    const pair = { o: 'u', u: 'o', O: 'U', U: 'O' }[root], sample = glyphs.get(HORN);
+    const byRoot = { ...(sample?.byRoot || {}), [root]: horn };
+    if (!glyphs.get((pair + HORN).normalize('NFC'))?.manualEdit) byRoot[pair] = horn;
+    glyphs.set(HORN, { ...(sample || {}), char: HORN, d: horn.d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char, byRoot, caseStrict: true, approved: false, locked: false });
+    for (const c of charset) { const nfd = c.normalize('NFD'); if (c !== char && nfd.includes(HORN) && byRoot[nfd[0]] === horn && free(c)) related.add(c); }
+  }
   if (!related.size) return [];
   const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
   for (const glyph of made) glyphs.set(glyph.char, glyph);
