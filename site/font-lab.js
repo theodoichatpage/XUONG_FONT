@@ -280,16 +280,13 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
     let target = opt('fl-points') ? hit(x, y) : null;
     if (target?.part === 'edge') target = target.inside;
     canvas.setPointerCapture(event.pointerId);
-    if (!target) {
-      // Kéo trên nền: khung chọn nhiều điểm.
-      drag = { marquee: { x0: x, y0: y, x1: x, y1: y }, add: event.shiftKey, base: event.shiftKey ? new Set(selected) : new Set() };
-      if (!event.shiftKey) select([]);
+    if (!target || target.part === 'contour') {
+      // Kéo ở chỗ không có điểm (trên nền hay trên nét): khung chọn nhiều điểm. Bấm một lần vào nét: chọn cả khối nét.
+      // Không kéo dời cả khối bằng chuột, để khỏi dời chữ nhầm; dời khối bằng phím mũi tên.
+      drag = { marquee: { x0: x, y0: y, x1: x, y1: y }, base: event.shiftKey ? new Set(selected) : new Set(), shift: event.shiftKey, contour: target?.c };
       return;
     }
-    if (target.part === 'contour') {
-      const keys = contours[target.c].map((_, i) => key(target.c, i));
-      if (event.shiftKey) select([...selected, ...keys], [...contourSelection, target.c]); else select(keys, [target.c]);
-    } else if (target.part === 'node') {
+    if (target.part === 'node') {
       const k = key(target.c, target.i);
       if (event.shiftKey) { const next = new Set(selected); next.has(k) ? next.delete(k) : next.add(k); select(next); }
       else if (!selected.has(k)) select([k]);
@@ -333,8 +330,18 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
 
   const endDrag = () => {
     if (drag?.moved) { undo.push(drag.before); redo = []; changed(); }
-    const wasMarquee = drag?.marquee; drag = null;
-    if (wasMarquee) draw();
+    const finished = drag; drag = null;
+    if (finished?.marquee) {
+      const { x0, y0, x1, y1 } = finished.marquee;
+      if (Math.hypot(x1 - x0, y1 - y0) < 4) {
+        // Chỉ bấm, không kéo: chọn khối nét dưới chuột, hoặc bỏ chọn khi bấm ra nền.
+        if (finished.contour != null) {
+          const keys = contours[finished.contour].map((_, i) => key(finished.contour, i));
+          if (finished.shift) select([...selected, ...keys], [...contourSelection, finished.contour]); else select(keys, [finished.contour]);
+        } else if (!finished.shift) select([]);
+      }
+      draw();
+    }
   };
   canvas.addEventListener('pointerup', endDrag);
   canvas.addEventListener('pointercancel', endDrag);
@@ -500,8 +507,13 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
   $('fl-simplify').onclick = () => {
     remember(); let n = 0;
     const tolerance = Number($('fl-simplify-level').value);
-    const scope = contourSelection.size ? [...contourSelection] : contours.map((_, c) => c);
-    for (const c of scope) n += G.simplifyContour(contours[c], tolerance);
+    // Có điểm đang chọn (ví dụ khoanh phần râu): chỉ bớt trong các điểm đó; chưa chọn: cả chữ.
+    // Đánh dấu bằng thuộc tính vì phép bớt điểm sao chép lại contour.
+    const picked = selected.size && !contourSelection.size;
+    if (picked) for (const node of selectedNodes()) node.pick = true;
+    const scope = picked ? [...new Set([...selected].map(k => parseKey(k)[0]))] : contourSelection.size ? [...contourSelection] : contours.map((_, c) => c);
+    for (const c of scope) n += G.simplifyContour(contours[c], tolerance, picked ? node => !node.pick : () => false);
+    for (const contour of contours) for (const node of contour) delete node.pick;
     $('fl-message').textContent = n ? 'Đã bớt ' + n + ' điểm thừa (lệch nét tối đa ' + tolerance + ' đơn vị).' : 'Không có điểm nào bớt được ở mức này.';
     select([]); changed();
   };
