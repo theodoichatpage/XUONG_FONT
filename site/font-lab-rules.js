@@ -2,6 +2,7 @@
 // chuyên nghiệp đã Việt hóa, cùng nguồn với tab Quy tắc font Việt và references/mark-standards.md của skill). Mọi số đo
 // theo chính font đang làm: x-height, chiều cao chữ hoa, độ rộng o/O, nét thân, độ tương phản nét o, kiểu đầu nét r.
 import { MARK_STANDARDS as STD } from './mark-standards.js';
+import { MARK_RANGES } from './mark-ranges.js';
 import { samples, contourBox } from './font-lab-geometry.js';
 
 const MARKS = {
@@ -113,11 +114,22 @@ export function markRules(char, contours, font) {
   }
 
   if (known.some(m => m.key === 'horn')) {
+    // Đo như scripts/lib/mark-metrics.cjs: vươn = (mép phải cả chữ − mép phải chữ gốc) / bề rộng chữ gốc;
+    // đầu râu = (đỉnh cả chữ − đỉnh chữ gốc) / x-height. Khoảng [min, trung vị, max] của 20 font trong mark-ranges.js.
     const kind = root.toLowerCase() === 'o' ? (upper ? 'O' : 'o') : (upper ? 'U' : 'u');
-    const reach = STD.horn.reach[kind] * (base.x1 - base.x0), tip = STD.horn.tip[kind] * xH;
-    out.guides.push({ kind: 'h', y: baseTop + tip, label: 'Đầu râu ≈ ' + Math.round(tip) + ' trên đỉnh' });
-    out.guides.push({ kind: 'v', x: base.x1 + reach, label: 'Râu vươn ≈ ' + Math.round(reach) });
+    const w = base.x1 - base.x0, [r0, rm, r1] = MARK_RANGES['rau_' + kind + '.reach'], [t0, tm, t1] = MARK_RANGES['rau_' + kind + '.tip'];
+    const all = parts.map(p => p.b), gx1 = Math.max(...all.map(b => b.x1)), gy1 = Math.max(...all.map(b => b.y1));
     out.guides.push({ kind: 'v', x: base.x1, label: 'Mép phải ' + root });
+    out.guides.push({ kind: 'xband', x0: base.x1 + r0 * w, x1: base.x1 + r1 * w, mid: base.x1 + rm * w,
+      label: 'Râu vươn ' + Math.round(r0 * w) + '–' + Math.round(r1 * w) + ' (giữa ' + Math.round(rm * w) + ')' });
+    out.guides.push({ kind: 'band', y0: baseTop + t0 * xH, y1: baseTop + t1 * xH, label: 'Đầu râu cao ' + Math.round(t0 * xH) + '–' + Math.round(t1 * xH) + ' trên đỉnh (giữa ' + Math.round(tm * xH) + ')' });
+    range('Râu: độ vươn', (gx1 - base.x1) / w, [rm, r0, r1], ' × rộng ' + root, 'Phần râu chìa quá mép phải ' + root + ': khoảng 20 font, không bắt buộc đúng mức giữa');
+    range('Râu: độ cao đầu râu', (gy1 - baseTop) / xH, [tm, t0, t1], ' x-height', 'Đầu râu cao hơn đỉnh ' + root);
+    const extra = parts.filter(p => p.b.x1 > base.x1 + 2 && p.b.y0 > base.y0 + .3 * (base.y1 - base.y0) && p.b.y1 - p.b.y0 < .6 * (base.y1 - base.y0)).map(p => p.c);
+    if (extra.length) {
+      const target = STD.thickness(font.stem), t = thickness(extra);
+      out.checks.push({ name: 'Râu: độ dày nét', value: t, range: [target * .8, target * 1.2], ok: t >= target * .8 && t <= target * 1.2, unit: ' đơn vị', note: 'Theo nét thân ' + Math.round(font.stem) + ': chuẩn ' + Math.round(target) });
+    }
   }
 
   // Sự hòa hợp: đặc điểm nét của chính font để đối chiếu khi chỉnh dấu.

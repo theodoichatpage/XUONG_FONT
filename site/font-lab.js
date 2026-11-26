@@ -116,6 +116,14 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
         ctx.setLineDash([]); ctx.fillStyle = 'rgba(110,220,150,.13)'; ctx.fillRect(0, a, box.width, b - a);
         ctx.strokeStyle = 'rgba(110,220,150,.55)'; ctx.strokeRect(-1, a, box.width + 2, b - a);
         ctx.fillStyle = '#8fe3ad'; ctx.textAlign = 'right'; ctx.fillText(g.label, box.width - 8, a - 4);
+      } else if (g.kind === 'xband') {
+        // Dải dọc: khoảng cho phép (tô), vạch đứt ở mức giữa của 20 font.
+        const a = toScreen({ x: g.x0, y: 0 }).x, b = toScreen({ x: g.x1, y: 0 }).x, m = Math.round(toScreen({ x: g.mid, y: 0 }).x) + .5;
+        ctx.setLineDash([]); ctx.fillStyle = 'rgba(110,220,150,.11)'; ctx.fillRect(a, 0, b - a, box.height);
+        ctx.strokeStyle = 'rgba(110,220,150,.55)'; ctx.strokeRect(a, -1, b - a, box.height + 2);
+        ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(m, 0); ctx.lineTo(m, box.height); ctx.stroke();
+        const room = b + 8 + ctx.measureText(g.label).width < box.width;
+        ctx.fillStyle = '#8fe3ad'; ctx.textAlign = room ? 'left' : 'right'; ctx.fillText(g.label, room ? b + 4 : a - 4, 30);
       } else if (g.kind === 'vband') {
         const top = toScreen({ x: 0, y: g.y1 }).y - 10, bottom = toScreen({ x: 0, y: g.y0 }).y + 10;
         ctx.setLineDash([]); ctx.strokeStyle = 'rgba(110,220,150,.8)'; ctx.lineWidth = 1.5;
