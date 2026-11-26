@@ -367,9 +367,17 @@ const outlineCleanup=setupOutlineCleanup({getGlyph:()=>reviewGlyph,prepareGlyph:
 // Font Lab (nháy đúp ô chữ): chữ sửa tay được khóa để Tạo dấu, Hoàn thiện và các bước dựng tự động không ghi đè.
 // Bảng chữ chặn ghi đè chữ khóa, nên ở đây ghi thẳng vào Map (chỉ khi người dùng tự lưu hoặc mở khóa trong Font Lab).
 async function commitLabEdit(previous, next) {
-  if (glyphs.get(previous.char) !== previous) throw Error('Chữ đã đổi trong lúc chỉnh. Đóng Font Lab rồi mở lại.');
+  // Font Lab là hộp thoại chặn: người dùng không đổi được chữ này ở chỗ khác lúc đang mở. Bản trong bộ chữ khác bản
+  // Font Lab giữ (bước chạy nền thay object, hay lần lưu trước lỗi giữa chừng) thì nét sửa tay vẫn thắng, không chặn
+  // lưu (lỗi cũ: báo "Chữ đã đổi trong lúc chỉnh" ở mọi lần bấm, tải lại trang thì mất hết nét đã sửa).
+  const current = glyphs.get(previous.char);
+  if (current && current !== previous) {
+    if (current.d !== previous.d) console.warn('Font Lab: ' + previous.char + ' đổi nét trong lúc chỉnh; giữ nét sửa tay.');
+    previous = current;
+  }
   const state = { glyphs: [...glyphs.values()].map(g => g === previous ? next : g), name: $('name').value, sample: $('sample').value, spacing: $('spacing').value, importedMetrics };
-  localStorage.setItem(storageKey, JSON.stringify(state));
+  try { localStorage.setItem(storageKey, JSON.stringify(state)); }
+  catch { throw Error('Trình duyệt hết chỗ lưu bộ chữ nên chưa lưu được ' + next.char + '. Bấm "Lưu font đang làm" trong Bộ sưu tập để giữ font, rồi thử lại.'); }
   try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { /* giữ thay đổi trong bộ chữ đang mở */ }
   Map.prototype.set.call(glyphs, next.char, next);
   recentGlyphs.add(next.char);
