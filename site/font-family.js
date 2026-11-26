@@ -37,8 +37,10 @@ function fromD(d, upm) {
 function splitMarks(path, capHeight, reference) {
   const parts = [];
   for (const command of path.commands) { if (command.type === 'M') parts.push([]); parts.at(-1)?.push(command); }
-  const boxOf = cmds => { const xs = [], ys = []; for (const c of cmds) for (const [x, y] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) if (Number.isFinite(c[x])) { xs.push(c[x]); ys.push(c[y]); }
-    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; };
+  // Khung đúng theo đường cong (không lấy điểm điều khiển: điểm điều khiển vồng trên đỉnh o làm đỉnh thân cao hơn
+  // thật ~20 đơn vị, đặt dấu theo đó thì hở dấu–thân hụt đi).
+  const boxOf = cmds => { const p = new opentype.Path(); p.commands = cmds; const b = p.getBoundingBox();
+    return { x0: b.x1, x1: b.x2, y0: b.y1, y1: b.y2 }; };
   const boxes = parts.map(boxOf), low = .3 * capHeight;
   // Chiều contour: dấu là contour ngoài (cùng chiều contour lớn nhất); lòng chữ (e, o) ngược chiều, thuộc thân.
   const area = cmds => { let a = 0; const pts = cmds.filter(c => Number.isFinite(c.x)); for (let k = 0; k < pts.length; k++) { const p = pts[k], q = pts[(k + 1) % pts.length]; a += p.x * q.y - q.x * p.y; } return a / 2; };
@@ -57,8 +59,12 @@ function splitMarks(path, capHeight, reference) {
   if (reference) {
     const ups = reference.marks.filter(m => m.upper), downs = reference.marks.filter(m => !m.upper);
     const upFrom = ups.length ? Math.min(...ups.map(m => m.b.y0)) - 15 : Infinity, downTo = downs.length ? Math.max(...downs.map(m => m.b.y1)) + 15 : -Infinity;
+    // Dấu tầng dưới của chồng hai tầng (mũ của ổ) tụt xuống theo độ nới, có thể thấp hơn mốc đáy dấu gốc − 15
+    // (Migra ExtraBold: mũ ổ 547 < 551, bị tính là thân, hỏi rơi xuống dính o thành "ơ"): contour ngoài nằm hẳn trên
+    // đỉnh thân của chính bản này (contour chạm vùng chân) cũng là dấu.
+    const lightAnchor = boxes.filter(b => b.y0 < low), lightTop = lightAnchor.length ? Math.max(...lightAnchor.map(b => b.y1)) : Infinity;
     parts.forEach((cmds, k) => { const b = boxes[k], outer = Math.sign(areas[k]) === Math.sign(main);
-      (outer && b.y0 >= upFrom ? marks.push({ cmds, b, upper: true }) : outer && b.y1 <= downTo && b.y1 <= 2 ? marks.push({ cmds, b, upper: false }) : body.push(cmds)); });
+      (outer && (b.y0 >= upFrom || (ups.length && b.y0 >= lightTop + 2)) ? marks.push({ cmds, b, upper: true }) : outer && b.y1 <= downTo && b.y1 <= 2 ? marks.push({ cmds, b, upper: false }) : body.push(cmds)); });
   }
   else parts.forEach((cmds, k) => { const b = boxes[k], outer = Math.sign(areas[k]) === Math.sign(main);
     (outer && b.y0 >= anchorTop - 2 ? marks.push({ cmds, b, upper: true }) : outer && b.y1 <= 2 && parts.length > 1 && Math.abs(areas[k]) < Math.abs(main) * .2 ? marks.push({ cmds, b, upper: false }) : body.push(cmds)); });
@@ -72,13 +78,17 @@ function recomposeOwn(entry, bodyWeigh, capHeight, markWeigh) {
   // Không có dấu rời (Ơ Ư: râu vẽ chồng thành contour riêng làm đổi phép đếm): đổi độ đậm cả glyph như chữ thường.
   if (!original) { const whole = bodyWeigh(entry.original); return whole?.commands?.length ? whole : null; }
   let light = splitMarks(entry.light, capHeight, original);
-  // Bản đổi độ đậm nhẹ mất dấu (dấu mảnh tan khi thu): lấy dấu của glyph gốc, đổi độ đậm riêng phần dấu (0.27 lần),
-  // đặt theo thân gốc. Nặng là chấm đặc: giữ nguyên.
-  if (!light?.marks.length) {
+  // Bản đổi độ đậm nhẹ phải còn đủ mọi dấu của glyph gốc: tâm mỗi dấu gốc nằm trong một dấu của bản nhẹ (so tâm,
+  // không so khung chồng nhau: khung mũ và hỏi của ẩ chồng lên nhau nên mất mũ vẫn tưởng còn đủ).
+  const holds = (m, l) => { const x = (m.b.x0 + m.b.x1) / 2, y = (m.b.y0 + m.b.y1) / 2; return l.b.x0 <= x && x <= l.b.x1 && l.b.y0 <= y && y <= l.b.y1; };
+  const complete = light?.marks.length && original.marks.every(m => light.marks.some(l => l.upper === m.upper && holds(m, l)));
+  // Bản đổi độ đậm nhẹ mất dấu (dấu mảnh tan khi thu, dấu tầng dưới dính thân): lấy dấu của glyph gốc, đổi độ đậm
+  // riêng phần dấu (0.27 lần), đặt theo thân gốc. Nặng là chấm đặc: giữ nguyên.
+  if (!complete) {
     const marks = original.marks.map(mark => {
       if (!mark.upper || !markWeigh) return mark;
       const path = new opentype.Path(); path.commands = mark.cmds.map(c => ({ ...c }));
-      try { const thin = markWeigh(path); if (thin?.commands?.length) return { ...mark, cmds: thin.commands }; } catch { /* giữ dấu gốc */ }
+      try { const thin = markWeigh(path); if (thin?.commands?.length) { const b = thin.getBoundingBox(); return { ...mark, cmds: thin.commands, b: { x0: b.x1, x1: b.x2, y0: b.y1, y1: b.y2 } }; } } catch { /* giữ dấu gốc */ }
       return mark;
     });
     light = { ...original, marks };
@@ -87,8 +97,18 @@ function recomposeOwn(entry, bodyWeigh, capHeight, markWeigh) {
   if (!body?.commands?.length) return null;
   const box = body.getBoundingBox(), cx = (box.x1 + box.x2) / 2;
   const out = new opentype.Path(); out.commands = body.commands.map(c => ({ ...c }));
+  // Khoảng hở dấu–thân giữ đúng như glyph gốc (skill Tạo family: đặt đúng khoảng cách tới đỉnh/chân thân như glyph
+  // gốc). Bản nhẹ đã nới cả thân lẫn dấu nên hở còn hở gốc − 2 lần độ nới (Migra ExtraBold: hở ó 0.04 x-height,
+  // chuẩn 0.10–0.17): đặt đáy dấu trên cách đỉnh thân mới đúng hở gốc, đỉnh dấu dưới cách chân thân mới đúng hở gốc.
+  const lowest = (list, upper) => list.filter(m => m.upper === upper), edge = (list, upper) => upper ? Math.min(...list.map(m => m.b.y0)) : Math.max(...list.map(m => m.b.y1));
+  const shiftOf = upper => {
+    const own = lowest(original.marks, upper), now = lowest(light.marks, upper);
+    if (!own.length || !now.length) return upper ? box.y2 - light.top : box.y1 - light.bottom;
+    return upper ? box.y2 + (edge(own, true) - original.top) - edge(now, true) : box.y1 - (original.bottom - edge(own, false)) - edge(now, false);
+  };
+  const dyUp = shiftOf(true), dyDown = shiftOf(false);
   for (const mark of light.marks) {
-    const dy = mark.upper ? box.y2 - light.top : box.y1 - light.bottom, dx = cx - light.cx;
+    const dy = mark.upper ? dyUp : dyDown, dx = cx - light.cx;
     for (const c of mark.cmds) { const n = { ...c }; for (const [x, y] of [['x', 'y'], ['x1', 'y1'], ['x2', 'y2']]) if (Number.isFinite(n[x])) { n[x] += dx; n[y] += dy; } out.commands.push(n); }
   }
   return out;
