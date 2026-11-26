@@ -157,7 +157,7 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
     }
     ctx.setLineDash([]);
     if (opt('fl-rules')) drawRules(box);
-    const shown = preview?.contours ?? contours, showPoints = opt('fl-points');
+    const shown = preview?.contours ?? contours, showPoints = opt('fl-points') && !spaceDown; // giữ phím cách: xem trước nét, ẩn điểm neo
     ctx.fillStyle = showPoints ? 'rgba(255,252,245,.86)' : '#fffcf5';
     ctx.fill(pathOf(shown));
     if (preview) { ctx.strokeStyle = '#e0533d'; ctx.lineWidth = 1.2; ctx.stroke(pathOf(contours)); }
@@ -459,9 +459,11 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
       event.preventDefault();
       const s = event.shiftKey ? 10 : 1;
       nudge(event.key === 'ArrowLeft' ? -s : event.key === 'ArrowRight' ? s : 0, event.key === 'ArrowUp' ? s : event.key === 'ArrowDown' ? -s : 0);
-    } else if (event.key === ' ') { event.preventDefault(); if (!spaceDown) { spaceDown = true; canvas.style.cursor = 'grab'; } }
+    } else if (event.key === ' ') { event.preventDefault(); if (!spaceDown && !event.repeat) { spaceDown = true; canvas.style.cursor = 'grab'; draw(); } }
   });
-  dialog.addEventListener('keyup', event => { if (event.key === ' ') { spaceDown = false; canvas.style.cursor = ''; } });
+  const spaceUp = () => { if (!spaceDown) return; spaceDown = false; canvas.style.cursor = ''; draw(); };
+  dialog.addEventListener('keyup', event => { if (event.key === ' ') spaceUp(); });
+  window.addEventListener('blur', spaceUp);
 
   // Co giãn, xoay vùng chọn (hoặc cả khối nét đang chọn) quanh tâm vùng.
   const transformInput = () => {
