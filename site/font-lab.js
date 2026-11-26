@@ -599,9 +599,15 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
       const spread = await commit(glyph, next);
       glyph = next; dirty = false; undo = []; redo = [];
       onStatus('Đã lưu nét sửa tay cho ' + label(next.char) + (shift ? ', đặt lại lên đường chân (dời ' + shift + ')' : '') + '. Chữ được khóa để các bước dựng tự động không ghi đè.'
-        + (spread?.length ? ' Đã ghép lại theo nét mới: ' + spread.join(' ') + '.' : ''));
+        + (spread?.length ? ' Đã ghép lại theo nét mới: ' + spread.join(' ') + '.' : '')
+        + (spread?.error ? ' Chưa ghép lại được các chữ liên quan (' + spread.error + '); mở lại chữ này và bấm Lưu chữ để thử lại.' : ''));
       dialog.close();
-    } catch (error) { $('fl-message').textContent = error.message; refreshPanel(); }
+    } catch (error) {
+      // Lỗi xảy ra sau khi chữ đã ghi vào bộ chữ: lấy bản đang có làm mốc, để bấm Lưu lần nữa không bị chặn
+      // "Chữ đã đổi trong lúc chỉnh" (Font Lab là hộp thoại chặn, chỉ chính nó đổi được chữ này lúc đang mở).
+      glyph = getGlyph(glyph.char) || glyph;
+      $('fl-message').textContent = error.message; refreshPanel();
+    }
   };
   $('fl-unlock').onclick = async () => {
     try {

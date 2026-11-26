@@ -373,7 +373,13 @@ async function commitLabEdit(previous, next) {
   try { await familyWorkspace.saveOutlineEdit(previous, next, importedMetrics); } catch { /* giữ thay đổi trong bộ chữ đang mở */ }
   Map.prototype.set.call(glyphs, next.char, next);
   recentGlyphs.add(next.char);
-  const spread = next.locked ? spreadLabEdit(next.char, previous) : [];
+  // Chữ đã ghi xong ở trên: lỗi khi ghép lại các chữ liên quan không được làm hỏng lần lưu (lỗi cũ: Font Lab giữ
+  // bản trước khi lưu, bấm Lưu lần nữa thì báo "Chữ đã đổi trong lúc chỉnh" và không lưu được).
+  let spread = [];
+  if (next.locked) {
+    try { spread = spreadLabEdit(next.char, previous); }
+    catch (error) { console.error(error); spread = Object.assign([], { error: error?.message || String(error) }); }
+  }
   refresh();
   return spread;
 }
