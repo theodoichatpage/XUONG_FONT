@@ -23,7 +23,16 @@ const fonts = [
     feasible: ['Thin', 'ExtraLight', 'Light', 'Regular', 'Medium'], infeasible: ['SemiBold', 'Bold', 'ExtraBold', 'Black'], family: ['Light', 'Medium'] },
   { name: 'UTM Bebas', file: path.join(home, 'AppData/Local/Microsoft/Windows/Fonts/UTM Bebas.ttf'),
     feasible: ['ExtraLight', 'Light', 'Regular', 'Medium', 'SemiBold', 'Bold'], infeasible: ['Thin', 'ExtraBold', 'Black'], family: ['Light'] },
+  // Migra Extralight đã Việt hóa của người dùng (chỉ đo trên máy, không commit): ExtraBold từng mất mũ của ổ ẩ.
+  { name: 'Migra Việt hóa', file: path.join(home, 'Downloads', 'migra-vn', 'migra-vn-extralight.ttf'), baseWeight: 200, familyOnly: true, family: ['ExtraBold'] },
 ];
+// Dấu trên của chữ có dấu: số contour nằm hẳn trên đỉnh chữ gốc và khoảng hở dấu–thân (đơn vị 1000 em).
+function upperMarks(f, char) {
+  const k = 1000 / f.unitsPerEm, top = f.charToGlyph(char.normalize('NFD')[0]).getBoundingBox().y2 * k, parts = [];
+  let cur; for (const c of f.charToGlyph(char).path.commands) { if (c.type === 'M') parts.push(cur = []); if ('y' in c) cur.push(c.y * k); }
+  const above = parts.filter(p => Math.min(...p) > top - 2);
+  return { count: above.length, gap: above.length ? Math.min(...above.flat()) - top : NaN };
+}
 const chars = [...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:;!?“”‘’\'"ơưƠƯờởữợỏọạụịỵĐđ'];
 function glyphMap(font, source = 'Ảnh mẫu') {
   const k = 1000 / font.unitsPerEm, map = new Map();
@@ -60,6 +69,20 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
       const markH = d => { const ps = svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim()).map(x => glyphBounds({ d: x })).sort((a, b) => b.y - a.y); return ps[0]?.height || 0; };
       const want = glyphBounds({ d: hookSample.d }).height, got = markH(made.get('ủ').d);
       assert.ok(Math.abs(got / want - 1) <= .12, font.name + ': dấu hỏi ghép vào ủ cao ' + Math.round(got) + ', dấu hỏi vẽ trong ảnh ' + Math.round(want));
+    }
+    if (font.familyOnly) {
+      // 4b. Family giữ đủ dấu hai tầng và khoảng hở dấu–thân của font gốc (lỗi 26/11/2026: ExtraBold của Migra mất mũ
+      // của ổ ẩ — mũ tụt dưới mốc tách dấu nên bị tính là thân — và hỏi rơi xuống dính o thành "thơi"; hở ó còn 0.04).
+      const twoTier = [...'ổẩễộóỏ'], want = Object.fromEntries(twoTier.map(c => [c, upperMarks(source, c)]));
+      await createFontFamily(record(font.name, buf), font.family, 'x', async result => {
+        if (!result.blob) return;
+        const out = parse(Buffer.from(await result.blob.arrayBuffer()));
+        for (const c of twoTier) {
+          const got = upperMarks(out, c);
+          assert.equal(got.count, want[c].count, font.name + ' ' + result.style + ': ' + c + ' còn ' + got.count + ' dấu trên, font gốc ' + want[c].count);
+          assert.ok(Math.abs(got.gap - want[c].gap) <= 6, font.name + ' ' + result.style + ': ' + c + ' hở dấu–thân ' + Math.round(got.gap) + ', font gốc ' + Math.round(want[c].gap));
+        }
+      }, { baseWeight: font.baseWeight });
     }
     if (font.feasible) {
       // 3. Biết trước kiểu family nào làm được (lỗi cũ: Bold không tạo được nhưng vẫn cho chọn).
