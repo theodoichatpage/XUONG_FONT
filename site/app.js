@@ -383,17 +383,21 @@ function spreadLabEdit(char, previous) {
   const key = char.normalize('NFD'), isMark = toneSamples.has(char), HORN = '̛';
   const free = c => (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked;
   const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key)) && free(c)));
-  // Sửa râu ở ơ/ư (Ơ/Ư): tách râu vừa vẽ làm râu mẫu cho cả cặp cùng cỡ chữ (ơ ↔ ư, Ơ ↔ Ư; skill: ư ơ cùng một nét râu),
-  // rồi ghép lại mọi chữ có râu của cặp đó. Chữ có râu đã sửa tay riêng thì giữ râu của nó.
+  // Sửa râu ở ơ/ư/Ơ/Ư: tách râu vừa vẽ làm râu mẫu chung cho cả bốn chữ (skill: ư ơ cùng một nét râu), rồi ghép lại
+  // mọi chữ có râu dùng râu mẫu đó.
   const [root, ...marks] = key;
   const before = new Map([[char, previous]]);
   const horn = marks.length === 1 && marks[0] === HORN && 'oOuU'.includes(root) && !glyphs.get(HORN)?.locked
     ? hornFromLetter(glyphs.get(char), glyphs.get(root), measureStem(glyphs), topRightEdge) : null;
   if (horn) {
-    const pair = { o: 'u', u: 'o', O: 'U', U: 'O' }[root], sample = glyphs.get(HORN), pairHorned = (pair + HORN).normalize('NFC');
-    before.set(pairHorned, glyphs.get(pairHorned));
-    const byRoot = { ...(sample?.byRoot || {}), [root]: horn };
-    if (!glyphs.get((pair + HORN).normalize('NFC'))?.manualEdit) byRoot[pair] = horn;
+    // Một nét râu dùng chung cho ơ ư Ơ Ư (người dùng 26/11/2026: chữ thường dùng chung râu với Ơ hoa). Chữ có râu đã
+    // sửa tay riêng giữ râu của nó.
+    const sample = glyphs.get(HORN), byRoot = { ...(sample?.byRoot || {}), [root]: horn };
+    for (const other of 'oOuU') {
+      const horned = (other + HORN).normalize('NFC');
+      if (other === root || glyphs.get(horned)?.manualEdit) continue;
+      byRoot[other] = horn; before.set(horned, glyphs.get(horned));
+    }
     glyphs.set(HORN, { ...(sample || {}), char: HORN, d: horn.d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char, byRoot, caseStrict: true, approved: false, locked: false });
     for (const c of charset) { const nfd = c.normalize('NFD'); if (c !== char && nfd.includes(HORN) && byRoot[nfd[0]] === horn && free(c)) related.add(c); }
   }
