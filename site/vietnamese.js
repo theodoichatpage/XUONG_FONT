@@ -165,7 +165,7 @@ export function composeVietnamese(glyphs, replace = () => false, { replaceHorn =
     if (useStructured) marks.splice(marks.indexOf(structural), 1);
     // Font dựng từ ảnh: chỉ ghép bằng dấu của chính font — dấu tách từ ảnh, dấu của font gốc, hoặc dấu Xưởng dựng từ nét
     // của chính font (Dựng từ nét chữ). Không dùng hình dấu mặc định (khi chưa có dấu mẫu nào).
-    if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||['Ảnh mẫu','Ảnh làm sạch','Font gốc','Dựng từ nét chữ'].includes(sample.source));})) continue;
+    if (requireReferenceMarks && marks.some(mark=>{const sample=glyphs.get(mark);return !sample?.d || !(sample.origin==='direct'||sample.manualEdit||['Ảnh mẫu','Ảnh làm sạch','Font gốc','Dựng từ nét chữ'].includes(sample.source));})) continue;   // dấu mẫu sửa tay trong Font Lab cũng là dấu của chính font
     // Hai tầng dấu (ấ ầ ẩ ẫ, ắ ằ ẳ ẵ và chữ hoa): xếp theo cách đo được ở 20 font đã Việt hóa,
     // giữ nguyên mũ/trăng như ở â/ă, dấu thanh lệch cạnh mũ thay vì chồng thẳng lên trên.
     const tone = marks.find(mark => TWO_TIER[mark]);
