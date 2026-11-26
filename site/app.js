@@ -25,7 +25,8 @@ import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
-import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
+import { strokeTerminal } from './horn-from-letters.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -373,9 +374,16 @@ const fontLab = setupFontLab({
   commit: commitLabEdit,
   unlock: async glyph => { const next = { ...glyph, locked: false, approved: false, version: (glyph.version || 0) + 1 }; await commitLabEdit(glyph, next); return next; },
   recompose: char => composeVietnamese(glyphs, c => c === char, { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).find(g => g.char === char)?.d,
+  // Số đo của chính font cho đường kẻ quy tắc dấu và phép đối chiếu hòa hợp (không dùng số của font khác).
   metrics: () => {
-    const top = char => { const g = glyphs.get(char); if (!g?.d) return undefined; const b = glyphBounds(g); return Math.round(b.y + b.height); };
-    return { ascent: importedMetrics?.ascent ?? ASCENT, descent: importedMetrics?.descent ?? DESCENT, cap: top('H'), x: top('x') };
+    const box = char => { const g = glyphs.get(char); if (!g?.d) return null; const b = glyphBounds(g); return b.width > 0 ? { x0: b.x, x1: b.x + b.width, y0: b.y, y1: b.y + b.height } : null; };
+    const top = char => box(char) && Math.round(box(char).y1), width = char => box(char) && box(char).x1 - box(char).x0;
+    const stem = measureStem(glyphs);
+    let terminal = null;
+    try { terminal = strokeTerminal(glyphs, stem, topRightEdge)?.terminal ?? null; } catch { /* thiếu r hoặc i */ }
+    return { ascent: importedMetrics?.ascent ?? ASCENT, descent: importedMetrics?.descent ?? DESCENT, capH: top('H'), xH: top('x'),
+      o: width('o'), O: width('O'), stem, contrast: strokeContrast(glyphs), terminal, period: box('.') && Math.max(width('.'), box('.').y1 - box('.').y0),
+      overshoot: box('o')?.y0 ?? 0, overshootUpper: box('O')?.y0 ?? 0, glyphBox: box };
   },
   label: char => toneSamples.get(char) ?? char,
   onStatus: status
