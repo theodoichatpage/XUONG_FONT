@@ -595,9 +595,10 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
       version: (glyph.version || 0) + 1, approved: true, locked: true, proof: undefined, identityVersion: undefined, pixelOutline: undefined };
     try {
       $('fl-save').disabled = true;
-      await commit(glyph, next);
+      const spread = await commit(glyph, next);
       glyph = next; dirty = false; undo = []; redo = [];
-      onStatus('Đã lưu nét sửa tay cho ' + label(next.char) + (shift ? ', đặt lại lên đường chân (dời ' + shift + ')' : '') + '. Chữ được khóa để các bước dựng tự động không ghi đè.');
+      onStatus('Đã lưu nét sửa tay cho ' + label(next.char) + (shift ? ', đặt lại lên đường chân (dời ' + shift + ')' : '') + '. Chữ được khóa để các bước dựng tự động không ghi đè.'
+        + (spread?.length ? ' Đã ghép lại theo nét mới: ' + spread.join(' ') + '.' : ''));
       dialog.close();
     } catch (error) { $('fl-message').textContent = error.message; refreshPanel(); }
   };
