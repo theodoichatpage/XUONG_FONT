@@ -287,6 +287,10 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     const found = new Map(markPlacement(g).map(issue => [issue.char, issue]));
     assert.ok(found.get('ỏ') && !found.get('ỏ').locked, 'Times: ỏ dời dấu 60 phải bị báo để ghép lại');
     assert.ok(found.get('ể')?.locked, 'Times: ể sửa tay lệch dấu phải được báo là chữ sửa tay');
+    // Dấu sửa ở chữ hai tầng có cỡ theo quy tắc hai tầng × độ thu cho vừa dòng: chia lại để ra dấu mẫu đúng cỡ.
+    const { toneScaleIn } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+    assert.equal(toneScaleIn({ char: 'ở' }, '̉'), 1, 'ở: dấu hỏi đúng cỡ dấu mẫu');
+    assert.ok(Math.abs(toneScaleIn({ char: 'Ổ', markFit: { factor: .8 } }, '̉') - .8) < 1e-9, 'Ổ thu 0.8: dấu mẫu phải phóng lại 1/0.8');
     assert.ok(!mayBeXuongMade('À') && !mayBeXuongMade('á') && mayBeXuongMade('ở') && mayBeXuongMade('Ơ'), 'chữ Latin có dấu là nét nhà thiết kế');
     done.push('soát vị trí dấu từng chữ (' + [...found.keys()].join(' ') + ' lệch)');
   }

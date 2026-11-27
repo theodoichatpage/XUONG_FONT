@@ -48,6 +48,13 @@ function contourList(d) {
   return parts.map(part => part.join(' '));
 }
 // Đặt dấu thanh cạnh/trên mũ hoặc trăng đã có trong chữ (tier = â, Â, ă... đã dựng hoặc của font gốc).
+// Tỉ lệ dấu thanh trong một chữ so với dấu mẫu: chữ hai tầng (ấ ổ Ẩ…) đặt dấu thanh theo cỡ của quy tắc hai tầng rồi
+// có thể thu thêm cho vừa dòng (markFit.factor). Sửa tay dấu ở chữ đó thì chia lại tỉ lệ này để ra dấu mẫu đúng cỡ.
+export function toneScaleIn(glyph, tone) {
+  const marks = [...(glyph?.char || '').normalize('NFD')].slice(1), structural = marks.find(mark => mark === '̂' || mark === '̆');
+  if (!structural || !TWO_TIER[tone] || marks.length < 2) return 1;
+  return (TWO_TIER[tone][structural === '̂' ? 'circumflex' : 'breve']?.scale ?? 1) * (glyph.markFit?.factor ?? 1);
+}
 function placeSecondTier(tier, plainRoot, sample, tone, structural, isCapital, body) {
   const rootBox = glyphBounds(plainRoot), rootTop = rootBox.y + rootBox.height;
   const markParts = contourList(tier.d).filter(d => { const b = glyphBounds({ d }); return b.y >= rootTop - 8 && b.height < rootBox.height * .6; });
