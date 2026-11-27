@@ -25,7 +25,7 @@ import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
-import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, mayBeXuongMade, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, mayBeXuongMade, toneScaleIn, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
 import { strokeTerminal, hornFromLetter, apartFrom } from './horn-from-letters.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -436,18 +436,40 @@ function spreadLabEdit(char, previous) {
   }
   // Sửa dấu thanh ngay trên một chữ (ỏ, ả, ở, Ấ...): tách dấu vừa vẽ (contour không chạm khung contour nào của chữ gốc)
   // làm dấu mẫu, rồi ghép lại mọi chữ mang dấu đó. Dùng khi ô Dấu mẫu trống hoặc khó sửa.
+  // Sửa ở chữ nào cũng là cùng một dấu (người dùng 27/11/2026: "làm dấu chữ nào chả được, nó vẫn là dấu đó"): lần sửa tay
+  // mới nhất thay dấu mẫu kể cả khi dấu mẫu đã khóa từ một lần sửa tay trên chữ khác; chỉ dấu mẫu vẽ thẳng trong ô dấu
+  // (khóa, không lấy từ chữ) mới giữ. Chữ hai tầng (ổ Ẩ…) đặt dấu nhỏ hơn dấu mẫu: chia lại tỉ lệ để dấu mẫu đúng cỡ.
   const tone = marks.at(-1), toneBase = tone && tone !== HORN && toneSamples.has(tone) ? glyphs.get((root + marks.slice(0, -1).join('')).normalize('NFC')) : null;
-  if (toneBase?.d && !glyphs.get(tone)?.locked) {
+  const toneSample = tone && glyphs.get(tone), lockedTone = [];
+  if (toneBase?.d && (!toneSample?.locked || toneSample.fromLetter || toneSample.manualEdit?.fromLetter)) {
     // Dấu vừa vẽ: contour nằm ngoài thân chữ gốc (so diện tích chồng, không so khung bao: chữ nghiêng có khung chồng nhau).
     const drawn = apartFrom(glyphs.get(char).d, toneBase.d, { outer: true });
     if (drawn.length) {
-      const sample = glyphs.get(tone);
-      glyphs.set(tone, { ...(sample || {}), char: tone, d: drawn.join(' '), advance: sample?.advance || 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char,
+      const k = toneScaleIn(glyphs.get(char), tone), d = Math.abs(k - 1) > .01 ? svgpath(drawn.join(' ')).scale(1 / k).toString() : drawn.join(' ');
+      // Dấu mẫu có thể đang khóa từ lần sửa tay trước: bộ chữ chặn ghi đè chữ khóa nên ghi thẳng vào Map.
+      Map.prototype.set.call(glyphs, tone, { ...(toneSample || {}), char: tone, d, advance: toneSample?.advance || 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char,
         nativeSize: undefined, approved: true, locked: true, manualEdit: { time: new Date().toISOString(), fromLetter: char } });
-      for (const c of charset) if (c !== char && c.normalize('NFD').includes(tone) && free(c)) related.add(c);
+      for (const c of charset) {
+        if (c === char || !c.normalize('NFD').includes(tone)) continue;
+        if (free(c)) related.add(c);
+        else if (glyphs.get(c)?.locked && c.normalize('NFD').at(-1) === tone) lockedTone.push(c);
+      }
     }
   }
-  if (!related.size) return [];
+  // Chữ đã sửa tay mang cùng dấu: chỉ thay phần dấu bằng dấu ghép theo quy tắc từ dấu mẫu mới, giữ nguyên thân (và râu,
+  // mũ, trăng) người dùng đã sửa; chữ vẫn khóa.
+  const swapped = [];
+  for (const c of lockedTone) {
+    const current = glyphs.get(c), base = glyphs.get([...c.normalize('NFD')].slice(0, -1).join('').normalize('NFC'));
+    if (!current?.d || !base?.d) continue;
+    const rule = composeVietnamese(glyphs, x => x === c, { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).find(g => g.char === c);
+    const oldMarks = new Set(apartFrom(current.d, base.d, { outer: true })), newMarks = rule?.d ? apartFrom(rule.d, base.d, { outer: true }) : [];
+    if (!oldMarks.size || !newMarks.length) continue;
+    const body = svgpath(current.d).abs().toString().split(/(?=M)/).filter(part => part.trim() && !oldMarks.has(part));
+    Map.prototype.set.call(glyphs, c, { ...current, d: [...body, ...newMarks].join(' '), version: (current.version || 0) + 1, proof: undefined });
+    swapped.push(c);
+  }
+  if (!related.size) return swapped;
   const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
   for (const glyph of made) glyphs.set(glyph.char, glyph);
   // Chữ ghép không dựng lại được (dấu thanh mẫu không thuộc nguồn được dùng để ghép, ví dụ dấu hỏi của ở, ử): giữ nguyên
@@ -467,7 +489,7 @@ function spreadLabEdit(char, previous) {
     done.add(c);
   }
   if (done.size) enforceRules([...done]);
-  return [...done];
+  return [...done, ...swapped];
 }
 const fontLab = setupFontLab({
   getGlyph: char => glyphs.get(char),
