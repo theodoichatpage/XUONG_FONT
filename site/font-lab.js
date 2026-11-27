@@ -598,7 +598,10 @@ export function setupFontLab({ getGlyph, commit, unlock, recompose, metrics, lab
       $('fl-save').disabled = true;
       const spread = await commit(glyph, next);
       glyph = next; dirty = false; undo = []; redo = [];
-      onStatus('Đã lưu nét sửa tay cho ' + label(next.char) + (shift ? ', đặt lại lên đường chân (dời ' + shift + ')' : '') + '. Chữ được khóa để các bước dựng tự động không ghi đè.'
+      // Ô dấu mẫu lưu đúng hình dựng theo quy tắc thì được trả về dấu Xưởng dựng (không khóa), báo đúng như vậy.
+      const ruled = getGlyph(next.char) && !getGlyph(next.char).locked;
+      onStatus((ruled ? 'Đã đưa ' + label(next.char) + ' về dấu dựng theo quy tắc từ nét của font (không khóa, quy tắc đổi thì dựng lại theo).'
+        : 'Đã lưu nét sửa tay cho ' + label(next.char) + (shift ? ', đặt lại lên đường chân (dời ' + shift + ')' : '') + '. Chữ được khóa để các bước dựng tự động không ghi đè.')
         + (spread?.length ? ' Đã ghép lại theo nét mới: ' + spread.join(' ') + '.' : '')
         + (spread?.error ? ' Chưa ghép lại được các chữ liên quan (' + spread.error + '); mở lại chữ này và bấm Lưu chữ để thử lại.' : ''));
       dialog.close();
