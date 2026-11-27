@@ -267,5 +267,28 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     }
     done.push('dấu hỏi dựng theo kiểu nét (' + checked.join(', ') + ')');
   }
+  // 11. Hoàn thiện soát khoảng hở, cỡ, vị trí dấu của từng chữ theo quy tắc ghép (người dùng 27/11/2026): bộ vừa ghép thì
+  // không lệch; chữ ghép có dấu bị dời thì lộ ra để ghép lại; chữ sửa tay (khóa) lệch thì lộ ra để báo, không ghép đè.
+  // Chữ Latin có dấu của nhà thiết kế (À Á) không bị coi là chữ Xưởng ghép.
+  {
+    const { markPlacement } = moduleFor('rule-check', 'site/rule-check.js');
+    const { mayBeXuongMade } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+    const g = glyphMap(parse(fs.readFileSync('C:/Windows/Fonts/times.ttf')), 'Font gốc');
+    for (const c of [...g.keys()]) if (c.normalize('NFD').length > 1 && !'ơưƠƯ'.includes(c)) g.delete(c);
+    const derived = deriveMarkSamples(g); for (const [c, m] of derived.marks || derived) if (!g.has(c)) g.set(c, m);
+    for (const x of composeVietnamese(g)) g.set(x.char, x);
+    assert.equal(markPlacement(g).length, 0, 'Times: bộ vừa ghép không được báo lệch vị trí dấu');
+    const lift = (char, dy, extra) => {
+      const glyph = g.get(char), [root] = char.normalize('NFD'), own = new Set(svgpath(g.get(root).d).abs().toString().split(/(?=M)/).map(p => p.trim()));
+      const d = svgpath(glyph.d).abs().toString().split(/(?=M)/).map(p => own.has(p.trim()) ? p : svgpath(p).translate(0, dy).toString()).join(' ');
+      g.set(char, { ...glyph, d, ...extra });
+    };
+    lift('ỏ', 60, {}); lift('ể', 45, { locked: true, manualEdit: { time: 'test' } });
+    const found = new Map(markPlacement(g).map(issue => [issue.char, issue]));
+    assert.ok(found.get('ỏ') && !found.get('ỏ').locked, 'Times: ỏ dời dấu 60 phải bị báo để ghép lại');
+    assert.ok(found.get('ể')?.locked, 'Times: ể sửa tay lệch dấu phải được báo là chữ sửa tay');
+    assert.ok(!mayBeXuongMade('À') && !mayBeXuongMade('á') && mayBeXuongMade('ở') && mayBeXuongMade('Ơ'), 'chữ Latin có dấu là nét nhà thiết kế');
+    done.push('soát vị trí dấu từng chữ (' + [...found.keys()].join(' ') + ' lệch)');
+  }
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });
