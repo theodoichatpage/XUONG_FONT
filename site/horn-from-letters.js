@@ -62,6 +62,19 @@ export function hornFromLetter(donor, root, stem, topRightEdge, align = null) {
     const dx = align ? align.dx : db.x - rb.x, dy = align ? align.dy : db.y - rb.y;
     const donorPolys = toPolygons(donor.d), rootPolys = shift(toPolygons(root.d), dx, dy);
     const top = rb.y + rb.height + dy, right = rb.x + rb.width + dx;
+    // Râu vẽ thành contour riêng (người dùng vẽ trong Font Lab, chữ Xưởng ghép): lấy nguyên contour đó, giữ đường cong
+    // và số điểm như người vẽ. Trừ đa giác (bên dưới) làm phẳng đường cong thành hàng chục đoạn thẳng ngắn: râu lan
+    // sang ư ở ử ợ thành chuỗi điểm dày, viền gãy (lỗi 26/11/2026, Migra Italic).
+    if (!align) {
+      const own = apartFrom(donor.d, rootPolys, { outer: true }).filter(part => {
+        const b = boxOf(toPolygons(part).flat());
+        return b.y1 > top - .1 * stem && b.x1 > right - stem && b.x0 > rb.x + dx + rb.width * .3;
+      });
+      if (own.length) {
+        const d = svgpath(own.join(' ')).translate(-dx, -dy).toString(), { edge } = topRightEdge(root.d, rb, root.char, stem), hb = glyphBounds({ d });
+        return { d, anchor: { dx: hb.x - edge, dy: hb.y - (rb.y + rb.height) }, direct: true };
+      }
+    }
     // Bỏ mảnh vụn dọc mép thân (hai lần tách cùng một chữ lệch nhau vài điểm ảnh).
     const rest = offset(offset(run(ClipperLib.ClipType.ctDifference, donorPolys, rootPolys), -.12 * stem), .12 * stem);
     const pieces = rest.filter(p => C.Orientation(p) && Math.abs(C.Area(p)) > (.15 * stem * S) ** 2)
@@ -86,6 +99,24 @@ export function hornFromLetter(donor, root, stem, topRightEdge, align = null) {
     const d = toD(Math.sign(signedArea(outerOf)) === want ? placed : placed.map(p => [...p].reverse())), hb = glyphBounds({ d });
     return { d, anchor: { dx: hb.x - edge, dy: hb.y - (rb.y + rb.height) } };
   } catch { return null; }
+}
+
+// Contour của d nằm ngoài thân chữ gốc (base: đường viền hoặc đa giác Clipper): phần lớn diện tích (> 50%) không nằm
+// trong thân. Dùng để tách dấu khỏi chữ có dấu thay cho so khung bao: ở chữ nghiêng, khung dấu hỏi của ở ử chồng lên
+// khung đầu râu nên bị tính nhầm là thân, ở ử không được ghép lại theo râu mới (lỗi 26/11/2026, Migra Italic).
+// outer: chỉ lấy contour cùng chiều contour ngoài của d (bỏ lòng chữ). share: phần chồng lên thân tối đa (mặc định
+// một nửa; dấu thanh rời thân thì gần 0, râu cắm vào thân thì lớn hơn).
+export function apartFrom(d, base, { outer = false, share = .5 } = {}) {
+  const parts = svgpath(d).abs().toString().split(/(?=M)/).filter(part => part.trim());
+  try {
+    const basePolys = typeof base === 'string' ? toPolygons(base) : base, want = outerSign(d);
+    const area = polys => polys.reduce((sum, p) => sum + Math.abs(C.Area(p)), 0);
+    return parts.filter(part => {
+      if (outer && parts.length > 1 && outerSign(part) !== want) return false;
+      const polys = run(ClipperLib.ClipType.ctUnion, toPolygons(part), []), total = area(polys);
+      return total > 0 && area(run(ClipperLib.ClipType.ctIntersection, polys, basePolys)) < share * total;
+    });
+  } catch { return []; }
 }
 
 // Râu ghép sang chữ gốc khác (râu ư cho Ư, Ơ): nếu đặt theo khoảng của ảnh mà chưa chạm thân (chân serif U mỏng, cao hơn

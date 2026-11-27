@@ -31,6 +31,7 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 | Ký tự đặc biệt theo kiểu nét (thanh-đậm: nét ngang mảnh, ngoặc thon hai đầu, % thanh-đậm; nét đều giữ đều) | mark-standards Nét đều hay thanh-đậm | Có (25/11/2026, `derive-symbols.js`); check:rules mục 8 |
 | Hoàn thiện dựng lại dấu Xưởng dựng từ nét (chưa khóa, chưa duyệt) khi quy tắc cho hình khác; đầu râu lưu có phiên bản | mark-standards Nét đều hay thanh-đậm | Có (25/11/2026); check:rules mục 8 |
 | Râu: độ vươn, độ cao đầu, chỗ nối, advance lấn lề phải | mark-standards Râu ơ ư | Có; check:rules, compare-horn-spacing |
+| Sửa tay một chữ trong Font Lab lan sang chữ liên quan: râu contour riêng lấy nguyên đường cong, dấu tách theo diện tích chồng (chữ nghiêng), lưu không bị chặn | workflow Sửa tay trong Font Lab | Có (26/11/2026); check:rules mục 9 |
 | Nặng tránh đuôi y; ị phân biệt chấm i và nặng | design-rules mục 9, bảng chi tiết | Có |
 | Chữ nghiêng: dấu nghiêng theo chữ, dịch theo trục | mark-standards Chữ nghiêng | Có |
 | Font toàn chữ hoa: x-height quy đổi, chấm theo chuẩn hoa | mark-standards Font toàn chữ hoa | Có; check:rules (UTM Bebas) |

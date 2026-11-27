@@ -26,7 +26,7 @@ import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
 import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
-import { strokeTerminal, hornFromLetter } from './horn-from-letters.js';
+import { strokeTerminal, hornFromLetter, apartFrom } from './horn-from-letters.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
 import { glyphBounds, prepareGlyphReview } from './glyph-review.js';
@@ -419,9 +419,8 @@ function spreadLabEdit(char, previous) {
   // làm dấu mẫu, rồi ghép lại mọi chữ mang dấu đó. Dùng khi ô Dấu mẫu trống hoặc khó sửa.
   const tone = marks.at(-1), toneBase = tone && tone !== HORN && toneSamples.has(tone) ? glyphs.get((root + marks.slice(0, -1).join('')).normalize('NFC')) : null;
   if (toneBase?.d && !glyphs.get(tone)?.locked) {
-    const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim());
-    const box = d => glyphBounds({ d }), hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-    const baseBoxes = parts(toneBase.d).map(box), drawn = parts(glyphs.get(char).d).filter(d => !baseBoxes.some(b => hit(box(d), b)));
+    // Dấu vừa vẽ: contour nằm ngoài thân chữ gốc (so diện tích chồng, không so khung bao: chữ nghiêng có khung chồng nhau).
+    const drawn = apartFrom(glyphs.get(char).d, toneBase.d, { outer: true });
     if (drawn.length) {
       const sample = glyphs.get(tone);
       glyphs.set(tone, { ...(sample || {}), char: tone, d: drawn.join(' '), advance: sample?.advance || 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char,
@@ -441,10 +440,9 @@ function spreadLabEdit(char, previous) {
     const baseChar = [...before.keys()].find(b => c.normalize('NFD').startsWith(b.normalize('NFD')));
     const old = before.get(baseChar), fresh = glyphs.get(baseChar), current = glyphs.get(c);
     if (!old?.d || !fresh?.d || !current?.d || current.d.startsWith(fresh.d)) continue;
-    const parts = d => svgpath(d).abs().toString().split(/(?=M)/).filter(x => x.trim());
-    const box = d => glyphBounds({ d }), hit = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-    const baseBoxes = [...parts(old.d), ...parts(fresh.d)].map(box);
-    const tone = parts(current.d).filter(d => !baseBoxes.some(b => hit(box(d), b)));
+    // Dấu thanh: nằm ngoài cả chữ có râu cũ lẫn mới, và rời thân o/u (râu cũ khác hình râu mới vẫn cắm vào thân).
+    const body = glyphs.get(c.normalize('NFD')[0])?.d;
+    const tone = apartFrom(current.d, old.d + ' ' + fresh.d, { outer: true }).filter(part => !body || apartFrom(part, body, { share: .02 }).length);
     if (!tone.length) continue;
     glyphs.set(c, { ...current, d: fresh.d + ' ' + tone.join(' '), advance: fresh.advance, version: (current.version || 0) + 1, proof: undefined });
     done.add(c);

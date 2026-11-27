@@ -15,6 +15,7 @@ const { createFontFamily, familyFeasibility } = moduleFor('family-generator-rule
 const { composeVietnamese, marksFromImageLetters, deriveMarkSamples, toneSamples, hornShape, hornEnds, measureStem, measureBody, strokeContrast, rightEdgeAt, HORN_END_VERSION } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
 const { deriveSymbols } = moduleFor('derive-symbols-rules', 'site/derive-symbols.js');
 const { glyphBounds } = moduleFor('glyph-review-rules', 'site/glyph-review.js');
+const { hornFromLetter, apartFrom } = moduleFor('horn-from-letters-rules', 'site/horn-from-letters.js');
 const parse = buf => opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const home = process.env.USERPROFILE || process.env.HOME || '';
 const fonts = [
@@ -216,5 +217,24 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     const h = glyphBounds(deriveSymbols(map).find(g => g.char === '-')).height;
     assert.ok(Math.abs(h - .82 * stem) < 2, 'Arial: gạch nối phải giữ 0.82 nét thân, đo ' + h.toFixed(1));
     done.push('Arial: ký tự đặc biệt nét đều đạt'); }
+  // 9. Sửa râu ơ trong Font Lab rồi lan sang chữ khác (lỗi 26/11/2026, Migra Italic): râu vẽ thành contour riêng phải
+  // giữ nguyên đường cong và số điểm (không làm phẳng thành chuỗi đoạn thẳng dày), và dấu thanh của ở ử phải tách được
+  // dù khung dấu hỏi chồng lên khung đầu râu ở chữ nghiêng.
+  if (fs.existsSync('C:/Windows/Fonts/timesi.ttf')) {
+    const map = glyphMap(parse(fs.readFileSync('C:/Windows/Fonts/timesi.ttf')), 'Font gốc'), o = map.get('o'), stem = measureStem(map), ob = glyphBounds(o);
+    const r = ob.x + ob.width, t = ob.y + ob.height;
+    const hornD = `M${r - 40} ${t - 90} C${r - 10} ${t - 60} ${r + 40} ${t + 20} ${r + 70} ${t + 120} L${r + 95} ${t + 112} C${r + 62} ${t + 10} ${r + 10} ${t - 80} ${r - 25} ${t - 112} Z`;
+    const donor = { char: 'ơ', d: o.d + ' ' + hornD };
+    const { topRightEdge } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+    const horn = hornFromLetter(donor, o, stem, topRightEdge);
+    assert.ok(horn?.direct, 'Times Italic: râu vẽ thành contour riêng phải được lấy nguyên contour');
+    const curves = d => svgpath(d).abs().segments.filter(([c]) => c === 'C').length;
+    assert.equal(curves(horn.d), curves(hornD), 'Times Italic: râu lan sang chữ khác phải giữ đường cong như người vẽ, có ' + curves(horn.d) + ' đoạn cong');
+    // Dấu hỏi đặt sao cho khung chồng lên khung đầu râu nhưng không chạm râu.
+    const hook = `M${r + 5} ${t + 90} L${r + 5} ${t + 150} L${r + 40} ${t + 150} L${r + 40} ${t + 90} Z`;   // cùng chiều contour ngoài với râu
+    const tone = apartFrom(donor.d + ' ' + hook, donor.d, { outer: true });
+    assert.equal(tone.length, 1, 'Times Italic: ở phải tách đúng một dấu hỏi, tách được ' + tone.length);
+    done.push('râu sửa tay lan sang chữ khác giữ đường cong, dấu hỏi chữ nghiêng tách đúng');
+  }
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });
