@@ -62,6 +62,20 @@ Nét lấy từ ảnh chỉ bị dời, co dọc ≤ 5% hoặc nắn nhẹ; khô
 
 Nút "Đề xuất sửa an toàn" / "AI đối chiếu và đề xuất sửa dấu": với cảnh báo khoảng dấu–thân, Xưởng tính bản dời dấu rời, xuất thử TTF và đo lại; bản nào hết cảnh báo và không gây lỗi mới thì **áp dụng luôn** (không bắt duyệt từng chữ), rồi tự kiểm lại file. Chỉ dời vị trí dấu, không đổi hình nét, kể cả chữ theo ảnh; chữ đã khóa, dấu dính thân hoặc bản sửa không qua kiểm lại thì ghi "Bỏ qua". Quay lại bằng Hoàn tác chỉnh dấu. Cảnh báo (Cần xem lại) không chặn việc xuất font; chỉ lỗi mới chặn.
 
+## Sửa tay trong Font Lab rồi lan sang chữ liên quan (`commitLabEdit`, `spreadLabEdit` trong `site/app.js`)
+
+Nháy đúp ô chữ mở Font Lab. **Lưu chữ** khóa chữ đó (Tạo dấu, Hoàn thiện không ghi đè) rồi ghép lại ngay các chữ Xưởng ghép từ nó; chữ của nhà thiết kế, chữ từ ảnh và chữ đã khóa giữ nguyên. Sửa một chữ là đủ, không sửa tay từng chữ:
+
+- **Râu:** sửa ở một trong ơ ư Ơ Ư → râu thành râu mẫu chung cho cả bốn chữ gốc và mọi chữ có râu (ờ ớ ở ỡ ợ ừ ứ ử ữ ự, hoa cũng vậy). Chữ có râu đã sửa tay riêng giữ râu của nó.
+- **Dấu thanh:** sửa dấu ngay trên một chữ (ỏ, ả, ở, Ấ…) → dấu đó thành dấu mẫu, mọi chữ mang dấu đó ghép lại.
+- **Râu vẽ thành contour riêng được lấy nguyên contour** (`hornFromLetter`, nhánh `direct`): giữ đúng đường cong, số điểm và chỗ nối như người vẽ. Chỉ khi râu liền một khối với thân mới tách bằng phép trừ đa giác (chữ có râu − chữ gốc). Phép trừ đa giác làm phẳng đường cong thành hàng chục đoạn thẳng ngắn: râu vẽ 4–6 điểm lan sang ư ở ử ợ thành chuỗi điểm dày, viền gãy (lỗi 26/11/2026, Migra Italic).
+- **Tách dấu khỏi chữ theo diện tích chồng, không theo khung bao** (`apartFrom` trong `site/horn-from-letters.js`): dấu là contour ngoài (bỏ lòng chữ) có hơn nửa diện tích nằm ngoài chữ gốc; khi giữ dấu thanh của ở ử để thay râu, dấu còn phải rời thân o/u (chồng < 2%). Ở chữ nghiêng, khung dấu hỏi của ở ử chồng lên khung đầu râu: so khung bao thì tưởng dấu là thân, ở ử không nhận râu mới (lỗi 26/11/2026).
+- Chữ ghép không dựng lại được bằng dấu mẫu (dấu thanh của ở ử không thuộc nguồn dùng để ghép) thì giữ dấu thanh đang có, thay phần thân và râu bằng chữ có râu mới.
+- Sau khi ghép lại thì sửa theo bảng quy tắc như mọi bước dựng (`enforceRules`).
+- **Lưu không bao giờ bị chặn:** Font Lab là hộp thoại chặn, nét sửa tay luôn thắng bản đang có trong bộ chữ. Lỗi ở bước ghép lại các chữ liên quan không làm hỏng lần lưu; dòng trạng thái báo "Chưa ghép lại được các chữ liên quan (lý do)". Trình duyệt hết chỗ lưu thì báo rõ, không im lặng (lỗi 26/11/2026: mọi lần bấm Lưu báo "Chữ đã đổi trong lúc chỉnh", tải lại trang mất nét đã sửa).
+
+Kiểm: `npm run check:rules` mục 9 (râu contour riêng giữ đường cong; dấu hỏi chữ nghiêng có khung chồng khung râu vẫn tách đúng).
+
 ## Dựng chữ cái gốc còn thiếu từ bộ phận (`site/derive-letters.js`)
 
 Chạy trong nút "Hoàn thiện font chữ" và nút dựng dấu mẫu, trước bước ghép chữ có dấu. Chỉ điền ô trống, không thay chữ theo ảnh, nét gốc hay chữ đã khóa. Kết quả ghi nguồn "Dựng từ bộ phận" và `derivedFrom`, luôn là suy luận để duyệt; Hoàn tác chỉnh dấu gỡ được.
