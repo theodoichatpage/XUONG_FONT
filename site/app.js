@@ -7,7 +7,7 @@ import { setupFontLab } from './font-lab.js';
 import {cleanOutline,fromImage,sampleOutline} from './outline-cleanup.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import { placePunctuation as placePunctuationIn } from './punctuation-rules.js';
-import { checkRules, ruleMessage, fixRules, markPlacement, rebaseLocked } from './rule-check.js';
+import { checkRules, ruleMessage, fixRules, markPlacement, sameShape } from './rule-check.js';
 const placePunctuation = (glyph, map = glyphs) => placePunctuationIn(glyph, map);
 import { outlineDefects } from './outline-quality.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -434,17 +434,34 @@ function spreadLabEdit(char, previous) {
   // mọi chữ có râu dùng râu mẫu đó.
   const [root, ...marks] = key;
   const before = new Map([[char, previous]]);
-  const horn = marks.length === 1 && marks[0] === HORN && 'oOuU'.includes(root) && !glyphs.get(HORN)?.locked
-    ? hornFromLetter(glyphs.get(char), glyphs.get(root), measureStem(glyphs), topRightEdge) : null;
+  // Râu sửa ở chữ nào cũng là râu của cả nhóm (người dùng 27/11/2026: sửa râu ở chữ ở mà ơ, Ớ… không đổi; "làm dấu chữ
+  // nào chả được, nó vẫn là dấu đó"). Chữ có râu kèm dấu thanh (ở ờ Ớ…): thân = các nét không phải dấu thanh; khác thân
+  // chữ có râu hiện có (so bằng hình) thì người dùng đã sửa râu.
+  const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
+  const rootTop = glyphs.get(root)?.d ? (b => b.y + b.height)(glyphBounds(glyphs.get(root))) : 0;
+  const toneOf = p => { const b = glyphBounds({ d: p }); return b.y >= rootTop - 2 || b.y + b.height <= 2; };
+  const hornedChar = (root + HORN).normalize('NFC');
+  let donor = null;
+  if (marks.includes(HORN) && 'oOuU'.includes(root) && glyphs.get(root)?.d && !glyphs.get(HORN)?.locked) {
+    if (marks.length === 1) donor = glyphs.get(char);
+    else {
+      const body = split(glyphs.get(char).d).filter(p => !toneOf(p)), base = glyphs.get(hornedChar);
+      const same = base?.d && split(base.d).length === body.length && split(base.d).every(p => body.some(q => sameShape(p, q)));
+      if (!same) donor = { ...glyphs.get(char), char: hornedChar, d: body.join(' ') };
+    }
+  }
+  const horn = donor ? hornFromLetter(donor, glyphs.get(root), measureStem(glyphs), topRightEdge) : null;
+  const lockedHorn = [];
   if (horn) {
-    // Một nét râu dùng chung cho ơ ư Ơ Ư (người dùng 26/11/2026: chữ thường dùng chung râu với Ơ hoa). Chữ có râu đã
-    // sửa tay riêng giữ râu của nó.
+    // Một nét râu dùng chung cho ơ ư Ơ Ư (người dùng 26/11/2026: chữ thường dùng chung râu với Ơ hoa). Lần sửa râu mới
+    // nhất thắng: cả chữ có râu đã sửa tay cũng nhận râu mới (chỉ thay thân + râu, giữ dấu thanh người dùng).
     const sample = glyphs.get(HORN), byRoot = { ...(sample?.byRoot || {}), [root]: horn };
     for (const other of 'oOuU') {
       const horned = (other + HORN).normalize('NFC');
-      if (other === root || glyphs.get(horned)?.manualEdit) continue;
+      if (other === root) continue;
       byRoot[other] = horn; before.set(horned, glyphs.get(horned));
     }
+    for (const c of charset) if (c !== char && c.normalize('NFD').includes(HORN) && glyphs.get(c)?.locked) lockedHorn.push(c);
     glyphs.set(HORN, { ...(sample || {}), char: HORN, d: horn.d, advance: 0, source: 'Ảnh mẫu', origin: 'direct', fromLetter: char, byRoot, caseStrict: true, approved: false, locked: false });
     for (const c of charset) { const nfd = c.normalize('NFD'); if (c !== char && nfd.includes(HORN) && byRoot[nfd[0]] === horn && free(c)) related.add(c); }
   }
@@ -501,18 +518,33 @@ function spreadLabEdit(char, previous) {
     glyphs.set(c, { ...current, d: fresh.d + ' ' + tone.join(' '), advance: fresh.advance, version: (current.version || 0) + 1, proof: undefined });
     done.add(c);
   }
+  // Chữ có râu đã khóa: chữ gốc có râu (ơ ư Ơ Ư) ghép lại từ o u O U + râu mới; chữ kèm dấu thanh lấy thân của chữ gốc
+  // có râu mới, giữ dấu thanh của mình. Chữ vẫn khóa.
+  if (lockedHorn.length) {
+    const opts = { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') };
+    for (const c of lockedHorn.filter(c => [...c.normalize('NFD')].length === 2)) {
+      const made = composeVietnamese(glyphs, x => x === c, opts).find(g => g.char === c);
+      if (made?.d) { Map.prototype.set.call(glyphs, c, { ...glyphs.get(c), d: made.d, advance: made.advance, version: (glyphs.get(c).version || 0) + 1, proof: undefined }); swapped.push(c); }
+    }
+    for (const c of lockedHorn.filter(c => [...c.normalize('NFD')].length > 2)) {
+      const [r] = c.normalize('NFD'), base = glyphs.get((r + HORN).normalize('NFC')), current = glyphs.get(c), rTop = (b => b.y + b.height)(glyphBounds(glyphs.get(r)));
+      if (!base?.d || !current?.d) continue;
+      const tones = split(current.d).filter(p => { const b = glyphBounds({ d: p }); return b.y >= rTop - 2 || b.y + b.height <= 2; });
+      if (!tones.length) continue;
+      Map.prototype.set.call(glyphs, c, { ...current, d: [...split(base.d), ...tones].join(' '), advance: base.advance ?? current.advance, version: (current.version || 0) + 1, proof: undefined });
+      swapped.push(c);
+    }
+  }
   // Soát cả bộ sau khi lan: chữ Xưởng ghép mà thân/râu không còn đúng chữ gốc hiện có, hay dấu lệch khoảng hở, cỡ, vị trí
   // theo quy tắc (ghép từ bản cũ trước khi râu, dấu mẫu đổi) thì ghép lại luôn, để mọi chữ cùng một râu, một dấu
   // (lỗi 27/11/2026: Ở ghép lại theo râu mới, Ỡ vẫn râu cũ).
-  // Vài lượt: ơ ư đổi râu trước, rồi mới lộ các chữ có râu ghép từ ơ ư cũ. Chữ khóa chỉ sửa dấu thì thân theo chữ gốc.
+  // Vài lượt: ơ ư đổi râu trước, rồi mới lộ các chữ có râu ghép từ ơ ư cũ.
   for (let pass = 0; pass < 3; pass++) {
     const issues = markPlacement(glyphs, { ours: glyph => !!glyph && (free(glyph.char) || !!glyph.locked) }) || [];
     const fix = new Set(issues.filter(issue => !issue.locked && free(issue.char)).map(issue => issue.char));
-    let moved = 0;
-    for (const issue of issues.filter(issue => issue.locked && issue.body)) {
-      const next = rebaseLocked(glyphs, issue.char);
-      if (next) { Map.prototype.set.call(glyphs, issue.char, next); swapped.push(issue.char); moved++; }
-    }
+    // Chữ đã khóa không bao giờ bị tự đổi thân ở đây (lỗi 27/11/2026: tự đổi thân chữ khóa làm mất râu người dùng sửa ở
+    // chữ ở); chỉ đổi khi chính người dùng sửa râu/dấu (ở trên).
+    const moved = 0;
     if (fix.size) for (const glyph of composeVietnamese(glyphs, c => fix.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }))
       if (fix.has(glyph.char)) { glyphs.set(glyph.char, glyph); done.add(glyph.char); }
     if (!fix.size && !moved) break;
@@ -2092,7 +2124,8 @@ $('apply-mark-spacing').addEventListener('click', () => {
     : 'Đã chỉnh dấu cho ' + lastMarkChange.length + ' chữ. Thân chữ và khoảng cách giữa các chữ được giữ nguyên.');
 });
 $('undo-mark-spacing').addEventListener('click', () => {
-  for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) { if (before) glyphs.set(char, before); else glyphs.delete(char); }
+  // Trả lại đúng bản trước lượt sửa, cả chữ đã khóa (bộ chữ chặn ghi đè chữ khóa nên ghi thẳng vào Map).
+  for (const {char, before, after} of lastMarkChange) if (glyphs.get(char) === after) { if (before) Map.prototype.set.call(glyphs, char, before); else Map.prototype.delete.call(glyphs, char); }
   lastMarkChange = []; completionRun = false; repairRecheckPending = true; refresh(); previewMarkSpacing(); $('undo-mark-spacing').disabled = true;
 });
 
@@ -2309,7 +2342,7 @@ async function fixByRules() {
       misplaced = markPlacement(next, { ours: marksOf }) || [];
     }
     for (const issue of misplaced) if (!issue.locked) failing.add(issue.char);
-    const handMisplaced = misplaced.filter(issue => issue.locked && !(issue.body && rebaseLocked(next, issue.char)));
+    const handMisplaced = misplaced.filter(issue => issue.locked);
     const reshaped = new Set([...heights.changed.map(g => g.char), ...cleaned]);
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
       || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu')
@@ -2330,9 +2363,6 @@ async function fixByRules() {
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
     const draft = keepLocked(next);   // chữ đã khóa (sửa tay trong Font Lab) không bị ghép lại
-    // Chữ khóa chỉ sửa dấu (thân y nguyên lần sửa trước): thân và râu theo chữ gốc hiện có, giữ dấu người dùng.
-    // (Chạy trên mọi chữ khóa, sau khi ơ ư và chữ gốc đã ghép lại ở trên.)
-    for (const [char, glyph] of [...draft]) if (glyph?.locked && char.normalize('NFD').length > 1) { const moved = rebaseLocked(draft, char); if (moved) Map.prototype.set.call(draft, char, moved); }
     // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
     // trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning).
     const kerned = importedMetrics ? 0 : vietnameseKerning([...draft.values()].filter(g => g?.d)).length;
