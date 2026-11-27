@@ -119,34 +119,11 @@ function shapeArea(d) {
   });
   return Math.abs(area / 2);
 }
-function sameShape(a, b) {
+export function sameShape(a, b) {
   const p = glyphBounds({ d: a }), q = glyphBounds({ d: b });
   if (Math.abs(p.x - q.x) > 1.5 || Math.abs(p.y - q.y) > 1.5 || Math.abs(p.width - q.width) > 1.5 || Math.abs(p.height - q.height) > 1.5) return false;
   const A = shapeArea(a), B = shapeArea(b);
   return Math.abs(A - B) <= .01 * Math.max(A, B, 1);
-}
-
-// Chữ đã khóa (sửa tay trong Font Lab) mà người dùng chỉ sửa dấu, không đụng thân: thân (cả râu, mũ, trăng) đi theo chữ
-// gốc hiện có, dấu người dùng giữ nguyên. Thân không đổi = mọi phần thân có y nguyên trong bản trước lần sửa
-// (outlineUndo). Người dùng 27/11/2026: Ở đã khóa vẫn giữ râu cũ trong khi Ớ theo râu mới. Trả về chữ mới hoặc null.
-export function rebaseLocked(map, char) {
-  const glyph = map.get(char);
-  if (!glyph?.d || !glyph.locked || !glyph.outlineUndo?.d) return null;
-  const [root, ...marks] = char.normalize('NFD');
-  if (!marks.length || (marks.length === 1 && marks[0] === '̛')) return null;
-  const base = map.get(marks.includes('̛') ? (root + '̛').normalize('NFC') : root), rootGlyph = map.get(root);
-  if (!base?.d || !rootGlyph?.d) return null;
-  const top = (b => b.y + b.height)(glyphBounds(rootGlyph));
-  const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
-  const isMark = p => { const b = glyphBounds({ d: p }); return b.y >= top - 2 || b.y + b.height <= 2; };
-  // So nét bằng hình (khung bao, diện tích), không so chuỗi: Font Lab lưu đường cong bậc ba, bản trước có thể là bậc hai.
-  const partsNow = split(glyph.d), before = split(glyph.outlineUndo.d);
-  const body = partsNow.filter(p => !isMark(p)), markParts = partsNow.filter(isMark);
-  if (!markParts.length || !body.every(p => before.some(q => sameShape(p, q)))) return null;
-  const shell = split(base.d);
-  if (shell.length === body.length && shell.every(p => body.some(q => sameShape(p, q)))) return null;   // thân đã đúng chữ gốc
-  const d = [...split(base.d), ...markParts].join(' ');
-  return d === glyph.d ? null : { ...glyph, d, advance: base.advance ?? glyph.advance, version: (glyph.version || 0) + 1, proof: undefined };
 }
 
 // Mỗi quy tắc: id, mô tả ngắn, mục skill, hàm đo trả về danh sách chữ lệch kèm số đo.

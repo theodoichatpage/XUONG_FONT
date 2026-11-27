@@ -310,19 +310,16 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     const { toneScaleIn } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
     assert.equal(toneScaleIn({ char: 'ở' }, '̉'), 1, 'ở: dấu hỏi đúng cỡ dấu mẫu');
     assert.ok(Math.abs(toneScaleIn({ char: 'Ổ', markFit: { factor: .8 } }, '̉') - .8) < 1e-9, 'Ổ thu 0.8: dấu mẫu phải phóng lại 1/0.8');
-    // Chữ khóa chỉ sửa dấu: ơ đổi râu thì thân, râu theo ơ mới, giữ dấu người dùng; chữ khóa đã sửa thân thì giữ nguyên.
+    // Chữ khóa (sửa tay) có râu khác ơ hiện có: chỉ báo, đánh dấu là chữ khóa, không tự ghép lại (lỗi 27/11/2026: tự đổi
+    // thân chữ khóa làm mất râu người dùng sửa ở chữ ở).
     {
-      const { rebaseLocked } = moduleFor('rule-check', 'site/rule-check.js');
-      const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
       const t = new Map(g), made = composeVietnamese(t).find(x => x.char === 'ớ');
-      t.set('ớ', { ...made, locked: true, outlineUndo: { ...made } });
+      const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
       const oParts = new Set(split(t.get('o').d).map(p => svgpath(p).round(0).toString()));
+      t.set('ớ', { ...made, locked: true, d: split(made.d).map(p => oParts.has(svgpath(p).round(0).toString()) ? p : svgpath(p).translate(0, 0).toString()).join(' ') });
       t.set('ơ', { ...t.get('ơ'), d: split(t.get('ơ').d).map(p => oParts.has(svgpath(p).round(0).toString()) ? p : svgpath(p).translate(15, 8).toString()).join(' ') });
-      const moved = rebaseLocked(t, 'ớ'), has = new Set(split(moved?.d || '').map(p => svgpath(p).round(0).toString()));
-      assert.ok(moved && split(t.get('ơ').d).every(p => has.has(svgpath(p).round(0).toString())), 'Times: ớ khóa chỉ sửa dấu phải theo râu ơ mới');
-      assert.ok(split(moved.d).length === split(t.get('ơ').d).length + 1, 'Times: ớ khóa giữ đúng dấu sắc');
-      t.set('ớ', { ...made, locked: true, outlineUndo: { ...made, d: svgpath(made.d).translate(3, 0).toString() } });
-      assert.equal(rebaseLocked(t, 'ớ'), null, 'Times: ớ khóa đã sửa thân phải giữ nguyên');
+      const issue = (markPlacement(t) || []).find(x => x.char === 'ớ');
+      assert.ok(issue?.locked && issue.body, 'Times: ớ khóa có râu khác ơ phải được báo là chữ khóa (không tự ghép lại)');
     }
     assert.ok(!mayBeXuongMade('À') && !mayBeXuongMade('á') && mayBeXuongMade('ở') && mayBeXuongMade('Ơ'), 'chữ Latin có dấu là nét nhà thiết kế');
     done.push('soát vị trí dấu từng chữ (' + [...found.keys()].join(' ') + ' lệch)');
