@@ -507,17 +507,14 @@ export function strokeAxis(glyphs) {
   const a = inner[(best - 3 + n) % n], b = inner[(best + 3) % n];
   return Math.atan2(b[1] - a[1], b[0] - a[0]);
 }
-export function strokeContrast(glyphs) {
-  // Độ tương phản = bề dày mảnh nhất / dày nhất của nét o, đo theo pháp tuyến của nét (khoảng cách từ mỗi điểm viền
-  // trong tới viền ngoài), không chỉ cắt dọc/ngang ở giữa: font có trục nét nghiêng (Migra, chỗ mảnh nhất ở góc ~−57°)
-  // cắt ở giữa sẽ đo nhầm thành nét đều (Migra Extralight 0.99, đúng là 0.29). Kết quả khớp bảng chuẩn: Times 0.32,
-  // Arial 0.80, Segoe 0.82, Courier 0.98, Palatino 0.32.
+// Nét mảnh nhất và dày nhất của chữ o (đo theo pháp tuyến, xem strokeContrast), theo đơn vị font. null khi không đo được.
+export function strokeWidths(glyphs) {
   const glyph = glyphs.get('o') || glyphs.get('O');
-  if (!glyph?.d) return .8;
+  if (!glyph?.d) return null;
   const contours = flattenOutline(glyph.d).filter(c => c.length >= 3);
   const area = c => c.reduce((sum, p, i) => { const q = c[(i + 1) % c.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
   const [outer, inner] = [...contours].sort((a, b) => Math.abs(area(b)) - Math.abs(area(a)));
-  if (!outer || !inner) return .8;
+  if (!outer || !inner) return null;
   const segment = (p, a, b) => {
     const dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy || 1;
     const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length));
@@ -529,7 +526,25 @@ export function strokeContrast(glyphs) {
     for (let i = 0; i < outer.length; i++) d = Math.min(d, segment(p, outer[i], outer[(i + 1) % outer.length]));
     thin = Math.min(thin, d); thick = Math.max(thick, d);
   }
-  return Number.isFinite(thin) && thick > 0 ? Math.max(.1, Math.min(1, thin / thick)) : .8;
+  return Number.isFinite(thin) && thick > 0 ? { thin, thick } : null;
+}
+export function strokeContrast(glyphs) {
+  // Độ tương phản = bề dày mảnh nhất / dày nhất của nét o, đo theo pháp tuyến của nét (khoảng cách từ mỗi điểm viền
+  // trong tới viền ngoài), không chỉ cắt dọc/ngang ở giữa: font có trục nét nghiêng (Migra, chỗ mảnh nhất ở góc ~−57°)
+  // cắt ở giữa sẽ đo nhầm thành nét đều (Migra Extralight 0.99, đúng là 0.29). Kết quả khớp bảng chuẩn: Times 0.32,
+  // Arial 0.80, Segoe 0.82, Courier 0.98, Palatino 0.32.
+  const w = strokeWidths(glyphs);
+  return w ? Math.max(.1, Math.min(1, w.thin / w.thick)) : .8;
+}
+// Bề dày trung bình của một hình (2 × diện tích / chu vi), cách skill đo bề dày dấu (mark-standards.md, Bề dày).
+export function meanStrokeWidth(d) {
+  let A = 0, P = 0;
+  for (const c of flattenOutline(d)) {
+    let a = 0;
+    for (let i = 0; i < c.length; i++) { const p = c[i], q = c[(i + 1) % c.length]; a += p[0] * q[1] - q[0] * p[1]; P += Math.hypot(q[0] - p[0], q[1] - p[1]); }
+    A += a / 2;
+  }
+  return P > 0 ? 2 * Math.abs(A) / P : 0;
 }
 // Độ nghiêng của chữ (kiểu Italic/Oblique): tâm nét thân l/I ở 75% chiều cao lệch so với ở 25%, chia khoảng cao.
 // Chữ đứng ≈ 0; Italic thường 0.15–0.25 (8–14°). Dấu dựng thêm phải nghiêng theo và đặt theo trục nghiêng.
@@ -714,28 +729,67 @@ export function deriveMarkSamples(glyphs) {
   // Hỏi: móc gọn, lòng mở, khác dấu chấm hỏi (skill). Đầu móc thon, cung tròn đều, cuối cung uốn mềm về giữa
   // rồi thành chân ngắn thẳng đứng, đầu chân cắt ngang. Nét nhẹ hơn thân chữ.
   // Rộng = cung từ 160° đến 20° (~1.94R) cộng độ dày; cao = chân + uốn + cung.
-  const hookT = .8 * t, hookR = Math.max(.75 * hookT, (W('hook') - hookT) / 1.94), hookBendDrop = .25 * hookR;
-  const hookTail = Math.max(.2 * hookR, H('hook') - hookR - hookT / 2 - 1.16 * hookR - hookBendDrop);
-  const hookC = 1.16 * hookR + hookBendDrop + hookTail;
-  const hookArc = Array.from({ length: 25 }, (_, i) => {
-    const a = Math.PI * (160 - 220 * i / 24) / 180;
-    return [Math.cos(a) * hookR, hookC + Math.sin(a) * hookR];
-  });
-  // Từ cuối cung (đang đi xuống trái) uốn bằng Bézier bậc hai: điểm điều khiển trên trục giữa, kết thúc ngay dưới nó
-  // nên tiếp tuyến liền ở cả hai đầu; sau đó là chân thẳng đứng.
-  const [ex, ey] = hookArc.at(-1), control = [0, hookC - 1.16 * hookR], foot = [0, hookTail];
-  const hookBend = Array.from({ length: 8 }, (_, i) => {
-    const s = (i + 1) / 8, q = 1 - s;
-    return [q * q * ex + 2 * q * s * control[0] + s * s * foot[0], q * q * ey + 2 * q * s * control[1] + s * s * foot[1]];
-  });
-  const hookPath = [...hookArc, ...hookBend, [0, 0]];
+  // Hình móc dựng theo bề dày nét T: giữ tổng rộng W('hook') và cao H('hook') của chuẩn, nét dày thì cung nhỏ lại.
+  const hookGeometry = (T, floor = .75) => {
+    const hookR = Math.max(floor * T, (W('hook') - T) / 1.94), hookBendDrop = .25 * hookR;
+    const hookTail = Math.max(.2 * hookR, H('hook') - hookR - T / 2 - 1.16 * hookR - hookBendDrop);
+    const hookC = 1.16 * hookR + hookBendDrop + hookTail;
+    const hookArc = Array.from({ length: 25 }, (_, i) => {
+      const a = Math.PI * (160 - 220 * i / 24) / 180;
+      return [Math.cos(a) * hookR, hookC + Math.sin(a) * hookR];
+    });
+    // Từ cuối cung (đang đi xuống trái) uốn bằng Bézier bậc hai: điểm điều khiển trên trục giữa, kết thúc ngay dưới nó
+    // nên tiếp tuyến liền ở cả hai đầu; sau đó là chân thẳng đứng.
+    const [ex, ey] = hookArc.at(-1), control = [0, hookC - 1.16 * hookR], foot = [0, hookTail];
+    const hookBend = Array.from({ length: 8 }, (_, i) => {
+      const s = (i + 1) / 8, q = 1 - s;
+      return [q * q * ex + 2 * q * s * control[0] + s * s * foot[0], q * q * ey + 2 * q * s * control[1] + s * s * foot[1]];
+    });
+    return [...hookArc, ...hookBend, [0, 0]];
+  };
+  const hookT = .8 * t, hookPath = hookGeometry(hookT);
   const hookStart = Math.max(.45, Math.min(1, taper * .9));   // đầu móc: nét đều gần bằng thân, thanh-đậm thon nhọn
-  // Thanh-đậm: dày mỏng theo trục nét (đầu móc đi lên theo hướng mảnh, lưng phải đi xuống đậm như lưng s, g),
-  // đầu móc vuốt về nét mảnh của font.
-  const hookPen = highContrast ? pen(hookPath, hookT) : null;
-  add('̉', strokeAlong(hookPath, s => hookPen
-    ? hookPen[Math.round(s * (hookPath.length - 1))] * (hookStart + (1 - hookStart) * Math.min(1, s * 4))
-    : hookT * (hookStart + (1 - hookStart) * Math.min(1, s * 3))));
+  // Thanh-đậm: dày mỏng theo trục nét (đầu móc đi lên theo hướng mảnh, lưng phải đi xuống đậm như lưng s, g).
+  // Bề dày và nét mảnh lấy từ chính font (người dùng 27/11/2026, Migra Extrabold: hỏi dày trung bình 31–34 trong khi
+  // dấu nhà thiết kế vẽ 48–66, cổ móc mảnh hơn nét mảnh của chữ):
+  // - bề dày trung bình (2A/P) của móc bằng 0.8 trung vị bề dày các dấu nhà thiết kế đã vẽ trong font (sắc huyền ngã
+  //   mũ trăng); font chưa có dấu nào thì 0.8 công thức bề dày của skill;
+  // - nét mảnh = tương phản × bề dày dấu, không dưới 0.6 nét mảnh thật của chữ o (không thành sợi chỉ);
+  // - đầu móc vuốt về nét mảnh trong 15% đầu nét (không phình thành cục).
+  let hookShape;
+  if (highContrast && axis != null) {
+    const designed = ['́', '̀', '̃', '̂', '̆'].map(mark => designerMark(glyphs, mark, false, new Map())).filter(m => m?.d);
+    const own = designed.map(m => meanStrokeWidth(m.d)).filter(w => w > 0).sort((a, b) => a - b);
+    // Móc hỏi nhẹ hơn các dấu khác như ở font chuyên nghiệp (hỏi = 0.8 bề dày dấu, như hookT; Times, Palatino đo được
+    // hỏi nhẹ hơn sắc, ngã): đích = 0.8 × trung vị dấu nhà thiết kế.
+    const target = .8 * (own.length ? own[Math.floor(own.length / 2)] : STD.thickness(stem));
+    const hair = Math.max(1, strokeWidths(glyphs)?.thin ?? contrast * stem);
+    // Chiều cao móc giữ như móc nét thường (khung mà phép đặt hai tầng và chuẩn đo đã chỉnh theo): nét dày thì thu cả
+    // hình về khung đó, không cao thêm (lỗi thử 27/11/2026: Ẳ, ẳ cao thêm ~12 đơn vị, đỉnh cụm vượt chuẩn).
+    // Khung = đường tâm móc chuẩn + nửa nét mảnh ở đỉnh (đỉnh móc đi ngang, theo trục nét là nét mảnh).
+    const maxH = Math.max(...hookPath.map(p => p[1])) - Math.min(...hookPath.map(p => p[1])) + hair / 2;
+    // Bề dày theo hướng nét: hướng mảnh nhất của o thì bằng nét mảnh của chữ, vuông góc thì T; làm mượt dọc nét nhưng
+    // không kéo giãn (kéo giãn ép chỗ mảnh nhất của móc về sợi chỉ dù hướng nét ở đó dày vừa). Đầu móc vào nét từ 0.35,
+    // chân móc thu về 0.7 ở 20% cuối (không loe thành khối).
+    const shape = T => {
+      const path = hookGeometry(T, .7), n = path.length;   // nét dày: cung không nhỏ hơn 0.7 nét để lòng móc còn mở
+      // Nét mảnh của dấu thu theo dấu (tương phản × T) nhưng không dưới 0.6 nét mảnh của chữ (không thành sợi chỉ).
+      const thin = Math.min(T, Math.max(contrast * T, .6 * hair));
+      const raw = path.map((_, i) => { const a = path[Math.max(0, i - 2)], b = path[Math.min(n - 1, i + 2)];
+        return thin + (T - thin) * Math.abs(Math.sin(Math.atan2(b[1] - a[1], b[0] - a[0]) - axis)); });
+      const reach = Math.max(1, Math.round(n / 8));
+      const width = raw.map((_, i) => { let sum = 0, c = 0; for (let k = -reach; k <= reach; k++) { const j = i + k; if (j >= 0 && j < n) { sum += raw[j]; c++; } } return sum / c; });
+      return strokeAlong(path, s => {
+        const w = width[Math.round(s * (n - 1))];
+        return Math.max(thin, w * Math.min(1, .35 + s / .15 * .65) * (s > .8 ? 1 - 1.5 * (s - .8) : 1));
+      });
+    };
+    const fitted = T => { const d = shape(T), b = glyphBounds({ d }); return b.height > maxH ? svgpath(d).translate(-b.x, -b.y).scale(maxH / b.height).translate(b.x, b.y).toString() : d; };
+    let T = Math.max(hookT, 2 * target);
+    for (let k = 0; k < 12; k++) { const mean = meanStrokeWidth(fitted(T)); if (!(mean > 0)) break; T = Math.min(3 * W('hook'), Math.max(hair * 1.5, T * target / mean)); }
+    hookShape = fitted(T);
+  }
+  add('̉', hookShape || strokeAlong(hookPath, s => hookT * (hookStart + (1 - hookStart) * Math.min(1, s * 3))));
 
   // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
   // Hình dấu nặng: dấu chấm thật của font trước, rồi chấm chữ i, cuối cùng mới tới dấu chấm do Xưởng tự dựng

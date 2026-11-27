@@ -237,7 +237,7 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     done.push('râu sửa tay lan sang chữ khác giữ đường cong, dấu hỏi chữ nghiêng tách đúng');
   }
   // 10. Dấu hỏi dựng từ nét đi theo kiểu nét của font (lỗi 27/11/2026, Migra): font thanh-đậm thì hỏi cũng thanh-đậm
-  // theo trục nét của o (mảnh/đậm ≈ độ tương phản), font nét đều/sans giữ gần đều. Đo bề dày dấu ở mọi điểm viền
+  // theo trục nét của o, đủ đậm như dấu của font; font nét đều/sans giữ gần đều. Đo bề dày dấu ở mọi điểm viền
   // (khoảng tới phía viền đối diện), lấy mức 10% / 90%.
   {
     const spread = d => {
@@ -261,9 +261,20 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
       if (!fs.existsSync(file)) continue;
       const g = glyphMap(parse(fs.readFileSync(file)), 'Font gốc'), contrast = strokeContrast(g);
       const derived = deriveMarkSamples(g), hook = (derived.marks || derived).get('̉'), ratio = spread(hook.d);
-      if (contrasty) assert.ok(ratio <= contrast + .15, `${name}: dấu hỏi dựng phải thanh-đậm theo nét font (mảnh/đậm ${ratio.toFixed(2)}, tương phản o ${contrast.toFixed(2)})`);
-      else assert.ok(ratio >= .6, `${name}: font nét gần đều thì dấu hỏi dựng gần đều (mảnh/đậm ${ratio.toFixed(2)})`);
-      checked.push(name + ' ' + ratio.toFixed(2));
+      if (contrasty) {
+        // Thanh-đậm: có chỗ mảnh và chỗ đậm rõ; nét mảnh nhất gần nét mảnh thật của chữ (không mảnh hơn nhiều như sợi chỉ);
+        // bề dày trung bình ≈ 0.8 bề dày dấu (dấu nhà thiết kế nếu có, không thì công thức skill) — lỗi 27/11/2026:
+        // Migra Extrabold hỏi dày 31–34 trong khi dấu của font 48–66.
+        const { strokeWidths, meanStrokeWidth } = moduleFor('vietnamese-rules', 'site/vietnamese.js');
+        const { MARK_STANDARDS } = moduleFor('mark-standards-rules', 'site/mark-standards.js');
+        const hair = strokeWidths(g).thin, mean = meanStrokeWidth(hook.d), target = .8 * MARK_STANDARDS.thickness(measureStem(g));
+        assert.ok(ratio <= .7, `${name}: dấu hỏi dựng phải thanh-đậm theo nét font (mảnh/đậm ${ratio.toFixed(2)})`);
+        assert.ok(mean >= .75 * target && mean <= 1.3 * target, `${name}: dấu hỏi dày trung bình ${mean.toFixed(0)}, đích ${target.toFixed(0)}`);
+        checked.push(`${name} mảnh/đậm ${ratio.toFixed(2)}, dày ${mean.toFixed(0)}/${target.toFixed(0)}`);
+      } else {
+        assert.ok(ratio >= .6, `${name}: font nét gần đều thì dấu hỏi dựng gần đều (mảnh/đậm ${ratio.toFixed(2)})`);
+        checked.push(name + ' ' + ratio.toFixed(2));
+      }
     }
     done.push('dấu hỏi dựng theo kiểu nét (' + checked.join(', ') + ')');
   }

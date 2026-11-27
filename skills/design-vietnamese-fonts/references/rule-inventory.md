@@ -34,6 +34,8 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 | Sửa tay một chữ trong Font Lab lan sang chữ liên quan: râu contour riêng lấy nguyên đường cong, dấu tách theo diện tích chồng (chữ nghiêng), lưu không bị chặn | workflow Sửa tay trong Font Lab | Có (26/11/2026); check:rules mục 9 |
 | Sửa dấu ở chữ nào cũng thay dấu mẫu (kể cả dấu mẫu khóa từ lần sửa chữ khác); chữ sửa tay mang cùng dấu chỉ thay phần dấu; chữ hai tầng chia lại tỉ lệ | workflow Sửa tay trong Font Lab | Có (27/11/2026); check:rules mục 11, thử trên trình duyệt |
 | Dấu hỏi, ngã dựng từ nét dày mỏng theo trục nét của chính font (nét thanh-đậm như e s g o) | mark-standards Nét đều hay nét thanh-đậm | Có (27/11/2026); check:rules mục 10, check:marks |
+| Hỏi dựng dày bằng 0.8 dấu nhà thiết kế của chính font, nét mảnh không dưới 0.6 nét mảnh của chữ, giữ khung móc chuẩn | mark-standards Nét đều hay nét thanh-đậm | Có (27/11/2026); check:rules mục 10, check:marks |
+| Font Lab: Dựng lại dấu theo quy tắc trên ô dấu mẫu đưa dấu sửa tay về dấu dựng (không khóa) và thay ở mọi chữ | workflow Sửa tay trong Font Lab | Có (27/11/2026); thử trên trình duyệt |
 | Tạo dấu tiếng Việt dựng lại dấu mẫu Xưởng đã dựng (chưa khóa, chưa duyệt) theo quy tắc hiện hành trước khi ghép, cả khi dự án đã có dấu mẫu | workflow Bộ sưu tập và bản Việt hóa | Có (27/11/2026); thử trên trình duyệt |
 | Hoàn thiện soát khoảng hở, cỡ, vị trí dấu của từng chữ có dấu theo quy tắc ghép: chữ ghép lệch thì ghép lại, chữ sửa tay thì báo | workflow Hoàn thiện 3b; `mark-place` trong rule-check.js | Tự sửa / Báo (27/11/2026); check:rules mục 11 |
 | Nặng tránh đuôi y; ị phân biệt chấm i và nặng | design-rules mục 9, bảng chi tiết | Có |

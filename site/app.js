@@ -25,7 +25,7 @@ import { borrowMissing,restoreBorrowedCorners } from './borrow-glyphs.js';
 import { deriveSymbols } from './derive-symbols.js';
 import { deriveLetters } from './derive-letters.js';
 import { redrawFontImage } from './ai-design.js';
-import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, mayBeXuongMade, toneScaleIn, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
+import { measureSlant, core, lowercase, punctuation, charset, toneSamples, composeVietnamese, mayBeXuongMade, toneScaleIn, meanStrokeWidth, applyReferenceMarks, applyCompactLowercaseHorns, deriveMarkSamples, deriveBarredD, measureStem, marksFromImageLetters, strokeContrast, topRightEdge } from './vietnamese.js';
 import { strokeTerminal, hornFromLetter, apartFrom } from './horn-from-letters.js';
 import { referenceCanvas, wordInk, splitCleanWord, splitWordByGaps, traceSymbol, pixelBox, expandWordBox, inkBox, inkCrossesBox, completeTildeO, alignReferenceGlyphs } from './reference-image.js';
 import { loadReferences, saveReferences } from './reference-storage.js';
@@ -416,6 +416,20 @@ function spreadLabEdit(char, previous) {
   const ours = glyph => glyph.source === 'Ghép dấu' || (vietnamized && glyph.source === 'Font gốc' && mayBeXuongMade(glyph.char));
   const free = c => (!glyphs.get(c) || ours(glyphs.get(c))) && !glyphs.get(c)?.locked && !glyphs.get(c)?.manualEdit;
   const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key)) && free(c)));
+  const lockedTone = [];
+  if (isMark) {
+    // Lưu ô dấu mẫu mà hình trùng dấu dựng theo quy tắc (bấm Dựng lại theo quy tắc rồi Lưu): trả dấu về dấu Xưởng dựng
+    // từ nét (không khóa), để lần sau quy tắc đổi thì dấu dựng lại theo. Người dùng 27/11/2026: đưa dấu hỏi đã sửa tay
+    // về dấu dựng theo quy tắc mới.
+    const rule = deriveMarkSamples(glyphs).marks.get(char), saved = glyphs.get(char);
+    if (rule?.d && saved?.d) {
+      const a = glyphBounds(rule), b = glyphBounds(saved), mean = meanStrokeWidth(rule.d);
+      if (Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2 && Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2
+        && Math.abs(meanStrokeWidth(saved.d) / mean - 1) < .02) Map.prototype.set.call(glyphs, char, { ...rule, version: (saved.version || 0) + 1 });
+    }
+    // Dấu mẫu đổi thì cả chữ đã sửa tay mang dấu đó cũng đổi dấu (chỉ phần dấu, giữ thân).
+    for (const c of charset) if (c.normalize('NFD').at(-1) === char && glyphs.get(c)?.locked) lockedTone.push(c);
+  }
   // Sửa râu ở ơ/ư/Ơ/Ư: tách râu vừa vẽ làm râu mẫu chung cho cả bốn chữ (skill: ư ơ cùng một nét râu), rồi ghép lại
   // mọi chữ có râu dùng râu mẫu đó.
   const [root, ...marks] = key;
@@ -440,7 +454,7 @@ function spreadLabEdit(char, previous) {
   // mới nhất thay dấu mẫu kể cả khi dấu mẫu đã khóa từ một lần sửa tay trên chữ khác; chỉ dấu mẫu vẽ thẳng trong ô dấu
   // (khóa, không lấy từ chữ) mới giữ. Chữ hai tầng (ổ Ẩ…) đặt dấu nhỏ hơn dấu mẫu: chia lại tỉ lệ để dấu mẫu đúng cỡ.
   const tone = marks.at(-1), toneBase = tone && tone !== HORN && toneSamples.has(tone) ? glyphs.get((root + marks.slice(0, -1).join('')).normalize('NFC')) : null;
-  const toneSample = tone && glyphs.get(tone), lockedTone = [];
+  const toneSample = tone && glyphs.get(tone);
   if (toneBase?.d && (!toneSample?.locked || toneSample.fromLetter || toneSample.manualEdit?.fromLetter)) {
     // Dấu vừa vẽ: contour nằm ngoài thân chữ gốc (so diện tích chồng, không so khung bao: chữ nghiêng có khung chồng nhau).
     const drawn = apartFrom(glyphs.get(char).d, toneBase.d, { outer: true });
@@ -495,7 +509,10 @@ const fontLab = setupFontLab({
   getGlyph: char => glyphs.get(char),
   commit: commitLabEdit,
   unlock: async glyph => { const next = { ...glyph, locked: false, approved: false, version: (glyph.version || 0) + 1 }; await commitLabEdit(glyph, next); return next; },
-  recompose: char => composeVietnamese(glyphs, c => c === char, { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).find(g => g.char === char)?.d,
+  // Ô dấu mẫu (Hỏi, Ngã…): Dựng lại theo quy tắc dựng dấu từ nét của chính font (deriveMarkSamples), để đưa dấu đã sửa tay
+  // về dấu theo quy tắc; Lưu chữ thì dấu đó thay ở mọi chữ (xem spreadLabEdit).
+  recompose: char => toneSamples.has(char) ? deriveMarkSamples(glyphs).marks.get(char)?.d
+    : composeVietnamese(glyphs, c => c === char, { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).find(g => g.char === char)?.d,
   // Số đo của chính font cho đường kẻ quy tắc dấu và phép đối chiếu hòa hợp (không dùng số của font khác).
   metrics: () => {
     const box = char => { const g = glyphs.get(char); if (!g?.d) return null; const b = glyphBounds(g); return b.width > 0 ? { x0: b.x, x1: b.x + b.width, y0: b.y, y1: b.y + b.height } : null; };

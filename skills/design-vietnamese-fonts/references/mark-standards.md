@@ -107,11 +107,14 @@ Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0
 
 **Dấu nét cong (hỏi, ngã) dày mỏng theo trục nét của chính font** (người dùng 27/11/2026, Migra: "phần nét thanh rất mảnh, nhưng dấu được tạo ra lại là nét đều"). Nét cong của e, s, g, o trong font thanh-đậm mảnh ở một hướng và đậm ở hướng vuông góc; dấu dựng phải theo đúng hướng đó, không chỉ vuốt thon một đầu:
 - **Trục nét** = hướng nét ở chỗ mảnh nhất của o, đo theo pháp tuyến như độ tương phản (`strokeAxis` trong `site/vietnamese.js`). Migra Extralight ~53°, Times ~11°.
-- Mỗi điểm trên đường tâm dấu: bề dày = nét mảnh + (nét đậm − nét mảnh) × |sin(hướng nét − trục)|. Nét mảnh = tương phản × nét đậm; nét đậm = bề dày dấu theo mục Bề dày. Đổi dày mỏng dần như nét bút (làm mượt dọc nét), chỗ đậm nhất vẫn bằng nét đậm.
-- **Hỏi:** đầu móc đi lên mảnh, lưng phải đi xuống đậm như lưng s và g, cổ uốn về chân mảnh dần. Mảnh/đậm của hỏi ≈ tương phản của o (Migra Extralight 0.35, Times 0.35); Arial giữ 0.74.
+- Mỗi điểm trên đường tâm dấu: bề dày = nét mảnh + (nét đậm − nét mảnh) × |sin(hướng nét − trục)|. Đổi dày mỏng dần như nét bút (làm mượt dọc nét, không kéo giãn: kéo giãn ép chỗ mảnh nhất về sợi chỉ dù hướng nét ở đó dày vừa).
+- **Bề dày hỏi theo dấu của chính font** (người dùng 27/11/2026, Migra Extrabold: hỏi dày trung bình 31–34 trong khi sắc, mũ, trăng, ngã của nhà thiết kế 48–66, trông yếu và lạc): bề dày trung bình (2A/P) của móc = 0.8 × trung vị bề dày các dấu nhà thiết kế đã vẽ trong font (sắc huyền ngã mũ trăng); font chưa có dấu nào thì 0.8 × công thức mục Bề dày. 0.8 vì hỏi nhẹ hơn các dấu khác như ở font chuyên nghiệp (đặt đúng bằng trung vị thì hỏi Times, Palatino nặng 1.35 lần hỏi gốc).
+- **Nét mảnh** = tương phản × nét đậm của dấu, không dưới 0.6 nét mảnh thật của chữ o (dấu nhỏ hơn chữ nên nét mảnh nhỏ theo, nhưng không thành sợi chỉ).
+- **Giữ cỡ và lòng móc:** nét dày thì cung móc không nhỏ hơn 0.7 nét (lòng còn mở); cao móc giữ đúng khung móc chuẩn (đường tâm + nửa nét mảnh ở đỉnh), dày hơn thì thu cả hình về khung đó, không cao thêm (lỗi thử: Ẳ ẳ cao thêm ~12 đơn vị, đỉnh cụm vượt chuẩn). Đầu móc vào nét từ 0.35, chân thu về 0.7 ở 20% cuối (không loe thành khối).
+- **Hỏi:** đầu móc đi lên mảnh, lưng phải đi xuống đậm như lưng s và g, cổ uốn về chân mảnh dần. Đo được (mức 10%/90% bề dày): Times 0.63, Migra Extralight 0.50; Arial giữ 0.74. Migra Extrabold dày trung bình 41–43 (dấu thiết kế 48–54 × 0.8).
 - **Ngã:** cùng trục nhưng sàn nét mảnh 0.6 nét đậm, vì ngã của font thanh-đậm chỉ mảnh ở hai đầu (0.54–0.74, bảng trên); đổi mạnh hơn thì ngã Times Bold mỏng và thấp hẳn so với ngã gốc.
 - Tương phản trên 0.9 (nét đều) thì giữ nét đều.
-- Kiểm: `npm run check:rules` mục 10 (hỏi dựng của Times, Migra Extralight có mảnh/đậm ≤ tương phản + 0.15; Arial ≥ 0.6) và `npm run check:marks` (cỡ, bề dày so với dấu gốc 20 font).
+- Kiểm: `npm run check:rules` mục 10 (hỏi dựng của Times, Migra Extralight: mảnh/đậm ≤ 0.7 và dày trung bình 0.75–1.3 lần đích; Arial ≥ 0.6) và `npm run check:marks` (cỡ, bề dày, đỉnh cụm hai tầng so với dấu gốc 20 font).
 
 **Ký tự đặc biệt Xưởng dựng** (`site/derive-symbols.js`) đi theo cùng kiểu nét (người dùng 25/11/2026): font thanh-đậm (tương phản < 0.5) thì nét ngang của - _ = + < > #, gạch dọc của $ và gạch dưới của ₫ bằng nét mảnh của font (tương phản × nét thân, ít nhất 0.3); ngoặc ( ) { } mảnh hai đầu, đậm giữa; vòng của % đậm hai bên, mảnh ở đỉnh và đáy. ~ và ^ lấy từ dấu ngã và dấu mũ nên đã theo kiểu nét. Font nét đều và sans giữ nét gần đều như cũ (gạch nối 0.82 nét thân).
 
