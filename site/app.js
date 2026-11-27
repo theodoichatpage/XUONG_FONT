@@ -7,7 +7,7 @@ import { setupFontLab } from './font-lab.js';
 import {cleanOutline,fromImage,sampleOutline} from './outline-cleanup.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import { placePunctuation as placePunctuationIn } from './punctuation-rules.js';
-import { checkRules, ruleMessage, fixRules, markPlacement } from './rule-check.js';
+import { checkRules, ruleMessage, fixRules, markPlacement, rebaseLocked } from './rule-check.js';
 const placePunctuation = (glyph, map = glyphs) => placePunctuationIn(glyph, map);
 import { outlineDefects } from './outline-quality.js';
 import {traceDetectedWords,splitReferenceWord} from './direct-reconstruction.js';
@@ -504,14 +504,21 @@ function spreadLabEdit(char, previous) {
   // Soát cả bộ sau khi lan: chữ Xưởng ghép mà thân/râu không còn đúng chữ gốc hiện có, hay dấu lệch khoảng hở, cỡ, vị trí
   // theo quy tắc (ghép từ bản cũ trước khi râu, dấu mẫu đổi) thì ghép lại luôn, để mọi chữ cùng một râu, một dấu
   // (lỗi 27/11/2026: Ở ghép lại theo râu mới, Ỡ vẫn râu cũ).
-  const stale = (markPlacement(glyphs, { ours: glyph => !!glyph && free(glyph.char) }) || []).filter(issue => !issue.locked && !done.has(issue.char)).map(issue => issue.char);
-  if (stale.length) {
-    const fix = new Set(stale);
-    for (const glyph of composeVietnamese(glyphs, c => fix.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }))
+  // Vài lượt: ơ ư đổi râu trước, rồi mới lộ các chữ có râu ghép từ ơ ư cũ. Chữ khóa chỉ sửa dấu thì thân theo chữ gốc.
+  for (let pass = 0; pass < 3; pass++) {
+    const issues = markPlacement(glyphs, { ours: glyph => !!glyph && (free(glyph.char) || !!glyph.locked) }) || [];
+    const fix = new Set(issues.filter(issue => !issue.locked && free(issue.char)).map(issue => issue.char));
+    let moved = 0;
+    for (const issue of issues.filter(issue => issue.locked && issue.body)) {
+      const next = rebaseLocked(glyphs, issue.char);
+      if (next) { Map.prototype.set.call(glyphs, issue.char, next); swapped.push(issue.char); moved++; }
+    }
+    if (fix.size) for (const glyph of composeVietnamese(glyphs, c => fix.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }))
       if (fix.has(glyph.char)) { glyphs.set(glyph.char, glyph); done.add(glyph.char); }
+    if (!fix.size && !moved) break;
   }
   if (done.size) enforceRules([...done]);
-  return [...done, ...swapped];
+  return [...new Set([...done, ...swapped])];
 }
 const fontLab = setupFontLab({
   getGlyph: char => glyphs.get(char),
@@ -2293,9 +2300,16 @@ async function fixByRules() {
     const vietnamized = own || xuongComposed();
     const marksOf = glyph => glyph && (glyph.source === 'Ghép dấu' || (!!glyph.locked && glyph.char.normalize('NFD').length > 1)
       || (vietnamized && glyph.source === 'Font gốc' && mayBeXuongMade(glyph.char)));
-    const misplaced = hasVowel ? markPlacement(next, { ours: marksOf }) || [] : [];
+    // ơ ư Xưởng ghép lệch râu theo quy tắc thì ghép lại trước, để lượt soát dưới so các chữ có râu với ơ ư mới.
+    let misplaced = hasVowel ? markPlacement(next, { ours: marksOf }) || [] : [];
+    const hornBases = misplaced.filter(issue => !issue.locked && 'ơưƠƯ'.includes(issue.char)).map(issue => issue.char);
+    if (hornBases.length) {
+      for (const glyph of composeVietnamese(next, c => hornBases.includes(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }))
+        if (hornBases.includes(glyph.char)) next.set(glyph.char, glyph);
+      misplaced = markPlacement(next, { ours: marksOf }) || [];
+    }
     for (const issue of misplaced) if (!issue.locked) failing.add(issue.char);
-    const handMisplaced = misplaced.filter(issue => issue.locked);
+    const handMisplaced = misplaced.filter(issue => issue.locked && !(issue.body && rebaseLocked(next, issue.char)));
     const reshaped = new Set([...heights.changed.map(g => g.char), ...cleaned]);
     const generated = hasVowel ? composeVietnamese(next, char => failing.has(char)
       || (reshaped.has(char.normalize('NFD')[0]) && glyphs.get(char)?.source === 'Ghép dấu')
@@ -2316,6 +2330,9 @@ async function fixByRules() {
     for (const glyph of dotBelow.changed) next.set(glyph.char, glyph);
     // Chữ đã khóa không đổi (ProtectedGlyphMap từ chối ghi đè).
     const draft = keepLocked(next);   // chữ đã khóa (sửa tay trong Font Lab) không bị ghép lại
+    // Chữ khóa chỉ sửa dấu (thân y nguyên lần sửa trước): thân và râu theo chữ gốc hiện có, giữ dấu người dùng.
+    // (Chạy trên mọi chữ khóa, sau khi ơ ư và chữ gốc đã ghép lại ở trên.)
+    for (const [char, glyph] of [...draft]) if (glyph?.locked && char.normalize('NFD').length > 1) { const moved = rebaseLocked(draft, char); if (moved) Map.prototype.set.call(draft, char, moved); }
     // Kerning tiếng Việt: font Xưởng dựng tự tính khi xuất. Font nhập giữ nguyên kerning gốc (SKILL.md: khi sửa dấu
     // trong file nhập, giữ nguyên thân chữ, baseline, advance và kerning).
     const kerned = importedMetrics ? 0 : vietnameseKerning([...draft.values()].filter(g => g?.d)).length;

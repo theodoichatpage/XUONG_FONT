@@ -59,6 +59,15 @@ export function markPlacement(map, { ours = glyph => glyph?.source === 'Ghép d�
     if (!targets.has(rule.char)) continue;
     const [root, ...marks] = rule.char.normalize('NFD');
     if (marks.includes('̣') && marks.length === 1) continue;   // dấu nặng: quy tắc dot-below
+    // ơ ư Ơ Ư Xưởng ghép: râu phải đúng râu ghép theo quy tắc hiện hành (râu mẫu, đầu râu, chỗ nối) — chúng là gốc
+    // của mọi chữ có râu, lệch thì cả nhóm lệch theo.
+    if (marks.length === 1 && marks[0] === '̛') {
+      const norm = d => new Set(svgpath(d).abs().round(0).toString().split(/(?=M)/).map(p => p.trim()).filter(Boolean));
+      const now = norm(map.get(rule.char).d), want = norm(rule.d);
+      if (!map.get(rule.char).locked && (now.size !== want.size || [...want].some(p => !now.has(p))))
+        out.push({ char: rule.char, measure: 'râu khác râu ghép theo quy tắc hiện hành', target: 'theo quy tắc ghép', locked: false });
+      continue;
+    }
     const baseChar = marks.includes('̛') ? (root + '̛').normalize('NFC') : root;
     const base = map.get(baseChar)?.d ? map.get(baseChar) : map.get(root);
     if (!base?.d) continue;
@@ -77,8 +86,12 @@ export function markPlacement(map, { ours = glyph => glyph?.source === 'Ghép d�
     const round = d => svgpath(d).abs().round(0).toString().split(/(?=M)/).map(p => p.trim()).filter(Boolean);
     if (root !== 'i' && root !== 'j') {
       const has = new Set(round(map.get(rule.char).d)), shell = round(base.d);
-      if (shell.length && !shell.every(part => has.has(part)) && round(rule.d).length && shell.every(part => new Set(round(rule.d)).has(part))) {
-        out.push({ char: rule.char, measure: 'thân/râu khác ' + baseChar + ' hiện có', target: 'đúng nét ' + baseChar, locked: !!map.get(rule.char).locked });
+      const locked = !!map.get(rule.char).locked;
+      // Chữ khóa (lưu qua Font Lab, đường cong bậc ba) so bằng hình; chữ Xưởng ghép so đúng chuỗi.
+      const inside = locked ? (() => { const now = svgpath(map.get(rule.char).d).abs().toString().split(/(?=M)/).filter(p => p.trim());
+        return svgpath(base.d).abs().toString().split(/(?=M)/).filter(p => p.trim()).every(p => now.some(q => sameShape(p, q))); })() : shell.every(part => has.has(part));
+      if (shell.length && !inside && (locked || shell.every(part => new Set(round(rule.d)).has(part)))) {
+        out.push({ char: rule.char, measure: 'thân/râu khác ' + baseChar + ' hiện có', target: 'đúng nét ' + baseChar, locked, body: true });
         continue;
       }
     }
@@ -91,6 +104,49 @@ export function markPlacement(map, { ours = glyph => glyph?.source === 'Ghép d�
     if (wrong.length) out.push({ char: rule.char, measure: wrong.join(', '), target: 'theo quy tắc ghép', locked: !!map.get(rule.char).locked });
   }
   return out;
+}
+
+// Hai nét (một contour) cùng hình: khung bao lệch ≤ 1.5 đơn vị, diện tích lệch ≤ 1%.
+function shapeArea(d) {
+  let area = 0, x0 = 0, y0 = 0, px = 0, py = 0;
+  svgpath(d).abs().unshort().unarc().iterate((s, i, x, y) => {
+    const step = (qx, qy) => { area += px * qy - qx * py; px = qx; py = qy; };
+    if (s[0] === 'M') { x0 = px = s[1]; y0 = py = s[2]; return; }
+    if (s[0] === 'Z') { step(x0, y0); return; }
+    if (s[0] === 'C') for (let k = 1; k <= 8; k++) { const t = k / 8, u = 1 - t; step(u*u*u*x + 3*u*u*t*s[1] + 3*u*t*t*s[3] + t*t*t*s[5], u*u*u*y + 3*u*u*t*s[2] + 3*u*t*t*s[4] + t*t*t*s[6]); }
+    else if (s[0] === 'Q') for (let k = 1; k <= 8; k++) { const t = k / 8, u = 1 - t; step(u*u*x + 2*u*t*s[1] + t*t*s[3], u*u*y + 2*u*t*s[2] + t*t*s[4]); }
+    else if (s[0] === 'H') step(s[1], py); else if (s[0] === 'V') step(px, s[1]); else step(s[s.length - 2], s[s.length - 1]);
+  });
+  return Math.abs(area / 2);
+}
+function sameShape(a, b) {
+  const p = glyphBounds({ d: a }), q = glyphBounds({ d: b });
+  if (Math.abs(p.x - q.x) > 1.5 || Math.abs(p.y - q.y) > 1.5 || Math.abs(p.width - q.width) > 1.5 || Math.abs(p.height - q.height) > 1.5) return false;
+  const A = shapeArea(a), B = shapeArea(b);
+  return Math.abs(A - B) <= .01 * Math.max(A, B, 1);
+}
+
+// Chữ đã khóa (sửa tay trong Font Lab) mà người dùng chỉ sửa dấu, không đụng thân: thân (cả râu, mũ, trăng) đi theo chữ
+// gốc hiện có, dấu người dùng giữ nguyên. Thân không đổi = mọi phần thân có y nguyên trong bản trước lần sửa
+// (outlineUndo). Người dùng 27/11/2026: Ở đã khóa vẫn giữ râu cũ trong khi Ớ theo râu mới. Trả về chữ mới hoặc null.
+export function rebaseLocked(map, char) {
+  const glyph = map.get(char);
+  if (!glyph?.d || !glyph.locked || !glyph.outlineUndo?.d) return null;
+  const [root, ...marks] = char.normalize('NFD');
+  if (!marks.length || (marks.length === 1 && marks[0] === '̛')) return null;
+  const base = map.get(marks.includes('̛') ? (root + '̛').normalize('NFC') : root), rootGlyph = map.get(root);
+  if (!base?.d || !rootGlyph?.d) return null;
+  const top = (b => b.y + b.height)(glyphBounds(rootGlyph));
+  const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
+  const isMark = p => { const b = glyphBounds({ d: p }); return b.y >= top - 2 || b.y + b.height <= 2; };
+  // So nét bằng hình (khung bao, diện tích), không so chuỗi: Font Lab lưu đường cong bậc ba, bản trước có thể là bậc hai.
+  const partsNow = split(glyph.d), before = split(glyph.outlineUndo.d);
+  const body = partsNow.filter(p => !isMark(p)), markParts = partsNow.filter(isMark);
+  if (!markParts.length || !body.every(p => before.some(q => sameShape(p, q)))) return null;
+  const shell = split(base.d);
+  if (shell.length === body.length && shell.every(p => body.some(q => sameShape(p, q)))) return null;   // thân đã đúng chữ gốc
+  const d = [...split(base.d), ...markParts].join(' ');
+  return d === glyph.d ? null : { ...glyph, d, advance: base.advance ?? glyph.advance, version: (glyph.version || 0) + 1, proof: undefined };
 }
 
 // Mỗi quy tắc: id, mô tả ngắn, mục skill, hàm đo trả về danh sách chữ lệch kèm số đo.
