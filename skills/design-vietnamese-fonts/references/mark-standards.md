@@ -105,6 +105,14 @@ Dấu đi theo nét chữ:
 
 Quy tắc Xưởng dùng: độ thon sắc/huyền = 1.1 × tương phản − 0.1 (giới hạn 0.2–1); tương phản dưới 0.5 thì chân trái mũ 0.78, hai đầu ngã 0.5 bề dày giữa, đầu móc hỏi thon. Nét đều thì dấu gần như không thon. Không áp một độ thon cố định cho mọi font: font nét đều sẽ có dấu nhọn lạc kiểu, font thanh-đậm có dấu cứng và nặng.
 
+**Dấu nét cong (hỏi, ngã) dày mỏng theo trục nét của chính font** (người dùng 27/11/2026, Migra: "phần nét thanh rất mảnh, nhưng dấu được tạo ra lại là nét đều"). Nét cong của e, s, g, o trong font thanh-đậm mảnh ở một hướng và đậm ở hướng vuông góc; dấu dựng phải theo đúng hướng đó, không chỉ vuốt thon một đầu:
+- **Trục nét** = hướng nét ở chỗ mảnh nhất của o, đo theo pháp tuyến như độ tương phản (`strokeAxis` trong `site/vietnamese.js`). Migra Extralight ~53°, Times ~11°.
+- Mỗi điểm trên đường tâm dấu: bề dày = nét mảnh + (nét đậm − nét mảnh) × |sin(hướng nét − trục)|. Nét mảnh = tương phản × nét đậm; nét đậm = bề dày dấu theo mục Bề dày. Đổi dày mỏng dần như nét bút (làm mượt dọc nét), chỗ đậm nhất vẫn bằng nét đậm.
+- **Hỏi:** đầu móc đi lên mảnh, lưng phải đi xuống đậm như lưng s và g, cổ uốn về chân mảnh dần. Mảnh/đậm của hỏi ≈ tương phản của o (Migra Extralight 0.35, Times 0.35); Arial giữ 0.74.
+- **Ngã:** cùng trục nhưng sàn nét mảnh 0.6 nét đậm, vì ngã của font thanh-đậm chỉ mảnh ở hai đầu (0.54–0.74, bảng trên); đổi mạnh hơn thì ngã Times Bold mỏng và thấp hẳn so với ngã gốc.
+- Tương phản trên 0.9 (nét đều) thì giữ nét đều.
+- Kiểm: `npm run check:rules` mục 10 (hỏi dựng của Times, Migra Extralight có mảnh/đậm ≤ tương phản + 0.15; Arial ≥ 0.6) và `npm run check:marks` (cỡ, bề dày so với dấu gốc 20 font).
+
 **Ký tự đặc biệt Xưởng dựng** (`site/derive-symbols.js`) đi theo cùng kiểu nét (người dùng 25/11/2026): font thanh-đậm (tương phản < 0.5) thì nét ngang của - _ = + < > #, gạch dọc của $ và gạch dưới của ₫ bằng nét mảnh của font (tương phản × nét thân, ít nhất 0.3); ngoặc ( ) { } mảnh hai đầu, đậm giữa; vòng của % đậm hai bên, mảnh ở đỉnh và đáy. ~ và ^ lấy từ dấu ngã và dấu mũ nên đã theo kiểu nét. Font nét đều và sans giữ nét gần đều như cũ (gạch nối 0.82 nét thân).
 
 **Dấu mẫu cũ trong dự án:** dấu Xưởng dựng từ nét (chưa khóa, chưa duyệt) được dựng lại khi bấm Hoàn thiện nếu quy tắc nay cho hình khác; kết quả đo đầu râu lưu kèm dấu râu có số phiên bản, khác phiên bản thì đo lại khi ghép (lỗi 25/11/2026: dấu Migra dựng khi còn đo nhầm tương phản vẫn nét đều, râu vẫn dài sau Hoàn thiện).
@@ -166,7 +174,7 @@ Dấu dựng từ nét phải mang **đầu nét, độ thon và góc nét của
 - Chữ nghiêng: râu và giọt nước nghiêng theo chữ (mục Chữ nghiêng).
 - Râu vươn không quá 0.45 độ rộng chữ tính từ chỗ nối. Chữ viết có nét trái của u cao hơn nét phải thì chỗ nối dò xuống nét phải (tới nửa chiều cao), không kéo râu ngang qua cả chữ.
 
-**Giới hạn còn lại:** chữ viết **nối nét** (u, o có nét nối chìa lên bên phải như Segoe Script) thì râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ. Dấu hỏi, ngã dựng chưa áp đầu nét giọt nước/vuốt nhọn (chỉ áp độ thon theo tương phản).
+**Giới hạn còn lại:** chữ viết **nối nét** (u, o có nét nối chìa lên bên phải như Segoe Script) thì râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ. Dấu hỏi, ngã dựng đã dày mỏng theo trục nét của font, nhưng đầu móc hỏi chưa gắn đúng đầu nét giọt nước/mũi vát đo từ chữ (chỉ vuốt về nét mảnh).
 
 Kiểm: `npm run check:rules` mục 7 (Times giọt nước và râu liền thân; Arial cắt bằng; Monotype Corsiva, Segoe Script không bo tròn; Comic Sans không vuốt nhọn), mục 8 (Migra Extralight/Extrabold nếu có trong Downloads — bản dùng cá nhân, không đưa vào repo: tương phản < 0.5, râu đầu vát chân mảnh đầu trên đậm cắt chéo, liền thân, ư ơ và Ư Ơ cùng cỡ râu, dấu râu mẫu cũ được đo lại, gạch nối mảnh; Arial giữ gạch nối 0.82 nét thân) và `npm run check:marks` (râu dựng vẫn khớp râu gốc của 20 font).
 

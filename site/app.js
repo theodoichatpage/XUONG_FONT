@@ -395,7 +395,11 @@ async function commitLabEdit(previous, next) {
 // nét vừa lưu, rồi sửa theo bảng quy tắc như mọi bước dựng. Chữ của nhà thiết kế (Font gốc, ảnh) và chữ đã khóa giữ nguyên.
 function spreadLabEdit(char, previous) {
   const key = char.normalize('NFD'), isMark = toneSamples.has(char), HORN = '̛';
-  const free = c => (!glyphs.get(c) || glyphs.get(c).source === 'Ghép dấu') && !glyphs.get(c)?.locked;
+  // Chữ có dấu mang nhãn Font gốc trong bản Việt hóa (XFVN, "Việt hóa") hay font người dùng tự dựng là chữ Xưởng ghép
+  // trước khi lưu, không phải nét nhà thiết kế: cũng ghép lại theo dấu vừa sửa (lỗi 27/11/2026: sửa hỏi ở ở, Ở không đổi).
+  const vietnamized = !!importedMetrics?.ownFont || /^XFVN - |Việt hóa/i.test($('name').value);
+  const ours = glyph => glyph.source === 'Ghép dấu' || (vietnamized && glyph.source === 'Font gốc' && [...glyph.char.normalize('NFD')].length > 1);
+  const free = c => (!glyphs.get(c) || ours(glyphs.get(c))) && !glyphs.get(c)?.locked && !glyphs.get(c)?.manualEdit;
   const related = new Set(charset.filter(c => c !== char && (isMark ? c.normalize('NFD').includes(char) : c.normalize('NFD').startsWith(key)) && free(c)));
   // Sửa râu ở ơ/ư/Ơ/Ư: tách râu vừa vẽ làm râu mẫu chung cho cả bốn chữ (skill: ư ơ cùng một nét râu), rồi ghép lại
   // mọi chữ có râu dùng râu mẫu đó.

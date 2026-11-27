@@ -236,5 +236,36 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
     assert.equal(tone.length, 1, 'Times Italic: ở phải tách đúng một dấu hỏi, tách được ' + tone.length);
     done.push('râu sửa tay lan sang chữ khác giữ đường cong, dấu hỏi chữ nghiêng tách đúng');
   }
+  // 10. Dấu hỏi dựng từ nét đi theo kiểu nét của font (lỗi 27/11/2026, Migra): font thanh-đậm thì hỏi cũng thanh-đậm
+  // theo trục nét của o (mảnh/đậm ≈ độ tương phản), font nét đều/sans giữ gần đều. Đo bề dày dấu ở mọi điểm viền
+  // (khoảng tới phía viền đối diện), lấy mức 10% / 90%.
+  {
+    const spread = d => {
+      const pts = []; svgpath(d).abs().iterate(seg => { if (seg.length >= 3) pts.push([seg[seg.length - 2], seg[seg.length - 1]]); });
+      const n = pts.length, w = [];
+      for (let i = 0; i < n; i++) {
+        let m = Infinity;
+        for (let j = 0; j < n; j++) {
+          if (Math.min(Math.abs(i - j), n - Math.abs(i - j)) < n / 6) continue;
+          const a = pts[j], b = pts[(j + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+          const u = Math.max(0, Math.min(1, ((pts[i][0] - a[0]) * dx + (pts[i][1] - a[1]) * dy) / L));
+          m = Math.min(m, Math.hypot(pts[i][0] - a[0] - u * dx, pts[i][1] - a[1] - u * dy));
+        }
+        w.push(m);
+      }
+      w.sort((a, b) => a - b); return w[Math.floor(n * .1)] / w[Math.floor(n * .9)];
+    };
+    const migra = path.join(require('node:os').homedir(), 'Downloads/Migra - Free for Personal Use/Migra-Extralight.ttf');
+    const checked = [];
+    for (const [name, file, contrasty] of [['Times', 'C:/Windows/Fonts/times.ttf', true], ['Migra Extralight', migra, true], ['Arial', 'C:/Windows/Fonts/arial.ttf', false]]) {
+      if (!fs.existsSync(file)) continue;
+      const g = glyphMap(parse(fs.readFileSync(file)), 'Font gốc'), contrast = strokeContrast(g);
+      const derived = deriveMarkSamples(g), hook = (derived.marks || derived).get('̉'), ratio = spread(hook.d);
+      if (contrasty) assert.ok(ratio <= contrast + .15, `${name}: dấu hỏi dựng phải thanh-đậm theo nét font (mảnh/đậm ${ratio.toFixed(2)}, tương phản o ${contrast.toFixed(2)})`);
+      else assert.ok(ratio >= .6, `${name}: font nét gần đều thì dấu hỏi dựng gần đều (mảnh/đậm ${ratio.toFixed(2)})`);
+      checked.push(name + ' ' + ratio.toFixed(2));
+    }
+    done.push('dấu hỏi dựng theo kiểu nét (' + checked.join(', ') + ')');
+  }
   console.log('PASS: bảng quy tắc skill —', done.join('; '));
 })().catch(error => { console.error(error); process.exit(1); });
