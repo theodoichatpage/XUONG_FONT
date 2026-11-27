@@ -71,6 +71,17 @@ export function markPlacement(map, { ours = glyph => glyph?.source === 'Ghép d�
       const y0 = Math.min(...list.map(p => p.b.y)), y1 = Math.max(...list.map(p => p.b.y + p.b.height));
       return { gap: y0 - top, h: y1 - y0, w: x1 - x0, cx: (x0 + x1) / 2 };
     };
+    // Thân (cả râu ơ ư, mũ â ê ô, trăng ă) phải đúng chữ gốc hiện có: chữ ghép từ bản cũ (ghép trước khi râu, mũ đổi)
+    // không còn chứa nguyên nét chữ gốc. Lỗi 27/11/2026 (Migra Extrabold Italic): sửa dấu hỏi thì Ở ghép lại theo râu
+    // mới, Ỡ vẫn giữ râu cũ, râu cái được cái không.
+    const round = d => svgpath(d).abs().round(0).toString().split(/(?=M)/).map(p => p.trim()).filter(Boolean);
+    if (root !== 'i' && root !== 'j') {
+      const has = new Set(round(map.get(rule.char).d)), shell = round(base.d);
+      if (shell.length && !shell.every(part => has.has(part)) && round(rule.d).length && shell.every(part => new Set(round(rule.d)).has(part))) {
+        out.push({ char: rule.char, measure: 'thân/râu khác ' + baseChar + ' hiện có', target: 'đúng nét ' + baseChar, locked: !!map.get(rule.char).locked });
+        continue;
+      }
+    }
     const now = markBox(map.get(rule.char).d), want = markBox(rule.d);
     if (!now || !want) continue;
     const wrong = [];

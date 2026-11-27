@@ -38,6 +38,7 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 | Font Lab: Dựng lại dấu theo quy tắc trên ô dấu mẫu đưa dấu sửa tay về dấu dựng (không khóa) và thay ở mọi chữ | workflow Sửa tay trong Font Lab | Có (27/11/2026); thử trên trình duyệt |
 | Tạo dấu tiếng Việt dựng lại dấu mẫu Xưởng đã dựng (chưa khóa, chưa duyệt) theo quy tắc hiện hành trước khi ghép, cả khi dự án đã có dấu mẫu | workflow Bộ sưu tập và bản Việt hóa | Có (27/11/2026); thử trên trình duyệt |
 | Hoàn thiện soát khoảng hở, cỡ, vị trí dấu của từng chữ có dấu theo quy tắc ghép: chữ ghép lệch thì ghép lại, chữ sửa tay thì báo | workflow Hoàn thiện 3b; `mark-place` trong rule-check.js | Tự sửa / Báo (27/11/2026); check:rules mục 11 |
+| Chữ có dấu chứa nguyên nét chữ gốc hiện có (râu, mũ, trăng đồng bộ); lệch thì ghép lại ngay sau khi lan dấu sửa tay và khi Hoàn thiện | workflow Sửa tay trong Font Lab, Hoàn thiện 3b; `mark-place` | Tự sửa / Báo (27/11/2026); check:rules mục 11 |
 | Nặng tránh đuôi y; ị phân biệt chấm i và nặng | design-rules mục 9, bảng chi tiết | Có |
 | Chữ nghiêng: dấu nghiêng theo chữ, dịch theo trục | mark-standards Chữ nghiêng | Có |
 | Font toàn chữ hoa: x-height quy đổi, chấm theo chuẩn hoa | mark-standards Font toàn chữ hoa | Có; check:rules (UTM Bebas) |
