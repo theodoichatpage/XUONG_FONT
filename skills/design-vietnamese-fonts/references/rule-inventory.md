@@ -33,6 +33,8 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 | Râu: độ vươn, độ cao đầu, chỗ nối, advance lấn lề phải | mark-standards Râu ơ ư | Có; check:rules, compare-horn-spacing |
 | Sửa tay một chữ trong Font Lab lan sang chữ liên quan: râu contour riêng lấy nguyên đường cong, dấu tách theo diện tích chồng (chữ nghiêng), lưu không bị chặn | workflow Sửa tay trong Font Lab | Có (26/11/2026); check:rules mục 9 |
 | Dấu hỏi, ngã dựng từ nét dày mỏng theo trục nét của chính font (nét thanh-đậm như e s g o) | mark-standards Nét đều hay nét thanh-đậm | Có (27/11/2026); check:rules mục 10, check:marks |
+| Tạo dấu tiếng Việt dựng lại dấu mẫu Xưởng đã dựng (chưa khóa, chưa duyệt) theo quy tắc hiện hành trước khi ghép, cả khi dự án đã có dấu mẫu | workflow Bộ sưu tập và bản Việt hóa | Có (27/11/2026); thử trên trình duyệt |
+| Hoàn thiện soát khoảng hở, cỡ, vị trí dấu của từng chữ có dấu theo quy tắc ghép: chữ ghép lệch thì ghép lại, chữ sửa tay thì báo | workflow Hoàn thiện 3b; `mark-place` trong rule-check.js | Tự sửa / Báo (27/11/2026); check:rules mục 11 |
 | Nặng tránh đuôi y; ị phân biệt chấm i và nặng | design-rules mục 9, bảng chi tiết | Có |
 | Chữ nghiêng: dấu nghiêng theo chữ, dịch theo trục | mark-standards Chữ nghiêng | Có |
 | Font toàn chữ hoa: x-height quy đổi, chấm theo chuẩn hoa | mark-standards Font toàn chữ hoa | Có; check:rules (UTM Bebas) |
@@ -68,7 +70,7 @@ Soát lần cuối: 25/11/2026. Mỗi dòng: quy tắc, nơi Xưởng thực hi�
 
 ## 6. Còn thiếu hoặc chỉ là hướng dẫn
 
-- **Hòa hợp cho dấu hỏi, ngã:** mới theo độ thon của tương phản; chưa gắn đầu nét giọt nước/vuốt nhọn như râu.
+- **Hòa hợp cho dấu hỏi, ngã:** đã dày mỏng theo trục nét của font (27/11/2026); chưa gắn đầu nét giọt nước/mũi vát như râu.
 - **Chữ viết nối nét** (u, o có nét nối chìa lên phải): râu dựng vẫn bám vào nét nối; cần ảnh mẫu ư/ơ.
 - **Cặp râu Ư Ơ hoa:** không chấm (font chuẩn không thống nhất).
 - **Thu nét theo tỷ lệ độ dày tại chỗ** (Light/Thin thật cho font hẹp): chưa có (SKILL.md Tạo family).

@@ -5,7 +5,7 @@
 import ClipperLib from 'clipper-lib';
 import svgpath from 'svgpath';
 import { glyphBounds } from './glyph-review.js';
-import { measureStem, charset, rightEdgeAt } from './vietnamese.js';
+import { measureStem, charset, rightEdgeAt, accented, composeVietnamese } from './vietnamese.js';
 import { normalizeHeights, normalizePunctuation, normalizeDotBelow } from './font-heights.js';
 import { placePunctuation } from './punctuation-rules.js';
 import { outlineDefects } from './outline-quality.js';
@@ -40,6 +40,46 @@ export function hornFootOffset(glyph, map, stem) {
   for (let n = 0; n <= 12; n++) { const x = rightEdgeAt(base.d, top - 2 - box.height * .2 * n / 12); if (x !== null) edge = Math.max(edge, x); }
   const offset = edge - hornLeft;
   return Number.isFinite(offset) && offset > .6 * stem ? offset : 0;
+}
+
+// Khoảng hở, cỡ, vị trí dấu của từng chữ có dấu so với chính quy tắc ghép của skill (mark-standards.md): ghép lại chữ đó
+// bằng dấu mẫu và chữ gốc hiện có rồi so phần dấu (contour không có trong chữ gốc). Soát mọi chữ, không chỉ chữ đại diện:
+// sau khi sửa tay dấu mẫu hay chữ gốc, chữ ghép từ bản cũ và chữ sửa tay đặt dấu lệch đều lộ ra (người dùng 27/11/2026:
+// Hoàn thiện phải soát lại khoảng cách, kích thước, vị trí dấu của mọi chữ). ours(glyph): chữ thuộc phạm vi soát.
+export function markPlacement(map, { ours = glyph => glyph?.source === 'Ghép dấu' || !!glyph?.locked } = {}) {
+  const targets = new Set(accented.filter(char => map.get(char)?.d && ours(map.get(char))));
+  if (!targets.size) return null;
+  let made;
+  try { made = composeVietnamese(map, char => targets.has(char), { requireReferenceMarks: [...map.values()].some(g => g?.origin === 'direct') }); }
+  catch { return null; }
+  const key = b => [b.x, b.y, b.width, b.height].map(v => Math.round(v)).join(',');
+  const xH = (b => b ? b.y + b.height : 500)(map.get('x')?.d ? glyphBounds(map.get('x')) : null);
+  const out = [];
+  for (const rule of made) {
+    if (!targets.has(rule.char)) continue;
+    const [root, ...marks] = rule.char.normalize('NFD');
+    if (marks.includes('̣') && marks.length === 1) continue;   // dấu nặng: quy tắc dot-below
+    const baseChar = marks.includes('̛') ? (root + '̛').normalize('NFC') : root;
+    const base = map.get(baseChar)?.d ? map.get(baseChar) : map.get(root);
+    if (!base?.d) continue;
+    const own = new Set(parts(base.d).map(p => key(p.b)));
+    const top = (b => b.y + b.height)(glyphBounds(base));
+    const markBox = d => {
+      const list = parts(d).filter(p => !own.has(key(p.b)) && p.b.y + p.b.height > top - 2);
+      if (!list.length) return null;
+      const x0 = Math.min(...list.map(p => p.b.x)), x1 = Math.max(...list.map(p => p.b.x + p.b.width));
+      const y0 = Math.min(...list.map(p => p.b.y)), y1 = Math.max(...list.map(p => p.b.y + p.b.height));
+      return { gap: y0 - top, h: y1 - y0, w: x1 - x0, cx: (x0 + x1) / 2 };
+    };
+    const now = markBox(map.get(rule.char).d), want = markBox(rule.d);
+    if (!now || !want) continue;
+    const wrong = [];
+    if (Math.abs(now.gap - want.gap) > Math.max(6, .03 * xH)) wrong.push(`khoảng hở ${Math.round(now.gap)} (quy tắc ${Math.round(want.gap)})`);
+    if (Math.abs(now.h / want.h - 1) > .15 || Math.abs(now.w / want.w - 1) > .15) wrong.push(`cỡ ${Math.round(now.w)}×${Math.round(now.h)} (quy tắc ${Math.round(want.w)}×${Math.round(want.h)})`);
+    if (Math.abs(now.cx - want.cx) > Math.max(8, .06 * xH)) wrong.push(`lệch ngang ${Math.round(now.cx - want.cx)}`);
+    if (wrong.length) out.push({ char: rule.char, measure: wrong.join(', '), target: 'theo quy tắc ghép', locked: !!map.get(rule.char).locked });
+  }
+  return out;
 }
 
 // Mỗi quy tắc: id, mô tả ngắn, mục skill, hàm đo trả về danh sách chữ lệch kèm số đo.
@@ -135,15 +175,17 @@ export const RULES = [
       if (!audit?.checked) return null;
       return audit.issues.map(issue => ({ char: issue.char, measure: issue.text, target: 'chuẩn' }));
     } },
+  { id: 'mark-place', text: 'Dấu từng chữ đúng khoảng hở, cỡ, vị trí theo quy tắc ghép', skill: 'references/mark-standards.md',
+    check(map, ctx) { return markPlacement(map, ctx.marksOf ? { ours: ctx.marksOf } : undefined); } },
   { id: 'coverage', text: 'Đủ bộ ký tự', skill: 'references/checking-coverage.md',
     check(map) { return charset.filter(char => !map.get(char)?.d).map(char => ({ char, measure: 'thiếu', target: 'có' })); } },
 ];
 
 // Đối chiếu toàn bộ bảng quy tắc. editable: chữ được phép sửa (nét dò ảnh, chữ suy luận, font người dùng tự dựng).
-export function checkRules(map, { editable = glyph => glyph?.source !== 'Font gốc' } = {}) {
+export function checkRules(map, { editable = glyph => glyph?.source !== 'Font gốc', marksOf } = {}) {
   let stem = 0; try { stem = measureStem(map) || 0; } catch { /* chưa đo được */ }
   const period = map.get('.')?.d ? (b => Math.max(b.width, b.height))(glyphBounds(map.get('.'))) : 0;
-  const ctx = { stem, dot: iDotWidth(map) || stem, period, capTop: capTopOf(map), editable };
+  const ctx = { stem, dot: iDotWidth(map) || stem, period, capTop: capTopOf(map), editable, marksOf };
   const rows = RULES.map(rule => {
     let issues = null;
     try { issues = rule.check(map, ctx); } catch { issues = null; }

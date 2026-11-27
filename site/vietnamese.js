@@ -87,6 +87,9 @@ const isReal = glyph => !!glyph?.d && (glyph.locked || glyph.origin === 'direct'
 // (ã õ ñ ũ..., chữ hoa Ã Õ Ñ Ũ...). Bỏ qua khối chữ tiếng Việt U+1EA0–1EF9 và ơ ư: trong font đã Việt hóa rồi
 // lưu lại, các chữ đó có thể do Xưởng ghép, nên lấy chúng làm mẫu sẽ làm dấu không đồng nhất (ễ khác Ữ).
 const DONOR_ROOTS = 'aoeuiynAOEUIYN';
+// Chữ có thể do Xưởng ghép khi font đã Việt hóa rồi mở lại (nhãn Font gốc): khối U+1EA0–1EF9 và ơ ư Ơ Ư. Chữ Latin có
+// dấu khác (á à ã â ă ê…) là nét nhà thiết kế, giữ nguyên (mark-standards.md, Dấu font đã có).
+export const mayBeXuongMade = char => { const code = char.codePointAt(0); return code >= 0x1EA0 && code <= 0x1EF9 || 'ơưƠƯ'.includes(char); };
 function designerMark(glyphs, mark, capital, cache) {
   const key = mark + (capital ? 'C' : 'c');
   if (cache.has(key)) return cache.get(key);
@@ -96,7 +99,7 @@ function designerMark(glyphs, mark, capital, cache) {
     for (const glyph of glyphs.values()) {
       if (glyph.source !== 'Font gốc' || !glyph.d || !glyph.char) continue;
       const code = glyph.char.codePointAt(0);
-      if (code >= 0x1EA0 && code <= 0x1EF9) continue;
+      if (mayBeXuongMade(glyph.char)) continue;
       const [root, ...marks] = glyph.char.normalize('NFD');
       if (marks.length !== 1 || marks[0] !== mark || (root !== root.toLowerCase()) !== capital || !glyphs.get(root)?.d) continue;
       const rank = DONOR_ROOTS.indexOf(root);
