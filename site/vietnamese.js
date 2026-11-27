@@ -467,6 +467,36 @@ function stemThickness(d) {
 }
 // Độ tương phản nét: nét ngang mảnh nhất ở đỉnh/đáy chữ o chia nét đứng dày nhất ở hai bên.
 // Nét đều (Courier, Poppins) ≈ 0.9–1; sans thường 0.7–0.85; nét thanh-đậm (Times, Palatino) 0.2–0.35.
+// Trục nét: hướng nét ở chỗ mảnh nhất của o (đo như strokeContrast). Bút nét thanh-đậm vẽ mảnh khi đi theo hướng này,
+// đậm khi đi vuông góc; dấu dựng từ nét (hỏi, ngã) theo đúng trục đó (mark-standards.md, Kiểu đầu nét: góc nét của
+// chính font). Trả về góc (radian, trục y lên) hoặc null khi không đo được.
+export function strokeAxis(glyphs) {
+  const glyph = glyphs.get('o') || glyphs.get('O');
+  if (!glyph?.d) return null;
+  const contours = flattenOutline(glyph.d).filter(c => c.length >= 3);
+  const area = c => c.reduce((sum, p, i) => { const q = c[(i + 1) % c.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+  const [outer, inner] = [...contours].sort((a, b) => Math.abs(area(b)) - Math.abs(area(a)));
+  if (!outer || !inner) return null;
+  const distance = p => {
+    let d = Infinity;
+    for (let i = 0; i < outer.length; i++) {
+      const a = outer[i], b = outer[(i + 1) % outer.length], dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / length));
+      d = Math.min(d, Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy));
+    }
+    return d;
+  };
+  // Làm mượt theo vài điểm lân cận để mẩu gấp khúc của viền không quyết định hướng.
+  const widths = inner.map(distance), n = inner.length;
+  let best = 0, bestValue = Infinity;
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let k = -2; k <= 2; k++) sum += widths[(i + k + n) % n];
+    if (sum < bestValue) { bestValue = sum; best = i; }
+  }
+  const a = inner[(best - 3 + n) % n], b = inner[(best + 3) % n];
+  return Math.atan2(b[1] - a[1], b[0] - a[0]);
+}
 export function strokeContrast(glyphs) {
   // Độ tương phản = bề dày mảnh nhất / dày nhất của nét o, đo theo pháp tuyến của nét (khoảng cách từ mỗi điểm viền
   // trong tới viền ngoài), không chỉ cắt dọc/ngang ở giữa: font có trục nét nghiêng (Migra, chỗ mảnh nhất ở góc ~−57°)
@@ -602,6 +632,28 @@ export function deriveMarkSamples(glyphs) {
   // Courier 0.98 → 1.0, Segoe 0.82 → 0.83, Times 0.33 → 0.32. Font nét đều cho dấu nét đều, font thanh-đậm cho dấu thon.
   const taper = Math.max(.2, Math.min(1, 1.1 * contrast - .1)), highContrast = contrast < .5;
   const t = STROKE_PER_MEASURED * STD.thickness(stem);
+  // Nét cong của dấu (hỏi, ngã) dày mỏng theo trục nét của chính font như chữ e s g o: đi theo hướng mảnh nhất của o
+  // thì bằng nét mảnh (tương phản × nét đậm), vuông góc thì bằng nét đậm. Font nét đều (tương phản ~1) giữ nét đều.
+  // Lỗi cũ (27/11/2026, Migra): hỏi chỉ thon ở đầu móc, còn lại dày đều nên lạc kiểu giữa chữ thanh-đậm.
+  const axis = strokeAxis(glyphs);
+  const pen = (points, thick, floor = .12) => {
+    const thin = Math.max(floor, contrast) * thick;
+    const raw = points.map((point, i) => {
+      if (axis == null || contrast > .9) return thick;
+      const a = points[Math.max(0, i - 2)], b = points[Math.min(points.length - 1, i + 2)];
+      return thin + (thick - thin) * Math.abs(Math.sin(Math.atan2(b[1] - a[1], b[0] - a[0]) - axis));
+    });
+    // Dày mỏng đổi dần như nét bút, không đổi gấp giữa hai điểm (đổi gấp làm viền khấc ở chỗ uốn).
+    const reach = Math.max(1, Math.round(points.length / 8));
+    const smooth = raw.map((_, i) => {
+      let sum = 0, count = 0;
+      for (let k = -reach; k <= reach; k++) { const j = i + k; if (j < 0 || j >= raw.length) continue; sum += raw[j]; count++; }
+      return sum / count;
+    });
+    // Chỗ đậm nhất vẫn bằng nét đậm của dấu (làm mượt không được làm dấu nhẹ đi), chỗ mảnh không dưới nét mảnh.
+    const low = Math.min(...smooth), high = Math.max(...smooth);
+    return smooth.map(w => high - low < 1e-6 ? thick : thin + (thick - thin) * (w - low) / (high - low));
+  };
   const H = key => STD.height[key][0] * xH, W = key => STD.width[key][0] * oW;
   const marks = new Map();
   const add = (mark, d) => marks.set(mark, { char: mark, d, advance: 0, source: 'Dựng từ nét chữ', origin: 'inferred',
@@ -640,10 +692,14 @@ export function deriveMarkSamples(glyphs) {
   const tildeT = .9 * t, waveW = Math.max(W('tilde') - .3 * tildeT, 3 * tildeT), waveSpan = 2.5 * Math.PI;
   const curvature = (waveSpan / waveW) ** 2;
   const amplitude = Math.max(.15 * tildeT, Math.min((H('tilde') - tildeT) / 2, 1 / (curvature * .62 * tildeT)));
-  add('̃', strokeAlong(Array.from({ length: 49 }, (_, i) => {
+  const wave = Array.from({ length: 49 }, (_, i) => {
     const phase = -.25 * Math.PI + waveSpan * i / 48;
     return [-waveW / 2 + waveW * i / 48, amplitude * Math.sin(phase)];
-  }), s => { const end = highContrast ? .5 : .86; return tildeT * (end + (1 - end) * Math.sin(Math.PI * s)); }));
+  });
+  // Ngã font thanh-đậm: hai đầu mảnh 0.54–0.74 giữa (bảng trên), nên trục nét chỉ đổi dày mỏng vừa phải (sàn 0.6).
+  const tildePen = highContrast ? pen(wave, 1.1 * tildeT, .6) : null;
+  add('̃', strokeAlong(wave, s => { const end = highContrast ? .5 : .86, ends = end + (1 - end) * Math.sin(Math.PI * s);
+    return tildePen ? Math.min(tildePen[Math.round(s * 48)], 1.1 * tildeT * ends) : tildeT * ends; }));
 
   // Hỏi: móc gọn, lòng mở, khác dấu chấm hỏi (skill). Đầu móc thon, cung tròn đều, cuối cung uốn mềm về giữa
   // rồi thành chân ngắn thẳng đứng, đầu chân cắt ngang. Nét nhẹ hơn thân chữ.
@@ -664,7 +720,12 @@ export function deriveMarkSamples(glyphs) {
   });
   const hookPath = [...hookArc, ...hookBend, [0, 0]];
   const hookStart = Math.max(.45, Math.min(1, taper * .9));   // đầu móc: nét đều gần bằng thân, thanh-đậm thon nhọn
-  add('̉', strokeAlong(hookPath, s => hookT * (hookStart + (1 - hookStart) * Math.min(1, s * 3))));
+  // Thanh-đậm: dày mỏng theo trục nét (đầu móc đi lên theo hướng mảnh, lưng phải đi xuống đậm như lưng s, g),
+  // đầu móc vuốt về nét mảnh của font.
+  const hookPen = highContrast ? pen(hookPath, hookT) : null;
+  add('̉', strokeAlong(hookPath, s => hookPen
+    ? hookPen[Math.round(s * (hookPath.length - 1))] * (hookStart + (1 - hookStart) * Math.min(1, s * 4))
+    : hookT * (hookStart + (1 - hookStart) * Math.min(1, s * 3))));
 
   // Nặng: dùng đúng dấu chấm của bộ chữ nếu có.
   // Hình dấu nặng: dấu chấm thật của font trước, rồi chấm chữ i, cuối cùng mới tới dấu chấm do Xưởng tự dựng
