@@ -483,7 +483,6 @@ function spreadLabEdit(char, previous) {
     Map.prototype.set.call(glyphs, c, { ...current, d: [...body, ...newMarks].join(' '), version: (current.version || 0) + 1, proof: undefined });
     swapped.push(c);
   }
-  if (!related.size) return swapped;
   const made = composeVietnamese(glyphs, c => related.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }).filter(g => related.has(g.char));
   for (const glyph of made) glyphs.set(glyph.char, glyph);
   // Chữ ghép không dựng lại được (dấu thanh mẫu không thuộc nguồn được dùng để ghép, ví dụ dấu hỏi của ở, ử): giữ nguyên
@@ -501,6 +500,15 @@ function spreadLabEdit(char, previous) {
     if (!tone.length) continue;
     glyphs.set(c, { ...current, d: fresh.d + ' ' + tone.join(' '), advance: fresh.advance, version: (current.version || 0) + 1, proof: undefined });
     done.add(c);
+  }
+  // Soát cả bộ sau khi lan: chữ Xưởng ghép mà thân/râu không còn đúng chữ gốc hiện có, hay dấu lệch khoảng hở, cỡ, vị trí
+  // theo quy tắc (ghép từ bản cũ trước khi râu, dấu mẫu đổi) thì ghép lại luôn, để mọi chữ cùng một râu, một dấu
+  // (lỗi 27/11/2026: Ở ghép lại theo râu mới, Ỡ vẫn râu cũ).
+  const stale = (markPlacement(glyphs, { ours: glyph => !!glyph && free(glyph.char) }) || []).filter(issue => !issue.locked && !done.has(issue.char)).map(issue => issue.char);
+  if (stale.length) {
+    const fix = new Set(stale);
+    for (const glyph of composeVietnamese(glyphs, c => fix.has(c), { requireReferenceMarks: [...glyphs.values()].some(g => g.origin === 'direct') }))
+      if (fix.has(glyph.char)) { glyphs.set(glyph.char, glyph); done.add(glyph.char); }
   }
   if (done.size) enforceRules([...done]);
   return [...done, ...swapped];

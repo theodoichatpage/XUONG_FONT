@@ -295,7 +295,15 @@ const record = (name, buf) => ({ id: 1, name, filename: name + '.ttf', blob: { a
       g.set(char, { ...glyph, d, ...extra });
     };
     lift('ỏ', 60, {}); lift('ể', 45, { locked: true, manualEdit: { time: 'test' } });
+    // ờ giữ râu cũ (râu khác ơ hiện có) — lỗi 27/11/2026, Migra Extrabold Italic: Ở râu mới, Ỡ râu cũ.
+    {
+      const split = d => svgpath(d).abs().toString().split(/(?=M)/).filter(p => p.trim());
+      const oParts = new Set(split(g.get('o').d).map(p => svgpath(p).round(0).toString())), hornOf = new Set(split(g.get('ơ').d).filter(p => !oParts.has(svgpath(p).round(0).toString())));
+      const glyph = g.get('ờ');
+      g.set('ờ', { ...glyph, d: split(glyph.d).map(p => hornOf.has(p) ? svgpath(p).translate(18, 10).toString() : p).join(' ') });
+    }
     const found = new Map(markPlacement(g).map(issue => [issue.char, issue]));
+    assert.ok(found.get('ờ') && /thân\/râu/.test(found.get('ờ').measure), 'Times: ờ còn râu cũ (khác ơ) phải bị báo để ghép lại, báo: ' + (found.get('ờ')?.measure || 'không'));
     assert.ok(found.get('ỏ') && !found.get('ỏ').locked, 'Times: ỏ dời dấu 60 phải bị báo để ghép lại');
     assert.ok(found.get('ể')?.locked, 'Times: ể sửa tay lệch dấu phải được báo là chữ sửa tay');
     // Dấu sửa ở chữ hai tầng có cỡ theo quy tắc hai tầng × độ thu cho vừa dòng: chia lại để ra dấu mẫu đúng cỡ.
